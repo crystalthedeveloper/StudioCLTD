@@ -8,7 +8,7 @@ import {
 import { useTexture } from "@react-three/drei";
 
 export function SpaceSky() {
-  const venusTexture = useTexture("/images/2k_venus_surface.jpg");
+  const venusTexture = useTexture("/images/8k_venus_surface.jpg");
   const skyTexture = useTexture("/images/8k_stars_milky_way.jpg");
   const scene = useThree((state) => state.scene);
   venusTexture.colorSpace = SRGBColorSpace;
@@ -28,7 +28,6 @@ export function SpaceSky() {
         <sphereGeometry args={[5000, 128, 96]} />
         <meshBasicMaterial
           map={skyTexture}
-          color={new Color(1.75, 1.85, 2.05)}
           side={BackSide}
           depthWrite={false}
           depthTest={false}

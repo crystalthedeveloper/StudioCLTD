@@ -7,6 +7,7 @@ import { ThirdPersonCamera } from "./ThirdPersonCamera";
 import { CharacterAnimationState } from "./playerTypes";
 import { useKeyboardControls } from "./useKeyboardControls";
 import { markPlayerRotationUpdate } from "../debug/controllerDebug";
+import { playerWorldState } from "../world/playerWorldState";
 
 const moveDirection = new Vector3();
 const facingDirection = new Vector3();
@@ -46,9 +47,10 @@ export function CharacterController() {
 
     const velocity = body.linvel();
     const translation = body.translation();
+    playerWorldState.position.set(translation.x, translation.y, translation.z);
     const groundHeight = getGroundHeight(translation.x, translation.z);
     const grounded = translation.y <= groundHeight + 1.13 && velocity.y <= 0.75;
-    const speed = controls.run ? 8.2 : 4.6;
+    const speed = controls.run ? 13.2 : 6.1;
     const turnSpeed = controls.run ? 2.85 : 2.35;
 
     const turnInput = Number(controls.left) - Number(controls.right);
@@ -124,6 +126,7 @@ export function CharacterController() {
       />
       <RigidBody
         ref={bodyRef}
+        name="StudioCLTDPlayer"
         colliders={false}
         position={spawn}
         enabledRotations={[false, false, false]}

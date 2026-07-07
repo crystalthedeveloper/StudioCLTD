@@ -14,11 +14,11 @@ function createPanelTexture() {
 
   ctx.fillStyle = "#171c26";
   ctx.fillRect(0, 0, 512, 512);
-  ctx.strokeStyle = "#4a5061";
-  ctx.lineWidth = 8;
+  ctx.strokeStyle = "rgba(232, 238, 248, 0.34)";
+  ctx.lineWidth = 3;
   ctx.strokeRect(10, 10, 492, 492);
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "#6b768d";
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(232, 238, 248, 0.22)";
 
   for (let i = 0; i <= 512; i += 128) {
     ctx.beginPath();
@@ -31,7 +31,7 @@ function createPanelTexture() {
     ctx.stroke();
   }
 
-  ctx.fillStyle = "#45ecff";
+  ctx.fillStyle = "rgba(246, 248, 252, 0.24)";
   for (let i = 0; i < 18; i += 1) {
     const x = 38 + ((i * 83) % 438);
     const y = 42 + ((i * 137) % 420);
@@ -85,25 +85,10 @@ export function ModularTerrain({ radius }: ModularTerrainProps) {
           </mesh>
           <mesh rotation-x={-Math.PI / 2} position={[0, 0.1, 0]}>
             <ringGeometry args={[2.65, 2.72, 4]} />
-            <meshBasicMaterial color="#4cf4ff" transparent opacity={0.08} />
+            <meshBasicMaterial color="#f5f7fb" transparent opacity={0.045} />
           </mesh>
         </group>
       ))}
-      <mesh position={[28, 1.1, -18]} receiveShadow castShadow>
-        <boxGeometry args={[24, 2, 14]} />
-        <meshStandardMaterial color="#303848" roughness={0.24} metalness={0.82} />
-      </mesh>
-      <CuboidCollider position={[28, 1.1, -18]} args={[12, 1, 7]} />
-      <mesh position={[-34, 0.8, 24]} receiveShadow castShadow>
-        <boxGeometry args={[18, 1.4, 22]} />
-        <meshStandardMaterial color="#2d3545" roughness={0.24} metalness={0.82} />
-      </mesh>
-      <CuboidCollider position={[-34, 0.8, 24]} args={[9, 0.7, 11]} />
-      <mesh position={[5, 1.65, -43]} receiveShadow castShadow>
-        <boxGeometry args={[34, 3.1, 12]} />
-        <meshStandardMaterial color="#333c4d" roughness={0.23} metalness={0.82} />
-      </mesh>
-      <CuboidCollider position={[5, 1.65, -43]} args={[17, 1.55, 6]} />
     </group>
   );
 }

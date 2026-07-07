@@ -3,7 +3,6 @@ import { useFrame } from "@react-three/fiber";
 import { MutableRefObject, useEffect, useRef } from "react";
 import { Group, Mesh } from "three";
 import { CharacterAnimationState } from "./playerTypes";
-import { markPlayerRotationUpdate } from "../debug/controllerDebug";
 
 type PlayerCharacterProps = {
   animationState: CharacterAnimationState;
@@ -34,7 +33,6 @@ export function PlayerCharacter({ animationState, yawRef }: PlayerCharacterProps
     const airborne = animationState === "jump" || animationState === "fall";
     const stride = animationState === "run" ? 13 : 8;
 
-    markPlayerRotationUpdate(Math.floor(clock.elapsedTime * 60), "PlayerCharacter");
     group.current.rotation.y = yawRef.current;
     group.current.position.y = moving ? Math.abs(Math.sin(t * stride)) * 0.035 - 1.05 : -1.05;
     group.current.rotation.z = moving ? Math.sin(t * stride) * 0.025 : 0;

@@ -28,8 +28,8 @@ const cameraSettings = {
   height: 1.0,
   targetHeight: 1.25,
   pitch: -0.22,
-  minPitch: -0.72,
-  maxPitch: 0.28,
+  minPitch: MathUtils.degToRad(-35),
+  maxPitch: MathUtils.degToRad(55),
   sensitivity: 0.0021,
   positionLerp: 0.11,
   rotationLerp: 0.12,
@@ -39,8 +39,12 @@ const cameraSettings = {
 const cameraTarget = new Vector3();
 const desiredPosition = new Vector3();
 const collisionDirection = new Vector3();
+const lookDirection = new Vector3();
 const lookAt = new Vector3();
 const smoothedLookAt = new Vector3();
+const worldUp = new Vector3(0, 1, 0);
+const rollTolerance = 0.0005;
+const pitchTolerance = 0.0005;
 
 export function ThirdPersonCamera({
   animationStateRef,
@@ -59,6 +63,8 @@ export function ThirdPersonCamera({
   const smoothedPitchRef = useRef(cameraSettings.pitch);
   const smoothedDistanceRef = useRef(cameraSettings.distance);
   const hasCameraStateRef = useRef(false);
+  const lastRollWarningRef = useRef(0);
+  const lastRotationLogRef = useRef(0);
 
   useEffect(() => {
     const canvas = gl.domElement;
@@ -127,6 +133,17 @@ export function ThirdPersonCamera({
 
     const yaw = smoothedYawRef.current;
     const pitch = smoothedPitchRef.current;
+    if (
+      (pitch < cameraSettings.minPitch - pitchTolerance || pitch > cameraSettings.maxPitch + pitchTolerance) &&
+      performance.now() - lastRollWarningRef.current > 250
+    ) {
+      lastRollWarningRef.current = performance.now();
+      console.warn("[StudioCLTD camera debug] Camera pitch outside clamp", {
+        maxPitch: cameraSettings.maxPitch,
+        minPitch: cameraSettings.minPitch,
+        pitch,
+      });
+    }
     const cameraDistance = smoothedDistanceRef.current;
     const horizontalDistance = Math.cos(pitch) * cameraDistance;
     const verticalOffset = cameraSettings.height + Math.sin(pitch) * cameraDistance;
@@ -155,11 +172,34 @@ export function ThirdPersonCamera({
 
     const frameScale = Math.min(delta * 60, 2);
     const positionSmoothing = 1 - Math.pow(1 - cameraSettings.positionLerp, frameScale);
-    const rotationSmoothing = 1 - Math.pow(1 - cameraSettings.rotationLerp, frameScale);
-
     camera.position.lerp(desiredPosition, positionSmoothing);
-    camera.lookAt(smoothedLookAt);
-    camera.rotation.z = MathUtils.lerp(camera.rotation.z, 0, rotationSmoothing);
+    camera.up.copy(worldUp);
+    lookDirection.copy(smoothedLookAt).sub(camera.position).normalize();
+    const cameraYaw = Math.atan2(-lookDirection.x, -lookDirection.z);
+    const cameraPitch = Math.asin(MathUtils.clamp(lookDirection.y, -1, 1));
+
+    camera.rotation.order = "YXZ";
+    camera.rotation.set(cameraPitch, cameraYaw, 0);
+
+    if (Math.abs(camera.rotation.z) > rollTolerance && performance.now() - lastRollWarningRef.current > 250) {
+      lastRollWarningRef.current = performance.now();
+      console.warn("[StudioCLTD camera debug] Camera roll detected after yaw/pitch solve", {
+        pitch: cameraPitch,
+        roll: camera.rotation.z,
+        yaw: cameraYaw,
+      });
+    }
+    camera.rotation.z = 0;
+    camera.updateMatrixWorld();
+
+    if (performance.now() - lastRotationLogRef.current > 250) {
+      lastRotationLogRef.current = performance.now();
+      console.log("[StudioCLTD camera debug] Camera yaw/pitch/roll", {
+        pitch: cameraPitch,
+        roll: camera.rotation.z,
+        yaw: cameraYaw,
+      });
+    }
 
     logControllerDebug(performance.now(), {
       animationState: animationStateRef.current,
@@ -178,8 +218,8 @@ export function ThirdPersonCamera({
         rotationLerp: cameraSettings.rotationLerp,
       },
       distance: cameraDistance,
-      pitch,
-      yaw,
+      pitch: cameraPitch,
+      yaw: cameraYaw,
     });
   });
 

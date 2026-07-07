@@ -15,3 +15,87 @@ body {
 canvas {
   display: block;
 }
+
+.hub-minimap {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  width: 188px;
+  height: 188px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  pointer-events: none;
+}
+
+.hub-minimap__ring {
+  position: absolute;
+  inset: 20px;
+  border: 1px solid rgba(230, 235, 244, 0.14);
+  border-radius: 50%;
+}
+
+.hub-minimap__section {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 92px;
+  font-size: 9.5px;
+  line-height: 1;
+  color: rgba(242, 245, 250, 0.9);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.18);
+  white-space: nowrap;
+}
+
+.hub-minimap__section span {
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(242, 245, 250, 0.88);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.28);
+}
+
+.hub-minimap__section small {
+  overflow: hidden;
+  color: rgba(235, 238, 244, 0.86);
+  text-overflow: ellipsis;
+}
+
+.hub-minimap__player {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.72);
+  transform: translate(-50%, -50%);
+}
+
+.hub-section-title {
+  position: fixed;
+  left: 50%;
+  top: 28px;
+  transform: translateX(-50%) translateY(-8px);
+  min-width: 220px;
+  padding: 10px 18px;
+  border: 1px solid rgba(255, 216, 145, 0.34);
+  background: rgba(7, 9, 14, 0.72);
+  color: #ffe5b6;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  text-shadow: 0 0 18px rgba(255, 198, 104, 0.6);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.hub-section-title--visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}

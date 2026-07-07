@@ -1,10 +1,23 @@
 import { Text } from "@react-three/drei";
-import { CuboidCollider, IntersectionEnterPayload, IntersectionExitPayload } from "@react-three/rapier";
-import { useFrame } from "@react-three/fiber";
+import { CuboidCollider, IntersectionEnterPayload, IntersectionExitPayload, RigidBody } from "@react-three/rapier";
+import { useFrame, useLoader } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DoubleSide, LinearFilter, Mesh, Object3D, SRGBColorSpace, Texture, TextureLoader, Vector3 } from "three";
+import {
+  DoubleSide,
+  Group,
+  LinearFilter,
+  MathUtils,
+  Mesh,
+  MeshBasicMaterial,
+  Object3D,
+  SRGBColorSpace,
+  TextureLoader,
+  Vector3,
+  VideoTexture,
+} from "three";
 import { hubSections, HubSection } from "../hubSections";
 import { playerWorldState } from "../playerWorldState";
+import { DistanceVisible } from "./DistanceVisible";
 
 type HubSectionsProps = {
   onActiveSectionChange: (sectionName: string | null) => void;
@@ -45,10 +58,49 @@ const offerOptions = [
 ];
 
 type OfferOption = (typeof offerOptions)[number];
+type ShowcaseVideoState = {
+  hasStarted: boolean;
+  playing: boolean;
+};
+
+let showcaseVideoElement: HTMLVideoElement | null = null;
+let showcaseVideoTexture: VideoTexture | null = null;
+
+function getShowcaseVideoResource() {
+  if (!showcaseVideoElement) {
+    const video = document.createElement("video");
+    video.src = "/videos/showcase.mp4";
+    video.crossOrigin = "anonymous";
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    video.load();
+
+    const texture = new VideoTexture(video);
+    texture.colorSpace = SRGBColorSpace;
+    texture.minFilter = LinearFilter;
+    texture.magFilter = LinearFilter;
+    texture.generateMipmaps = false;
+    texture.needsUpdate = true;
+
+    showcaseVideoElement = video;
+    showcaseVideoTexture = texture;
+  }
+
+  return {
+    texture: showcaseVideoTexture,
+    video: showcaseVideoElement,
+  };
+}
 
 export function HubSections({ onActiveSectionChange }: HubSectionsProps) {
   const activeSectionRef = useRef<string | null>(null);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
+  const [showcaseVideoState, setShowcaseVideoState] = useState<ShowcaseVideoState>({
+    hasStarted: false,
+    playing: false,
+  });
 
   useEffect(() => {
     offerOptions.forEach((offer) => {
@@ -84,7 +136,14 @@ export function HubSections({ onActiveSectionChange }: HubSectionsProps) {
           key={section.id}
           section={section}
           selectedOffer={offerOptions.find((offer) => offer.id === selectedOfferId) ?? null}
+          showcaseVideoState={showcaseVideoState}
           onOfferSelect={setSelectedOfferId}
+          onShowcasePause={() => {
+            setShowcaseVideoState((current) => (current.playing ? { ...current, playing: false } : current));
+          }}
+          onShowcasePlay={() => {
+            setShowcaseVideoState({ hasStarted: true, playing: true });
+          }}
         />
       ))}
     </group>
@@ -102,12 +161,12 @@ function HubPaths() {
         return (
           <group key={section.id} rotation-y={angle}>
             <mesh position={[0, 0.14, distance / 2]} rotation-x={-Math.PI / 2}>
-              <boxGeometry args={[0.12, distance, 0.02]} />
-              <meshBasicMaterial color={white} transparent opacity={0.34} />
+              <boxGeometry args={[0.04, distance, 0.018]} />
+              <meshBasicMaterial color="#ffffff" transparent opacity={0.3} toneMapped={false} />
             </mesh>
             <mesh position={[0, 0.15, distance - 7]} rotation-x={-Math.PI / 2}>
-              <coneGeometry args={[0.7, 1.75, 3]} />
-              <meshBasicMaterial color={white} transparent opacity={0.46} />
+              <coneGeometry args={[0.42, 1.05, 3]} />
+              <meshBasicMaterial color="#ffffff" transparent opacity={0.4} toneMapped={false} />
             </mesh>
           </group>
         );
@@ -118,12 +177,18 @@ function HubPaths() {
 
 function HubSectionDistrict({
   onOfferSelect,
+  onShowcasePause,
+  onShowcasePlay,
   section,
   selectedOffer,
+  showcaseVideoState,
 }: {
   onOfferSelect: (offerId: string | null) => void;
+  onShowcasePause: () => void;
+  onShowcasePlay: () => void;
   section: HubSection;
   selectedOffer: OfferOption | null;
+  showcaseVideoState: ShowcaseVideoState;
 }) {
   const rotation = useMemo(() => {
     sectionPosition.set(...section.position);
@@ -132,37 +197,57 @@ function HubSectionDistrict({
 
   return (
     <group name={`HubSection:${section.id}`} position={section.position} rotation-y={rotation}>
-      <SectionBillboard section={section} selectedOffer={selectedOffer} />
-      <EntranceMarker section={section} />
-      {section.id === "offers" && <OffersSelector selectedOfferId={selectedOffer?.id ?? null} onOfferSelect={onOfferSelect} />}
+      <DistanceVisible>
+        <SectionBillboard section={section} selectedOffer={selectedOffer} showcaseVideoState={showcaseVideoState} />
+        {section.id === "offers" && <OffersSelector selectedOfferId={selectedOffer?.id ?? null} onOfferSelect={onOfferSelect} />}
+        {section.id === "showcase" && (
+          <ShowcaseSelector
+            isPlaying={showcaseVideoState.playing}
+            onPlayerEnter={onShowcasePlay}
+            onPlayerExit={onShowcasePause}
+          />
+        )}
+      </DistanceVisible>
       <TriggerZone section={section} />
     </group>
   );
 }
 
-function SectionBillboard({ section, selectedOffer }: { section: HubSection; selectedOffer: OfferOption | null }) {
+function SectionBillboard({
+  section,
+  selectedOffer,
+  showcaseVideoState,
+}: {
+  section: HubSection;
+  selectedOffer: OfferOption | null;
+  showcaseVideoState: ShowcaseVideoState;
+}) {
   const isOffers = section.id === "offers";
+  const isShowcase = section.id === "showcase";
 
   return (
     <group name={`Billboard:${section.id}`} position={[0, 4.8, 0]}>
-      <mesh castShadow receiveShadow position={[0, 0, -0.08]}>
-        <boxGeometry args={[10.4, 5.8, 0.32]} />
-        <meshStandardMaterial color="#101621" metalness={0.72} roughness={0.34} />
-      </mesh>
-      <mesh position={[0, 0.1, -0.26]}>
-        <planeGeometry args={[9.25, 4.85]} />
-        <meshStandardMaterial
-          color="#111827"
-          emissive="#ffffff"
-          emissiveIntensity={isOffers ? 0.08 : 0.04}
-          metalness={0.2}
-          roughness={0.48}
-        />
-      </mesh>
-      <mesh position={[0, 2.85, -0.14]}>
-        <boxGeometry args={[10.8, 0.15, 0.18]} />
-        <meshBasicMaterial color={softWhite} transparent opacity={0.64} />
-      </mesh>
+      <RigidBody type="fixed" colliders={false}>
+        <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
+        <mesh castShadow receiveShadow position={[0, 0, -0.08]}>
+          <boxGeometry args={[10.4, 5.8, 0.32]} />
+          <meshStandardMaterial color="#101621" metalness={0.72} roughness={0.34} />
+        </mesh>
+        <mesh position={[0, 0.1, -0.26]}>
+          <planeGeometry args={[9.25, 4.85]} />
+          <meshStandardMaterial
+            color="#111827"
+            emissive="#ffffff"
+            emissiveIntensity={isOffers ? 0.08 : 0.04}
+            metalness={0.2}
+            roughness={0.48}
+          />
+        </mesh>
+        <mesh position={[0, 2.85, -0.14]}>
+          <boxGeometry args={[10.8, 0.15, 0.18]} />
+          <meshBasicMaterial color={softWhite} transparent opacity={0.64} />
+        </mesh>
+      </RigidBody>
       <Text
         color={white}
         fontSize={0.86}
@@ -175,6 +260,8 @@ function SectionBillboard({ section, selectedOffer }: { section: HubSection; sel
       </Text>
       {isOffers ? (
         <OffersScreenContent selectedOffer={selectedOffer} />
+      ) : isShowcase ? (
+        <ShowcaseScreenContent isPlaying={showcaseVideoState.playing} hasStarted={showcaseVideoState.hasStarted} />
       ) : (
         <Text
           color="#9fb5cc"
@@ -206,80 +293,106 @@ function SectionBillboard({ section, selectedOffer }: { section: HubSection; sel
 }
 
 function OffersScreenContent({ selectedOffer }: { selectedOffer: OfferOption | null }) {
-  const [textures, setTextures] = useState<Record<string, Texture>>({});
-  const loggedDisplayRef = useRef<string | null>(null);
+  const loadedTextures = useLoader(TextureLoader, offerOptions.map((offer) => offer.imagePath));
 
   useEffect(() => {
-    const loader = new TextureLoader();
-    let disposed = false;
-
-    offerOptions.forEach((offer) => {
-      loader.load(
-        offer.imagePath,
-        (texture) => {
-          if (disposed) return;
-
-          texture.colorSpace = SRGBColorSpace;
-          texture.minFilter = LinearFilter;
-          texture.magFilter = LinearFilter;
-          texture.needsUpdate = true;
-
-          console.log("[StudioCLTD offers] Texture loaded successfully", {
-            offer: offer.name,
-            path: offer.imagePath,
-          });
-
-          setTextures((current) => ({
-            ...current,
-            [offer.id]: texture,
-          }));
-        },
-        undefined,
-        (error) => {
-          console.error("[StudioCLTD offers] Texture failed to load", {
-            error,
-            offer: offer.name,
-            path: offer.imagePath,
-          });
-        }
-      );
+    loadedTextures.forEach((texture) => {
+      texture.colorSpace = SRGBColorSpace;
+      texture.minFilter = LinearFilter;
+      texture.magFilter = LinearFilter;
+      texture.needsUpdate = true;
     });
+  }, [loadedTextures]);
 
-    return () => {
-      disposed = true;
-    };
-  }, []);
-
-  const texture = selectedOffer ? textures[selectedOffer.id] : null;
+  const selectedIndex = selectedOffer ? offerOptions.findIndex((offer) => offer.id === selectedOffer.id) : -1;
+  const texture = selectedIndex >= 0 ? loadedTextures[selectedIndex] : null;
 
   useEffect(() => {
-    const displayKey = selectedOffer ? `${selectedOffer.id}:${Boolean(texture)}` : "none";
-    if (loggedDisplayRef.current === displayKey) return;
-
-    loggedDisplayRef.current = displayKey;
-    console.log("[StudioCLTD offers] Current image being displayed", {
-      offer: selectedOffer?.name ?? "None",
-      path: selectedOffer?.imagePath ?? null,
-      textureReady: Boolean(texture),
-    });
+    if (selectedOffer && !texture) {
+      console.error("[StudioCLTD offers] Selected offer has no loaded texture", {
+        image: selectedOffer.imagePath,
+        offer: selectedOffer.name,
+      });
+    }
   }, [selectedOffer, texture]);
+
+  return (
+    <mesh key={selectedOffer?.id ?? "offers-empty-screen"} position={[0, -0.03, -0.2]} renderOrder={20}>
+      <planeGeometry args={[8.4, 4.15]} />
+      {texture ? (
+        <meshBasicMaterial
+          key={`offer-image-${selectedOffer?.id}`}
+          color="#ffffff"
+          depthTest={false}
+          map={texture}
+          side={DoubleSide}
+          toneMapped
+        />
+      ) : (
+        <meshBasicMaterial key="offer-empty-screen" color="#111827" depthTest={false} side={DoubleSide} toneMapped />
+      )}
+    </mesh>
+  );
+}
+
+function ShowcaseScreenContent({ hasStarted, isPlaying }: { hasStarted: boolean; isPlaying: boolean }) {
+  const materialRef = useRef<MeshBasicMaterial>(null);
+  const screenOpacityRef = useRef(0);
+  const resource = useMemo(() => getShowcaseVideoResource(), []);
+
+  useEffect(() => {
+    const video = resource.video;
+    if (!video) return;
+
+    if (isPlaying) {
+      video
+        .play()
+        .then(() => {
+          console.log("[StudioCLTD showcase] Video playing");
+        })
+        .catch((error) => {
+          console.error("[StudioCLTD showcase] Video failed to play", error);
+        });
+      return;
+    }
+
+    if (!hasStarted || video.paused) return;
+    video.pause();
+    console.log("[StudioCLTD showcase] Video paused");
+  }, [hasStarted, isPlaying, resource.video]);
+
+  useEffect(() => {
+    return () => {
+      resource.video?.pause();
+    };
+  }, [resource.video]);
+
+  useFrame((_, delta) => {
+    const material = materialRef.current;
+    if (!material) return;
+
+    const targetOpacity = hasStarted ? 1 : 0;
+    screenOpacityRef.current = MathUtils.damp(screenOpacityRef.current, targetOpacity, 5.5, Math.min(delta, 1 / 30));
+    material.opacity = screenOpacityRef.current;
+    material.needsUpdate = true;
+  });
 
   return (
     <mesh position={[0, -0.03, -0.2]} renderOrder={20}>
       <planeGeometry args={[8.4, 4.15]} />
-      {texture ? (
-        <meshStandardMaterial
-          color="#c9c9c9"
+      {resource.texture ? (
+        <meshBasicMaterial
+          ref={materialRef}
+          color="#ffffff"
           depthTest={false}
-          emissive="#050505"
-          emissiveIntensity={0.015}
-          map={texture}
-          metalness={0}
-          roughness={0.78}
+          map={resource.texture}
+          opacity={0}
           side={DoubleSide}
+          toneMapped
+          transparent
         />
       ) : (
-        <meshStandardMaterial color="#111827" depthTest={false} emissive="#020304" roughness={0.8} side={DoubleSide} />
+        <meshBasicMaterial color="#111827" depthTest={false} side={DoubleSide} toneMapped />
       )}
     </mesh>
   );
@@ -295,11 +408,13 @@ function OffersSelector({
   const [countdownOfferId, setCountdownOfferId] = useState<string | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState(0);
   const countdownStartedAtRef = useRef(0);
+  const countdownSecondsRef = useRef(0);
   const pageOpenedRef = useRef(false);
 
   const startCountdown = (offer: OfferOption) => {
     onOfferSelect(offer.id);
     setCountdownOfferId(offer.id);
+    countdownSecondsRef.current = 3;
     setCountdownSeconds(3);
     countdownStartedAtRef.current = performance.now();
     pageOpenedRef.current = false;
@@ -312,6 +427,7 @@ function OffersSelector({
     if (countdownOfferId !== offer.id || pageOpenedRef.current) return;
 
     setCountdownOfferId(null);
+    countdownSecondsRef.current = 0;
     setCountdownSeconds(0);
     console.log("Countdown cancelled", offer.name);
   };
@@ -321,12 +437,16 @@ function OffersSelector({
 
     const elapsed = performance.now() - countdownStartedAtRef.current;
     const remaining = Math.max(0, Math.ceil((offerCountdownMs - elapsed) / 1000));
-    setCountdownSeconds((current) => (current === remaining ? current : remaining));
+    if (countdownSecondsRef.current !== remaining) {
+      countdownSecondsRef.current = remaining;
+      setCountdownSeconds(remaining);
+    }
 
     if (elapsed < offerCountdownMs || pageOpenedRef.current) return;
 
     pageOpenedRef.current = true;
     setCountdownOfferId(null);
+    countdownSecondsRef.current = 0;
     setCountdownSeconds(0);
     console.log("Opening offers page", offersPageUrl);
     window.open(offersPageUrl, "_blank", "noopener,noreferrer");
@@ -348,6 +468,22 @@ function OffersSelector({
   );
 }
 
+function ShowcaseSelector({
+  isPlaying,
+  onPlayerEnter,
+  onPlayerExit,
+}: {
+  isPlaying: boolean;
+  onPlayerEnter: () => void;
+  onPlayerExit: () => void;
+}) {
+  return (
+    <group name="ShowcaseSelector">
+      <ShowcasePortalPad active={isPlaying} onPlayerEnter={onPlayerEnter} onPlayerExit={onPlayerExit} />
+    </group>
+  );
+}
+
 function OfferPortalPad({
   active,
   countdownSeconds,
@@ -361,9 +497,13 @@ function OfferPortalPad({
   onPlayerEnter: () => void;
   onPlayerExit: () => void;
 }) {
+  const groupRef = useRef<Group>(null);
   const ringRef = useRef<Mesh>(null);
   const pulseRef = useRef<Mesh>(null);
   const playerInsideRef = useRef(false);
+  const worldPositionRef = useRef(new Vector3());
+  const activeStartedAtRef = useRef(0);
+  const wasActiveRef = useRef(active);
 
   const isPlayerIntersection = (object?: Object3D) => {
     let current: Object3D | null | undefined = object;
@@ -404,29 +544,56 @@ function OfferPortalPad({
   };
 
   useFrame(({ clock }) => {
-    const pulse = active ? 1 + Math.sin(clock.elapsedTime * 9) * 0.045 : 1;
-    const opacity = active ? 0.78 + Math.sin(clock.elapsedTime * 12) * 0.12 : 0.5;
+    if (active && !wasActiveRef.current) {
+      activeStartedAtRef.current = clock.elapsedTime;
+    }
+    wasActiveRef.current = active;
+
+    if (groupRef.current) {
+      groupRef.current.getWorldPosition(worldPositionRef.current);
+      const distance = Math.hypot(
+        playerWorldState.position.x - worldPositionRef.current.x,
+        playerWorldState.position.z - worldPositionRef.current.z
+      );
+      const playerInsidePad = distance <= 1.05 && playerWorldState.position.y < 2.3;
+
+      if (playerInsidePad && !playerInsideRef.current) {
+        playerInsideRef.current = true;
+        onPlayerEnter();
+      }
+
+      if (!playerInsidePad && playerInsideRef.current) {
+        playerInsideRef.current = false;
+        onPlayerExit();
+      }
+    }
+
+    const activationGlow = active ? Math.max(0, 1 - (clock.elapsedTime - activeStartedAtRef.current) / 1) : 0;
+    const pulse = 1 + activationGlow * 0.05;
+    const opacity = 0.56 + activationGlow * 0.28;
 
     if (ringRef.current) {
       ringRef.current.scale.setScalar(pulse);
       const material = ringRef.current.material;
-      if (material && !Array.isArray(material) && "opacity" in material) {
+      if (material instanceof MeshBasicMaterial) {
+        material.color.set("#ffffff");
         material.opacity = opacity;
       }
     }
 
     if (pulseRef.current) {
-      pulseRef.current.visible = active;
-      pulseRef.current.scale.setScalar(active ? 1.15 + Math.sin(clock.elapsedTime * 10) * 0.08 : 1);
+      pulseRef.current.visible = active || activationGlow > 0;
+      pulseRef.current.scale.setScalar(1.03 + activationGlow * 0.18);
       const material = pulseRef.current.material;
-      if (material && !Array.isArray(material) && "opacity" in material) {
-        material.opacity = active ? 0.2 : 0;
+      if (material instanceof MeshBasicMaterial) {
+        material.color.set("#ffffff");
+        material.opacity = activationGlow * 0.16;
       }
     }
   });
 
   return (
-    <group name={`OfferPortal:${offer.id}`} position={offer.position}>
+    <group ref={groupRef} name={`OfferPortal:${offer.id}`} position={offer.position}>
       <CuboidCollider
         sensor
         args={[0.95, 0.28, 0.95]}
@@ -436,11 +603,11 @@ function OfferPortalPad({
       />
       <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
         <torusGeometry args={[0.84, 0.024, 10, 96]} />
-        <meshBasicMaterial color={active ? "#ffe58a" : white} transparent opacity={active ? 0.9 : 0.5} depthWrite={false} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.56} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh ref={pulseRef} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false}>
         <ringGeometry args={[0.58, 0.88, 96]} />
-        <meshBasicMaterial color="#ffd35c" transparent opacity={0} depthWrite={false} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       <Text
         color={white}
@@ -464,19 +631,130 @@ function OfferPortalPad({
           {`Opening offers page in ${countdownSeconds}...`}
         </Text>
       )}
-      <pointLight color="#ffd35c" intensity={active ? 5.5 : 0.8} distance={active ? 6 : 3} position={[0, 0.72, 0]} />
+      <pointLight color="#ffffff" intensity={active ? 2.4 : 0.7} distance={active ? 5.5 : 3} position={[0, 0.72, 0]} />
     </group>
   );
 }
 
-function EntranceMarker({ section }: { section: HubSection }) {
+function ShowcasePortalPad({
+  active,
+  onPlayerEnter,
+  onPlayerExit,
+}: {
+  active: boolean;
+  onPlayerEnter: () => void;
+  onPlayerExit: () => void;
+}) {
+  const groupRef = useRef<Group>(null);
+  const ringRef = useRef<Mesh>(null);
+  const pulseRef = useRef<Mesh>(null);
+  const playerInsideRef = useRef(false);
+  const worldPositionRef = useRef(new Vector3());
+  const activeStartedAtRef = useRef(0);
+  const wasActiveRef = useRef(active);
+
+  const isPlayerIntersection = (object?: Object3D) => {
+    let current: Object3D | null | undefined = object;
+    while (current) {
+      if (current.name === "StudioCLTDPlayer") return true;
+      current = current.parent;
+    }
+    return false;
+  };
+
+  const isPlayerEvent = (event: IntersectionEnterPayload | IntersectionExitPayload) =>
+    isPlayerIntersection(event.other.rigidBodyObject) || isPlayerIntersection(event.other.colliderObject);
+
+  const activate = () => {
+    if (playerInsideRef.current) return;
+    playerInsideRef.current = true;
+    console.log("[StudioCLTD showcase] Trigger activated");
+    onPlayerEnter();
+  };
+
+  const deactivate = () => {
+    if (!playerInsideRef.current) return;
+    playerInsideRef.current = false;
+    onPlayerExit();
+  };
+
+  const handleEnter = (event: IntersectionEnterPayload) => {
+    if (!isPlayerEvent(event)) return;
+    activate();
+  };
+
+  const handleExit = (event: IntersectionExitPayload) => {
+    if (!isPlayerEvent(event)) return;
+    deactivate();
+  };
+
+  useFrame(({ clock }) => {
+    if (active && !wasActiveRef.current) {
+      activeStartedAtRef.current = clock.elapsedTime;
+    }
+    wasActiveRef.current = active;
+
+    if (groupRef.current) {
+      groupRef.current.getWorldPosition(worldPositionRef.current);
+      const distance = Math.hypot(
+        playerWorldState.position.x - worldPositionRef.current.x,
+        playerWorldState.position.z - worldPositionRef.current.z
+      );
+      const playerInsidePad = distance <= 1.1 && playerWorldState.position.y < 2.3;
+
+      if (playerInsidePad) {
+        activate();
+      } else {
+        deactivate();
+      }
+    }
+
+    const activationGlow = active ? Math.max(0, 1 - (clock.elapsedTime - activeStartedAtRef.current) / 1) : 0;
+    const steadyGlow = active ? 0.2 : 0;
+    const pulse = 1 + activationGlow * 0.05;
+    const opacity = 0.58 + steadyGlow + activationGlow * 0.16;
+
+    if (ringRef.current) {
+      ringRef.current.scale.setScalar(pulse);
+      const material = ringRef.current.material;
+      if (material instanceof MeshBasicMaterial) {
+        material.color.set("#ffffff");
+        material.opacity = opacity;
+      }
+    }
+
+    if (pulseRef.current) {
+      pulseRef.current.visible = active || activationGlow > 0;
+      pulseRef.current.scale.setScalar(1.04 + activationGlow * 0.16);
+      const material = pulseRef.current.material;
+      if (material instanceof MeshBasicMaterial) {
+        material.color.set("#ffffff");
+        material.opacity = active ? 0.1 + activationGlow * 0.1 : activationGlow * 0.12;
+      }
+    }
+  });
+
   return (
-    <group name={`EntranceMarker:${section.id}`} position={[0, 0.24, 6.2]}>
-      <mesh rotation-x={-Math.PI / 2}>
-        <torusGeometry args={[2.3, 0.045, 10, 72]} />
-        <meshBasicMaterial color={white} transparent opacity={0.58} />
+    <group ref={groupRef} name="ShowcasePortal:play" position={[0, 0.18, 9.2]}>
+      <CuboidCollider
+        sensor
+        args={[0.95, 0.28, 0.95]}
+        position={[0, 0.45, 0]}
+        onIntersectionEnter={handleEnter}
+        onIntersectionExit={handleExit}
+      />
+      <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
+        <torusGeometry args={[0.84, 0.024, 10, 96]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.58} depthWrite={false} toneMapped={false} />
       </mesh>
-      <pointLight color="#ffffff" intensity={3.2} distance={8} position={[0, 1.2, 0]} />
+      <mesh ref={pulseRef} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false}>
+        <ringGeometry args={[0.58, 0.88, 96]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <Text color={white} fontSize={0.28} anchorX="center" anchorY="middle" position={[0, 1.05, 0]} maxWidth={3}>
+        Play Showcase
+      </Text>
+      <pointLight color="#ffffff" intensity={active ? 2.2 : 0.6} distance={active ? 5.2 : 3} position={[0, 0.72, 0]} />
     </group>
   );
 }
@@ -485,10 +763,6 @@ function TriggerZone({ section }: { section: HubSection }) {
   return (
     <group name={`TriggerZone:${section.id}`} position={[0, 1.8, 6.2]}>
       <CuboidCollider sensor args={[4.5, 1.8, 4.5]} />
-      <mesh position={[0, -1.66, 0]} rotation-x={-Math.PI / 2}>
-        <ringGeometry args={[4.2, 4.35, 72]} />
-        <meshBasicMaterial color={white} transparent opacity={0.13} />
-      </mesh>
     </group>
   );
 }

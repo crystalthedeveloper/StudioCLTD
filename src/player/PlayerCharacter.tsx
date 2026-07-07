@@ -15,6 +15,15 @@ export function PlayerCharacter({ animationState, yawRef }: PlayerCharacterProps
   const { actions } = useAnimations(model.animations, group);
 
   useEffect(() => {
+    model.scene.traverse((object) => {
+      if (object instanceof Mesh) {
+        object.castShadow = true;
+        object.receiveShadow = true;
+      }
+    });
+  }, [model.scene]);
+
+  useEffect(() => {
     const action = actions[animationState];
     if (!action) return;
 
@@ -25,25 +34,13 @@ export function PlayerCharacter({ animationState, yawRef }: PlayerCharacterProps
     };
   }, [actions, animationState]);
 
-  useFrame(({ clock }) => {
+  useFrame(() => {
     if (!group.current) return;
 
-    const t = clock.elapsedTime;
-    const moving = animationState === "walk" || animationState === "run";
-    const airborne = animationState === "jump" || animationState === "fall";
-    const stride = animationState === "run" ? 13 : 8;
-
     group.current.rotation.y = yawRef.current;
-    group.current.position.y = moving ? Math.abs(Math.sin(t * stride)) * 0.035 - 1.05 : -1.05;
-    group.current.rotation.z = moving ? Math.sin(t * stride) * 0.025 : 0;
-    group.current.rotation.x = airborne ? -0.08 : 0;
-  });
-
-  model.scene.traverse((object) => {
-    if (object instanceof Mesh) {
-      object.castShadow = true;
-      object.receiveShadow = true;
-    }
+    group.current.position.y = -1.05;
+    group.current.rotation.z = 0;
+    group.current.rotation.x = 0;
   });
 
   return (

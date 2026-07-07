@@ -16,6 +16,21 @@ canvas {
   display: block;
 }
 
+.game-shell {
+  width: 100%;
+  height: 100%;
+  cursor: auto;
+}
+
+.game-shell canvas {
+  cursor: auto;
+}
+
+.game-shell--focused,
+.game-shell--focused canvas {
+  cursor: none;
+}
+
 .hub-minimap {
   position: fixed;
   top: 18px;
@@ -98,4 +113,125 @@ canvas {
 .hub-section-title--visible {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+.game-focus-hint {
+  position: fixed;
+  left: 50%;
+  top: 18px;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 148px;
+  padding: 9px 14px;
+  border: 1px solid rgba(245, 247, 251, 0.18);
+  background: rgba(4, 6, 12, 0.64);
+  color: rgba(245, 247, 251, 0.92);
+  opacity: 0;
+  pointer-events: none;
+  text-align: center;
+  transform: translateX(-50%) translateY(-8px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.game-focus-hint--visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.game-focus-hint strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.game-focus-hint span {
+  color: rgba(220, 226, 236, 0.72);
+  font-size: 11px;
+}
+
+.speed-boost-hud {
+  position: fixed;
+  left: 50%;
+  top: 70px;
+  z-index: 24;
+  min-width: 140px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 211, 92, 0.34);
+  background: rgba(8, 7, 4, 0.68);
+  color: #ffd35c;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 0 16px rgba(255, 211, 92, 0.5);
+  transform: translateX(-50%);
+}
+
+.trackpad-shell {
+  position: fixed;
+  left: 50%;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  z-index: 40;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.trackpad {
+  position: relative;
+  width: clamp(112px, 18vw, 148px);
+  height: clamp(112px, 18vw, 148px);
+  border: 1px solid rgba(245, 247, 251, 0.22);
+  border-radius: 22px;
+  background: rgba(10, 13, 20, 0.34);
+  box-shadow: inset 0 0 24px rgba(255, 255, 255, 0.05), 0 12px 38px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+}
+
+.trackpad::before,
+.trackpad::after {
+  position: absolute;
+  content: "";
+  background: rgba(245, 247, 251, 0.14);
+}
+
+.trackpad::before {
+  left: 50%;
+  top: 16px;
+  bottom: 16px;
+  width: 1px;
+}
+
+.trackpad::after {
+  top: 50%;
+  left: 16px;
+  right: 16px;
+  height: 1px;
+}
+
+.trackpad__thumb {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 50%;
+  background: rgba(245, 247, 251, 0.2);
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.12);
+  transition: transform 60ms linear;
+}
+
+@media (max-width: 640px) {
+  .trackpad-shell {
+    bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  .trackpad {
+    width: 118px;
+    height: 118px;
+    border-radius: 20px;
+  }
 }

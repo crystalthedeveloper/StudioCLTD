@@ -1,5 +1,3 @@
-import { useThree } from "@react-three/fiber";
-import { useEffect } from "react";
 import {
   BackSide,
   Color,
@@ -10,17 +8,8 @@ import { useTexture } from "@react-three/drei";
 export function SpaceSky() {
   const venusTexture = useTexture("/images/8k_venus_surface.jpg");
   const skyTexture = useTexture("/images/8k_stars_milky_way.jpg");
-  const scene = useThree((state) => state.scene);
   venusTexture.colorSpace = SRGBColorSpace;
   skyTexture.colorSpace = SRGBColorSpace;
-
-  useEffect(() => {
-    scene.environment = null;
-    scene.environmentIntensity = 0;
-    return () => {
-      scene.environment = null;
-    };
-  }, [scene]);
 
   return (
     <group>

@@ -21,9 +21,9 @@ type CameraDebug = {
   cameraTarget: Vector3;
   distance: number;
   damping: {
-    orbitLerp: number;
-    positionLerp: number;
-    rotationLerp: number;
+    lookAtDamping: number;
+    targetDamping: number;
+    yawDamping: number;
   };
   pitch: number;
   yaw: number;
@@ -40,6 +40,10 @@ const debugState = {
 
 const targetChangeThreshold = 0.035;
 const logIntervalMs = 250;
+
+export function isControllerDebugEnabled() {
+  return globalThis.localStorage?.getItem("studiocltd-debug") === "true";
+}
 
 export function recordMouseDelta(x: number, y: number) {
   debugState.lastMouseDelta = { x, y };
@@ -86,6 +90,7 @@ export function markPlayerRotationUpdate(frame: number, source: string) {
 }
 
 export function logTargetChange(cameraTarget: Vector3) {
+  if (!isControllerDebugEnabled()) return;
   if (debugState.lastCameraTarget.distanceTo(cameraTarget) <= targetChangeThreshold) return;
 
   console.log("[StudioCLTD camera debug] Camera target changed", {
@@ -96,6 +101,7 @@ export function logTargetChange(cameraTarget: Vector3) {
 }
 
 export function logControllerDebug(nowMs: number, player: MovementDebug, camera: CameraDebug) {
+  if (!isControllerDebugEnabled()) return;
   if (nowMs - debugState.lastLogTime < logIntervalMs) return;
   debugState.lastLogTime = nowMs;
 
@@ -114,8 +120,6 @@ export function logControllerDebug(nowMs: number, player: MovementDebug, camera:
         A: player.keyboard.left,
         D: player.keyboard.right,
         S: player.keyboard.backward,
-        Shift: player.keyboard.run,
-        Space: player.keyboard.jump,
         W: player.keyboard.forward,
       },
       mouseDelta: {

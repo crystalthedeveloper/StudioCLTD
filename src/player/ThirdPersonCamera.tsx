@@ -1,13 +1,13 @@
 import { useFrame, useThree } from "@react-three/fiber";
-import { MutableRefObject, useEffect, useRef } from "react";
+import { MutableRefObject, useRef } from "react";
 import { MathUtils, Vector3 } from "three";
-import { RapierRigidBody, useRapier } from "@react-three/rapier";
+import { RapierRigidBody } from "@react-three/rapier";
 import {
   getLastMouseDelta,
+  isControllerDebugEnabled,
   logControllerDebug,
   logTargetChange,
   markCameraUpdate,
-  recordMouseDelta,
 } from "../debug/controllerDebug";
 import { KeyboardControls } from "./useKeyboardControls";
 
@@ -21,30 +21,35 @@ type ThirdPersonCameraProps = {
 };
 
 const cameraSettings = {
-  distance: 5,
-  minZoom: 3.4,
-  maxZoom: 7.2,
-  minDistance: 2.1,
-  height: 1.0,
-  targetHeight: 1.25,
-  pitch: -0.22,
+  distance: 7.4,
+  height: 3,
+  targetHeight: 1.45,
+  pitch: -0.24,
   minPitch: MathUtils.degToRad(-35),
   maxPitch: MathUtils.degToRad(55),
-  sensitivity: 0.0021,
-  positionLerp: 0.11,
-  rotationLerp: 0.12,
-  orbitLerp: 0.14,
+  lookAtDamping: 12,
+  pitchDamping: 12,
+  targetDamping: 20,
+  yawDamping: 10,
+  yawFollowDamping: 5.8,
 };
 
 const cameraTarget = new Vector3();
+const smoothedCameraTarget = new Vector3();
 const desiredPosition = new Vector3();
-const collisionDirection = new Vector3();
 const lookDirection = new Vector3();
 const lookAt = new Vector3();
 const smoothedLookAt = new Vector3();
 const worldUp = new Vector3(0, 1, 0);
 const rollTolerance = 0.0005;
 const pitchTolerance = 0.0005;
+const distanceDriftTolerance = 0.55;
+const maxFrameDelta = 1 / 30;
+
+function dampAngle(current: number, target: number, lambda: number, delta: number) {
+  const angleDelta = MathUtils.euclideanModulo(target - current + Math.PI, Math.PI * 2) - Math.PI;
+  return current + angleDelta * (1 - Math.exp(-lambda * delta));
+}
 
 export function ThirdPersonCamera({
   animationStateRef,
@@ -55,63 +60,19 @@ export function ThirdPersonCamera({
   targetRef,
 }: ThirdPersonCameraProps) {
   const camera = useThree((state) => state.camera);
-  const gl = useThree((state) => state.gl);
-  const { rapier, world } = useRapier();
   const pitchRef = useRef(cameraSettings.pitch);
-  const distanceRef = useRef(cameraSettings.distance);
   const smoothedYawRef = useRef(cameraYawRef.current);
   const smoothedPitchRef = useRef(cameraSettings.pitch);
-  const smoothedDistanceRef = useRef(cameraSettings.distance);
   const hasCameraStateRef = useRef(false);
   const lastRollWarningRef = useRef(0);
-  const lastRotationLogRef = useRef(0);
-
-  useEffect(() => {
-    const canvas = gl.domElement;
-
-    const handleClick = () => {
-      canvas.requestPointerLock?.();
-    };
-
-    const handlePointerMove = (event: PointerEvent) => {
-      if (document.pointerLockElement !== canvas) return;
-
-      recordMouseDelta(event.movementX, event.movementY);
-      console.log("[StudioCLTD camera debug] PointerLockControls-style mouse camera input", {
-        movementX: event.movementX,
-        movementY: event.movementY,
-      });
-      cameraYawRef.current -= event.movementX * cameraSettings.sensitivity;
-      pitchRef.current = MathUtils.clamp(
-        pitchRef.current - event.movementY * cameraSettings.sensitivity,
-        cameraSettings.minPitch,
-        cameraSettings.maxPitch
-      );
-    };
-
-    const handleWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      distanceRef.current = MathUtils.clamp(
-        distanceRef.current + event.deltaY * 0.004,
-        cameraSettings.minZoom,
-        cameraSettings.maxZoom
-      );
-    };
-
-    canvas.addEventListener("click", handleClick);
-    canvas.addEventListener("wheel", handleWheel, { passive: false });
-    document.addEventListener("pointermove", handlePointerMove);
-
-    return () => {
-      canvas.removeEventListener("click", handleClick);
-      canvas.removeEventListener("wheel", handleWheel);
-      document.removeEventListener("pointermove", handlePointerMove);
-    };
-  }, [cameraYawRef, gl.domElement]);
+  const lastDistanceLogRef = useRef(0);
+  const lastFpsLogRef = useRef(0);
 
   useFrame((_, delta) => {
     const body = targetRef.current;
     if (!body) return;
+    const debugEnabled = isControllerDebugEnabled();
+    const frameDelta = Math.min(delta, maxFrameDelta);
 
     const debugFrame = Math.floor(_.clock.elapsedTime * 60);
     markCameraUpdate(debugFrame, "ThirdPersonCamera");
@@ -120,21 +81,33 @@ export function ThirdPersonCamera({
     logTargetChange(cameraTarget);
     if (!hasCameraStateRef.current) {
       smoothedLookAt.copy(cameraTarget);
+      smoothedCameraTarget.copy(cameraTarget);
+      smoothedYawRef.current = cameraYawRef.current;
       hasCameraStateRef.current = true;
     }
 
-    smoothedYawRef.current = MathUtils.lerp(smoothedYawRef.current, cameraYawRef.current, cameraSettings.orbitLerp);
-    smoothedPitchRef.current = MathUtils.lerp(smoothedPitchRef.current, pitchRef.current, cameraSettings.orbitLerp);
-    smoothedDistanceRef.current = MathUtils.lerp(
-      smoothedDistanceRef.current,
-      distanceRef.current,
-      cameraSettings.positionLerp
-    );
+    const velocity = body.linvel();
+    const horizontalSpeed = Math.hypot(velocity.x, velocity.z);
+    const movingFast = horizontalSpeed > 10;
+    const movingForwardOrTurning = movementDirectionRef.current.lengthSq() > 0.001 || controlsRef.current.left || controlsRef.current.right;
+    if (movingForwardOrTurning) {
+      cameraYawRef.current = dampAngle(
+        cameraYawRef.current,
+        playerYawRef.current,
+        movingFast ? cameraSettings.yawFollowDamping * 1.25 : cameraSettings.yawFollowDamping,
+        frameDelta
+      );
+    }
+
+    smoothedYawRef.current = dampAngle(smoothedYawRef.current, cameraYawRef.current, cameraSettings.yawDamping, frameDelta);
+    smoothedPitchRef.current = MathUtils.damp(smoothedPitchRef.current, pitchRef.current, cameraSettings.pitchDamping, frameDelta);
+    smoothedCameraTarget.lerp(cameraTarget, 1 - Math.exp(-frameDelta * cameraSettings.targetDamping));
 
     const yaw = smoothedYawRef.current;
     const pitch = smoothedPitchRef.current;
     if (
       (pitch < cameraSettings.minPitch - pitchTolerance || pitch > cameraSettings.maxPitch + pitchTolerance) &&
+      debugEnabled &&
       performance.now() - lastRollWarningRef.current > 250
     ) {
       lastRollWarningRef.current = performance.now();
@@ -144,35 +117,19 @@ export function ThirdPersonCamera({
         pitch,
       });
     }
-    const cameraDistance = smoothedDistanceRef.current;
+    const cameraDistance = cameraSettings.distance;
     const horizontalDistance = Math.cos(pitch) * cameraDistance;
     const verticalOffset = cameraSettings.height + Math.sin(pitch) * cameraDistance;
 
     desiredPosition.set(
-      cameraTarget.x + Math.sin(yaw) * horizontalDistance,
-      cameraTarget.y + verticalOffset,
-      cameraTarget.z + Math.cos(yaw) * horizontalDistance
+      smoothedCameraTarget.x + Math.sin(yaw) * horizontalDistance,
+      smoothedCameraTarget.y + verticalOffset,
+      smoothedCameraTarget.z + Math.cos(yaw) * horizontalDistance
     );
     lookAt.copy(cameraTarget);
-    smoothedLookAt.lerp(lookAt, cameraSettings.rotationLerp);
+    smoothedLookAt.lerp(lookAt, 1 - Math.exp(-frameDelta * cameraSettings.lookAtDamping));
 
-    collisionDirection.copy(desiredPosition).sub(cameraTarget);
-    const desiredDistance = collisionDirection.length();
-    collisionDirection.normalize();
-
-    const hit = world.castRay(
-      new rapier.Ray(cameraTarget, collisionDirection),
-      desiredDistance,
-      true
-    );
-
-    if (hit && hit.timeOfImpact > cameraSettings.minDistance) {
-      desiredPosition.copy(cameraTarget).addScaledVector(collisionDirection, hit.timeOfImpact - 0.24);
-    }
-
-    const frameScale = Math.min(delta * 60, 2);
-    const positionSmoothing = 1 - Math.pow(1 - cameraSettings.positionLerp, frameScale);
-    camera.position.lerp(desiredPosition, positionSmoothing);
+    camera.position.copy(desiredPosition);
     camera.up.copy(worldUp);
     lookDirection.copy(smoothedLookAt).sub(camera.position).normalize();
     const cameraYaw = Math.atan2(-lookDirection.x, -lookDirection.z);
@@ -181,7 +138,7 @@ export function ThirdPersonCamera({
     camera.rotation.order = "YXZ";
     camera.rotation.set(cameraPitch, cameraYaw, 0);
 
-    if (Math.abs(camera.rotation.z) > rollTolerance && performance.now() - lastRollWarningRef.current > 250) {
+    if (debugEnabled && Math.abs(camera.rotation.z) > rollTolerance && performance.now() - lastRollWarningRef.current > 250) {
       lastRollWarningRef.current = performance.now();
       console.warn("[StudioCLTD camera debug] Camera roll detected after yaw/pitch solve", {
         pitch: cameraPitch,
@@ -192,12 +149,29 @@ export function ThirdPersonCamera({
     camera.rotation.z = 0;
     camera.updateMatrixWorld();
 
-    if (performance.now() - lastRotationLogRef.current > 250) {
-      lastRotationLogRef.current = performance.now();
-      console.log("[StudioCLTD camera debug] Camera yaw/pitch/roll", {
-        pitch: cameraPitch,
-        roll: camera.rotation.z,
-        yaw: cameraYaw,
+    if (performance.now() - lastDistanceLogRef.current > 1000) {
+      lastDistanceLogRef.current = performance.now();
+      const distanceToPlayer = camera.position.distanceTo(smoothedCameraTarget);
+      const expectedDistance = desiredPosition.distanceTo(smoothedCameraTarget);
+      console.log("[StudioCLTD camera debug] Camera distance to player", {
+        configuredDistance: cameraSettings.distance,
+        distanceToPlayer,
+        expectedDistance,
+      });
+
+      if (debugEnabled && Math.abs(distanceToPlayer - expectedDistance) > distanceDriftTolerance) {
+        console.warn("[StudioCLTD camera debug] Camera distance drift detected", {
+          configuredDistance: cameraSettings.distance,
+          distanceToPlayer,
+          expectedDistance,
+        });
+      }
+    }
+
+    if (performance.now() - lastFpsLogRef.current > 1000) {
+      lastFpsLogRef.current = performance.now();
+      console.log("[StudioCLTD camera debug] FPS", {
+        fps: Math.round(1 / Math.max(delta, 0.0001)),
       });
     }
 
@@ -213,9 +187,9 @@ export function ThirdPersonCamera({
       cameraRotation: camera.rotation,
       cameraTarget,
       damping: {
-        orbitLerp: cameraSettings.orbitLerp,
-        positionLerp: cameraSettings.positionLerp,
-        rotationLerp: cameraSettings.rotationLerp,
+        lookAtDamping: cameraSettings.lookAtDamping,
+        targetDamping: cameraSettings.targetDamping,
+        yawDamping: cameraSettings.yawDamping,
       },
       distance: cameraDistance,
       pitch: cameraPitch,

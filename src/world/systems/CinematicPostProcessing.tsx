@@ -15,7 +15,7 @@ export function CinematicPostProcessing() {
   const composer = useMemo(() => new EffectComposer(gl), [gl]);
   const renderPass = useMemo(() => new RenderPass(scene, camera), [camera, scene]);
   const bloomPass = useMemo(
-    () => new UnrealBloomPass(new Vector2(size.width, size.height), 0.38, 0.72, 0.42),
+    () => new UnrealBloomPass(new Vector2(size.width, size.height), 0.44, 0.76, 0.36),
     [size.height, size.width]
   );
 
@@ -31,7 +31,7 @@ export function CinematicPostProcessing() {
   }, [bloomPass, composer, renderPass]);
 
   useEffect(() => {
-    composer.setPixelRatio(viewport.dpr);
+    composer.setPixelRatio(Math.min(viewport.dpr, 1));
     composer.setSize(size.width, size.height);
     bloomPass.setSize(size.width, size.height);
   }, [bloomPass, composer, size.height, size.width, viewport.dpr]);

@@ -17,7 +17,6 @@ import {
 } from "three";
 import { hubSections, HubSection } from "../hubSections";
 import { playerWorldState } from "../playerWorldState";
-import { DistanceVisible } from "./DistanceVisible";
 
 type HubSectionsProps = {
   onActiveSectionChange: (sectionName: string | null) => void;
@@ -197,17 +196,15 @@ function HubSectionDistrict({
 
   return (
     <group name={`HubSection:${section.id}`} position={section.position} rotation-y={rotation}>
-      <DistanceVisible>
-        <SectionBillboard section={section} selectedOffer={selectedOffer} showcaseVideoState={showcaseVideoState} />
-        {section.id === "offers" && <OffersSelector selectedOfferId={selectedOffer?.id ?? null} onOfferSelect={onOfferSelect} />}
-        {section.id === "showcase" && (
-          <ShowcaseSelector
-            isPlaying={showcaseVideoState.playing}
-            onPlayerEnter={onShowcasePlay}
-            onPlayerExit={onShowcasePause}
-          />
-        )}
-      </DistanceVisible>
+      <SectionBillboard section={section} selectedOffer={selectedOffer} showcaseVideoState={showcaseVideoState} />
+      {section.id === "offers" && <OffersSelector selectedOfferId={selectedOffer?.id ?? null} onOfferSelect={onOfferSelect} />}
+      {section.id === "showcase" && (
+        <ShowcaseSelector
+          isPlaying={showcaseVideoState.playing}
+          onPlayerEnter={onShowcasePlay}
+          onPlayerExit={onShowcasePause}
+        />
+      )}
       <TriggerZone section={section} />
     </group>
   );

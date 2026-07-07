@@ -5,7 +5,6 @@ import { Mesh, MeshBasicMaterial, Vector3 } from "three";
 import { VillainCharacter, VillainStatus } from "../../villain/VillainCharacter";
 import { hubSections } from "../hubSections";
 import { playerWorldState } from "../playerWorldState";
-import { DistanceVisible } from "./DistanceVisible";
 
 const padRadius = 1.35;
 const cooldownMs = 1800;
@@ -99,13 +98,11 @@ function SectionPortalEncounter({ encounter }: { encounter: SectionEncounterConf
 
   return (
     <group name={`PortalEncounter:${encounter.id}`}>
-      <DistanceVisible origin={encounter.padPosition}>
-        <TriggerPad position={encounter.padPosition} active={portalActive} onActivate={activatePad} />
-        <VillainCharacter
-          basePosition={encounter.villainPosition}
-          villainStatus={villainStatus}
-        />
-      </DistanceVisible>
+      <TriggerPad position={encounter.padPosition} active={portalActive} onActivate={activatePad} />
+      <VillainCharacter
+        basePosition={encounter.villainPosition}
+        villainStatus={villainStatus}
+      />
     </group>
   );
 }

@@ -1,6 +1,6 @@
 import { CapsuleCollider, RigidBody, RapierRigidBody } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { MathUtils, Vector3 } from "three";
 import { PlayerCharacter } from "./PlayerCharacter";
 import { ThirdPersonCamera } from "./ThirdPersonCamera";
@@ -42,7 +42,6 @@ export function CharacterController({
   const movementDirectionRef = useRef(new Vector3());
   const animationStateRef = useRef<CharacterAnimationState>("idle");
   const forwardBackSpeedRef = useRef(0);
-  const [animationState, setAnimationState] = useState<CharacterAnimationState>("idle");
   const spawn = useMemo<[number, number, number]>(() => [0, 2.8, 8], []);
 
   useEffect(() => {
@@ -53,7 +52,6 @@ export function CharacterController({
     forwardBackSpeedRef.current = 0;
     movementDirectionRef.current.set(0, 0, 0);
     animationStateRef.current = "idle";
-    setAnimationState("idle");
     playerWorldState.position.set(spawn[0], spawn[1], spawn[2]);
 
     if (!body) return;
@@ -83,10 +81,7 @@ export function CharacterController({
         body.setAngvel({ x: 0, y: 0, z: 0 }, true);
       }
 
-      if (animationStateRef.current !== "idle") {
-        animationStateRef.current = "idle";
-        setAnimationState("idle");
-      }
+      animationStateRef.current = "idle";
       return;
     }
 
@@ -148,10 +143,7 @@ export function CharacterController({
 
     const nextState: CharacterAnimationState = isMoving ? "run" : "idle";
 
-    if (animationStateRef.current !== nextState) {
-      animationStateRef.current = nextState;
-      setAnimationState(nextState);
-    }
+    animationStateRef.current = nextState;
   });
 
   return (
@@ -175,7 +167,7 @@ export function CharacterController({
       >
         <CapsuleCollider args={[0.65, 0.38]} friction={0} restitution={0} />
         <PlayerCharacter
-          animationState={animationState}
+          animationStateRef={animationStateRef}
           dialogue={dialogue}
           fixedAnimationRequest={fixedAnimationRequest}
           onFixedAnimationComplete={onFixedAnimationComplete}

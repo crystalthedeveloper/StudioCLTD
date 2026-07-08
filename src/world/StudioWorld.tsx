@@ -8,43 +8,32 @@ import { CombatPrototype } from "./systems/CombatPrototype";
 import { GlowCubeField } from "./systems/GlowCubeField";
 import { HubSections } from "./systems/HubSections";
 import { ModularTerrain } from "./systems/ModularTerrain";
-import { PerformanceDebug } from "./systems/PerformanceDebug";
 import { SpaceSky } from "./systems/SpaceSky";
 import { SpeedPowerUp } from "./systems/SpeedPowerUp";
 import { WorldLights } from "./systems/WorldLights";
 
 type StudioWorldProps = {
-  onActiveSectionChange: (sectionName: string | null) => void;
   restartKey: number;
 };
 
-const sectionVillainDialogue: Record<string, string> = {
-  "Quick Fix": "😈 Broken Button!",
-  "Urgent Fix": "😈 Broken Images!",
-  Performance: "😈 Poor PageSpeed",
-  "Site Improvement": "😈 Broken Slider",
-};
 const enablePostProcessing = import.meta.env.VITE_ENABLE_POSTPROCESSING === "true";
 
-export function StudioWorld({ onActiveSectionChange, restartKey }: StudioWorldProps) {
+export function StudioWorld({ restartKey }: StudioWorldProps) {
   const dialogueIdRef = useRef(0);
   const fixedAnimationRequestRef = useRef(0);
   const [fixedAnimationRequest, setFixedAnimationRequest] = useState(0);
   const [movementLocked, setMovementLocked] = useState(false);
   const [serviceResolutions, setServiceResolutions] = useState<Record<string, boolean>>({});
-  const [activeSectionName, setActiveSectionName] = useState<string | null>(null);
   const [playerDialogue, setPlayerDialogue] = useState<DialogueMessage | null>(null);
   const [villainDialogue, setVillainDialogue] = useState<(DialogueMessage & { sectionName: string }) | null>(null);
 
   useEffect(() => {
     setMovementLocked(false);
     setServiceResolutions({});
-    setActiveSectionName(null);
     setPlayerDialogue(null);
     setVillainDialogue(null);
-    onActiveSectionChange(null);
     resetSpeedBoost();
-  }, [onActiveSectionChange, restartKey]);
+  }, [restartKey]);
 
   const createDialogue = (text: string): DialogueMessage => {
     dialogueIdRef.current += 1;
@@ -54,37 +43,16 @@ export function StudioWorld({ onActiveSectionChange, restartKey }: StudioWorldPr
     };
   };
 
-  const handleActiveSectionChange = (sectionName: string | null) => {
-    setActiveSectionName(sectionName);
-    onActiveSectionChange(sectionName);
-
-    if (!sectionName) return;
-
-    const text = sectionVillainDialogue[sectionName];
-    if (!text) return;
-
-    setVillainDialogue({
-      ...createDialogue(text),
-      sectionName,
-    });
-  };
-
   return (
     <>
       <WorldLights />
-      <PerformanceDebug />
       <SpaceSky />
       <Environment preset="warehouse" background={false} environmentIntensity={0.05} />
       <ModularTerrain radius={7} />
       <GlowCubeField />
       <SpeedPowerUp restartKey={restartKey} />
-      <HubSections
-        restartKey={restartKey}
-        serviceResolutions={serviceResolutions}
-        onActiveSectionChange={handleActiveSectionChange}
-      />
+      <HubSections restartKey={restartKey} serviceResolutions={serviceResolutions} />
       <CombatPrototype
-        activeSectionName={activeSectionName}
         restartKey={restartKey}
         onPlayerDialogue={(text) => setPlayerDialogue(createDialogue(text))}
         onPlayerFixedAnimation={() => {

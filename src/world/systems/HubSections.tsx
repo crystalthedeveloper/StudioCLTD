@@ -16,19 +16,16 @@ import {
   VideoTexture,
 } from "three";
 import { BillboardLabel } from "../../ui/BillboardLabel";
+import { gameTextFont } from "../../ui/textFont";
 import { hubSections, HubSection } from "../hubSections";
-import { playerWorldState } from "../playerWorldState";
 
 type HubSectionsProps = {
-  onActiveSectionChange: (sectionName: string | null) => void;
   restartKey: number;
   serviceResolutions: Record<string, boolean>;
 };
 
 const center = new Vector3(0, 0, 0);
 const sectionPosition = new Vector3();
-const triggerRadius = 9;
-const triggerRadiusSq = triggerRadius * triggerRadius;
 const offerCountdownMs = 3000;
 const offerDisplayMs = 10000;
 const simpleDisplayMs = 10000;
@@ -129,9 +126,7 @@ function getShowcaseVideoResource() {
   };
 }
 
-export function HubSections({ onActiveSectionChange, restartKey, serviceResolutions }: HubSectionsProps) {
-  const activeSectionRef = useRef<string | null>(null);
-  const activeSectionCheckElapsedRef = useRef(0);
+export function HubSections({ restartKey, serviceResolutions }: HubSectionsProps) {
   const displayTimersRef = useRef<Record<string, number>>({});
   const [activeSimpleDisplays, setActiveSimpleDisplays] = useState<Record<string, boolean>>({});
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
@@ -172,7 +167,6 @@ export function HubSections({ onActiveSectionChange, restartKey, serviceResoluti
   useEffect(() => {
     Object.values(displayTimersRef.current).forEach((timer) => window.clearTimeout(timer));
     displayTimersRef.current = {};
-    activeSectionRef.current = null;
     setActiveSimpleDisplays({});
     setSelectedOfferId(null);
     setShowcaseVideoState({ playing: false });
@@ -183,23 +177,6 @@ export function HubSections({ onActiveSectionChange, restartKey, serviceResoluti
       resource.video.currentTime = 0;
     }
   }, [restartKey]);
-
-  useFrame((_, delta) => {
-    activeSectionCheckElapsedRef.current += delta;
-    if (activeSectionCheckElapsedRef.current < 0.12) return;
-    activeSectionCheckElapsedRef.current = 0;
-
-    const active = hubSections.find((section) => {
-      sectionPosition.set(...section.position);
-      return playerWorldState.position.distanceToSquared(sectionPosition) <= triggerRadiusSq;
-    });
-    const nextName = active?.name ?? null;
-
-    if (activeSectionRef.current !== nextName) {
-      activeSectionRef.current = nextName;
-      onActiveSectionChange(nextName);
-    }
-  });
 
   const showSimpleDisplay = (sectionId: string) => {
     const existingTimer = displayTimersRef.current[sectionId];
@@ -257,10 +234,6 @@ function HubPaths() {
             <mesh position={[0, 0.14, distance / 2]} rotation-x={-Math.PI / 2}>
               <boxGeometry args={[0.04, distance, 0.018]} />
               <meshBasicMaterial color="#ffffff" transparent opacity={0.3} toneMapped={false} />
-            </mesh>
-            <mesh position={[0, 0.15, distance - 7]} rotation-x={-Math.PI / 2}>
-              <coneGeometry args={[0.42, 1.05, 3]} />
-              <meshBasicMaterial color="#ffffff" transparent opacity={0.4} toneMapped={false} />
             </mesh>
           </group>
         );
@@ -320,7 +293,6 @@ function HubSectionDistrict({
           onPlayerExit={onShowcasePause}
         />
       )}
-      <TriggerZone section={section} />
     </group>
   );
 }
@@ -368,6 +340,7 @@ function SectionBillboard({
       </RigidBody>
       <Text
         color={white}
+        font={gameTextFont}
         fontSize={0.86}
         anchorX="center"
         anchorY="middle"
@@ -387,6 +360,7 @@ function SectionBillboard({
       ) : (
         <Text
           color="#9fb5cc"
+          font={gameTextFont}
           fontSize={0.26}
           anchorX="center"
           anchorY="middle"
@@ -400,6 +374,7 @@ function SectionBillboard({
         <>
           <Text
             color={white}
+            font={gameTextFont}
             fontSize={0.3}
             anchorX="center"
             anchorY="middle"
@@ -582,43 +557,55 @@ function OffersSelector({
   const [countdownSeconds, setCountdownSeconds] = useState(0);
   const countdownStartedAtRef = useRef(0);
   const countdownSecondsRef = useRef(0);
+  const countdownIntervalRef = useRef(0);
+  const offerOpenTimerRef = useRef(0);
   const pageOpenedRef = useRef(false);
 
+  const clearCountdownTimers = () => {
+    window.clearInterval(countdownIntervalRef.current);
+    window.clearTimeout(offerOpenTimerRef.current);
+    countdownIntervalRef.current = 0;
+    offerOpenTimerRef.current = 0;
+  };
+
   const startCountdown = (offer: OfferOption) => {
+    clearCountdownTimers();
     onOfferSelect(offer.id);
     setCountdownOfferId(offer.id);
     countdownSecondsRef.current = 3;
     setCountdownSeconds(3);
     countdownStartedAtRef.current = performance.now();
     pageOpenedRef.current = false;
+
+    countdownIntervalRef.current = window.setInterval(() => {
+      const elapsed = performance.now() - countdownStartedAtRef.current;
+      const remaining = Math.max(0, Math.ceil((offerCountdownMs - elapsed) / 1000));
+      if (countdownSecondsRef.current === remaining) return;
+
+      countdownSecondsRef.current = remaining;
+      setCountdownSeconds(remaining);
+    }, 180);
+
+    offerOpenTimerRef.current = window.setTimeout(() => {
+      pageOpenedRef.current = true;
+      clearCountdownTimers();
+      setCountdownOfferId(null);
+      countdownSecondsRef.current = 0;
+      setCountdownSeconds(0);
+      window.open(offersPageUrl, "_blank", "noopener,noreferrer");
+    }, offerCountdownMs);
   };
 
   const cancelCountdown = (offer: OfferOption) => {
     if (countdownOfferId !== offer.id || pageOpenedRef.current) return;
 
+    clearCountdownTimers();
     setCountdownOfferId(null);
     countdownSecondsRef.current = 0;
     setCountdownSeconds(0);
   };
 
-  useFrame(() => {
-    if (!countdownOfferId) return;
-
-    const elapsed = performance.now() - countdownStartedAtRef.current;
-    const remaining = Math.max(0, Math.ceil((offerCountdownMs - elapsed) / 1000));
-    if (countdownSecondsRef.current !== remaining) {
-      countdownSecondsRef.current = remaining;
-      setCountdownSeconds(remaining);
-    }
-
-    if (elapsed < offerCountdownMs || pageOpenedRef.current) return;
-
-    pageOpenedRef.current = true;
-    setCountdownOfferId(null);
-    countdownSecondsRef.current = 0;
-    setCountdownSeconds(0);
-    window.open(offersPageUrl, "_blank", "noopener,noreferrer");
-  });
+  useEffect(() => clearCountdownTimers, []);
 
   return (
     <group name="OffersSelector">
@@ -901,14 +888,6 @@ function ShowcasePortalPad({
         {label}
       </BillboardLabel>
       <pointLight color="#ffffff" intensity={active ? 2.2 : 0.6} distance={active ? 5.2 : 3} position={[0, 0.72, 0]} />
-    </group>
-  );
-}
-
-function TriggerZone({ section }: { section: HubSection }) {
-  return (
-    <group name={`TriggerZone:${section.id}`} position={[0, 1.8, 6.2]}>
-      <CuboidCollider sensor args={[4.5, 1.8, 4.5]} />
     </group>
   );
 }

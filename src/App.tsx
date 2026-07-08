@@ -12,7 +12,6 @@ import { StudioWorld } from "./world/StudioWorld";
 import { AssetPreloader } from "./world/systems/AssetPreloader";
 
 export default function App() {
-  const [activeSection, setActiveSection] = useState<string | null>(null);
   const [restartKey, setRestartKey] = useState(0);
   const [worldAssetsReady, setWorldAssetsReady] = useState(false);
   const [showcaseVideoReady, setShowcaseVideoReady] = useState(false);
@@ -21,7 +20,6 @@ export default function App() {
 
   const restartGame = () => {
     setRestartKey((current) => current + 1);
-    setActiveSection(null);
   };
 
   const openWebsite = () => {
@@ -136,7 +134,7 @@ export default function App() {
           <Suspense fallback={null}>
             <AssetPreloader onReady={handleWorldAssetsReady} />
             <Physics gravity={[0, -20, 0]}>
-              <StudioWorld restartKey={restartKey} onActiveSectionChange={setActiveSection} />
+              <StudioWorld restartKey={restartKey} />
             </Physics>
           </Suspense>
         </Canvas>
@@ -150,7 +148,7 @@ export default function App() {
           My Site
         </button>
       </div>
-      <HubOverlay activeSection={activeSection} />
+      <HubOverlay />
       <SpeedBoostHud />
       <div className={`game-focus-hint${gameFocused ? "" : " game-focus-hint--visible"}`}>
         <strong>Click to Play</strong>

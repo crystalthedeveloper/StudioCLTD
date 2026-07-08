@@ -2,13 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { hubSections } from "../world/hubSections";
 import { playerWorldState } from "../world/playerWorldState";
 
-type HubOverlayProps = {
-  activeSection: string | null;
-};
-
 const enableMinimap = import.meta.env.VITE_ENABLE_MINIMAP === "true";
 
-export function HubOverlay({ activeSection }: HubOverlayProps) {
+export function HubOverlay() {
   const [playerPoint, setPlayerPoint] = useState({ x: 50, y: 50 });
   const playerPointRef = useRef(playerPoint);
   const points = useMemo(
@@ -68,9 +64,6 @@ export function HubOverlay({ activeSection }: HubOverlayProps) {
           />
         </div>
       )}
-      <div className={`hub-section-title ${activeSection ? "hub-section-title--visible" : ""}`}>
-        {activeSection}
-      </div>
     </>
   );
 }

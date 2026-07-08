@@ -2,6 +2,7 @@ import { Text } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { ReactNode, useRef } from "react";
 import { Euler, Group, Quaternion, Vector3 } from "three";
+import { gameTextFont } from "./textFont";
 
 const worldPosition = new Vector3();
 const parentQuaternion = new Quaternion();
@@ -56,6 +57,7 @@ export function BillboardLabel({
         anchorX="center"
         anchorY="middle"
         color={color}
+        font={gameTextFont}
         fontSize={fontSize}
         lineHeight={lineHeight}
         maxWidth={maxWidth}

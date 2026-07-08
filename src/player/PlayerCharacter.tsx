@@ -8,7 +8,7 @@ import { DialogueBubble, DialogueMessage } from "../ui/DialogueBubble";
 import { CharacterAnimationState } from "./playerTypes";
 
 type PlayerCharacterProps = {
-  animationState: CharacterAnimationState;
+  animationStateRef: MutableRefObject<CharacterAnimationState>;
   dialogue: DialogueMessage | null;
   fixedAnimationRequest: number;
   onFixedAnimationComplete: () => void;
@@ -29,7 +29,7 @@ function fadeOutOtherActions(actions: Record<string, AnimationAction | null>, ac
 }
 
 export function PlayerCharacter({
-  animationState,
+  animationStateRef,
   dialogue,
   fixedAnimationRequest,
   onFixedAnimationComplete,
@@ -41,12 +41,8 @@ export function PlayerCharacter({
   const { actions } = useAnimations(model.animations, group);
   const fixedRequestRef = useRef(0);
   const fixedActionRef = useRef<AnimationAction | null>(null);
-  const animationStateRef = useRef<CharacterAnimationState>(animationState);
+  const activeLocomotionStateRef = useRef<CharacterAnimationState | null>(null);
   const onFixedAnimationCompleteRef = useRef(onFixedAnimationComplete);
-
-  useEffect(() => {
-    animationStateRef.current = animationState;
-  }, [animationState]);
 
   useEffect(() => {
     onFixedAnimationCompleteRef.current = onFixedAnimationComplete;
@@ -63,21 +59,23 @@ export function PlayerCharacter({
     });
   }, [scene]);
 
-  useEffect(() => {
-    if (fixedActionRef.current) return;
+  const playLocomotionAction = (nextState: CharacterAnimationState) => {
+    if (fixedActionRef.current || activeLocomotionStateRef.current === nextState) return;
 
-    const action = actions[playerAnimationByState[animationState]];
+    const action = actions[playerAnimationByState[nextState]];
     if (!action) return;
 
+    activeLocomotionStateRef.current = nextState;
     fadeOutOtherActions(actions, action);
     action.setLoop(LoopRepeat, Infinity);
     action.clampWhenFinished = false;
     action.reset().fadeIn(0.16).play();
+  };
 
-    return () => {
-      action.fadeOut(0.16);
-    };
-  }, [actions, animationState]);
+  useEffect(() => {
+    activeLocomotionStateRef.current = null;
+    playLocomotionAction(animationStateRef.current);
+  }, [actions]);
 
   useEffect(() => {
     if (fixedAnimationRequest === fixedRequestRef.current) return;
@@ -107,13 +105,8 @@ export function PlayerCharacter({
       action.fadeOut(0.08);
       onFixedAnimationCompleteRef.current();
 
-      const nextAction = actions[playerAnimationByState[animationStateRef.current]];
-      if (nextAction) {
-        fadeOutOtherActions(actions, nextAction);
-        nextAction.setLoop(LoopRepeat, Infinity);
-        nextAction.clampWhenFinished = false;
-        nextAction.reset().fadeIn(0.12).play();
-      }
+      activeLocomotionStateRef.current = null;
+      playLocomotionAction(animationStateRef.current);
       mixer.removeEventListener("finished", handleFinished);
     };
 
@@ -136,6 +129,8 @@ export function PlayerCharacter({
 
   useFrame(() => {
     if (!group.current) return;
+
+    playLocomotionAction(animationStateRef.current);
 
     group.current.rotation.y = yawRef.current;
     group.current.position.y = -1.05;

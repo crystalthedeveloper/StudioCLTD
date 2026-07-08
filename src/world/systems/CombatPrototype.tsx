@@ -5,15 +5,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Group, Mesh, MeshBasicMaterial, SphereGeometry, Vector3 } from "three";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { DialogueMessage } from "../../ui/DialogueBubble";
+import { gameTextFont } from "../../ui/textFont";
 import { VillainCharacter, VillainStatus } from "../../villain/VillainCharacter";
 import { hubSections } from "../hubSections";
 import { playerWorldState } from "../playerWorldState";
 
-const padRadius = 1.6;
 const cooldownMs = 1800;
 const dialoguePadRadius = 6.5;
 const dialogueVillainRadius = 9;
-const padRadiusSq = padRadius * padRadius;
 const dialoguePadRadiusSq = dialoguePadRadius * dialoguePadRadius;
 const dialogueVillainRadiusSq = dialogueVillainRadius * dialogueVillainRadius;
 const encounterSectionIds = ["quick-fix", "urgent-fix", "performance", "site-improvement"];
@@ -75,7 +74,6 @@ function createSectionEncounters(): SectionEncounterConfig[] {
 const sectionEncounters = createSectionEncounters();
 
 type CombatPrototypeProps = {
-  activeSectionName: string | null;
   onPlayerFixedAnimation: () => void;
   onPlayerDialogue: (text: string) => void;
   onSectionResolved: (sectionId: string) => void;
@@ -85,7 +83,6 @@ type CombatPrototypeProps = {
 };
 
 export function CombatPrototype({
-  activeSectionName,
   onPlayerFixedAnimation,
   onPlayerDialogue,
   onSectionResolved,
@@ -114,10 +111,8 @@ export function CombatPrototype({
       {sectionEncounters.map((encounter) => (
         <SectionPortalEncounter
           key={`${encounter.id}:${restartKey}`}
-          activeSectionName={activeSectionName}
           activeInfoId={activeInfoId}
           encounter={encounter}
-          onInfoClose={() => setActiveInfoId(null)}
           onInfoOpen={() => setActiveInfoId(encounter.id)}
           onPlayerFixedAnimation={onPlayerFixedAnimation}
           onPlayerDialogue={onPlayerDialogue}
@@ -131,10 +126,8 @@ export function CombatPrototype({
 }
 
 function SectionPortalEncounter({
-  activeSectionName,
   activeInfoId,
   encounter,
-  onInfoClose,
   onInfoOpen,
   onPlayerFixedAnimation,
   onPlayerDialogue,
@@ -142,10 +135,8 @@ function SectionPortalEncounter({
   onVillainDialogue,
   villainDialogue,
 }: {
-  activeSectionName: string | null;
   activeInfoId: string | null;
   encounter: SectionEncounterConfig;
-  onInfoClose: () => void;
   onInfoOpen: () => void;
   onPlayerFixedAnimation: () => void;
   onPlayerDialogue: (text: string) => void;
@@ -163,9 +154,25 @@ function SectionPortalEncounter({
   const lastInfoActivatedRef = useRef(0);
   const wasNearDialogueRef = useRef(false);
   const wasNearVillainRef = useRef(false);
-  const wasOnPadRef = useRef(false);
-  const wasOnInfoPadRef = useRef(false);
+  const villainBubbleVisibleRef = useRef(false);
+  const villainBubbleUpdateTimerRef = useRef(0);
+  const villainDialogueTimerRef = useRef(0);
   const defeatedRef = useRef(false);
+
+  const setVillainBubbleVisibilitySoon = (visible: boolean) => {
+    window.clearTimeout(villainBubbleUpdateTimerRef.current);
+    villainBubbleUpdateTimerRef.current = window.setTimeout(() => {
+      villainBubbleVisibleRef.current = visible;
+      setVillainBubbleVisible(visible);
+    }, 0);
+  };
+
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(villainBubbleUpdateTimerRef.current);
+      window.clearTimeout(villainDialogueTimerRef.current);
+    };
+  }, []);
 
   const activatePad = () => {
     const now = performance.now();
@@ -233,42 +240,25 @@ function SectionPortalEncounter({
     const villainDeltaX = playerWorldState.position.x - encounter.villainPosition.x;
     const villainDeltaZ = playerWorldState.position.z - encounter.villainPosition.z;
     const villainDistanceSq = villainDeltaX * villainDeltaX + villainDeltaZ * villainDeltaZ;
-    const onPad = padDistanceSq <= padRadiusSq && playerWorldState.position.y < 2.3;
-    const onInfoPad = infoPadDistanceSq <= padRadiusSq && playerWorldState.position.y < 2.3;
     const nearDialogueArea =
-      activeSectionName === encounter.name ||
       padDistanceSq <= dialoguePadRadiusSq ||
       infoPadDistanceSq <= dialoguePadRadiusSq ||
       villainDistanceSq <= dialogueVillainRadiusSq;
     const nearVillain = !defeatedRef.current && villainDistanceSq <= dialogueVillainRadiusSq;
 
-    if (onPad && !wasOnPadRef.current) {
-      activatePad();
-    }
-
-    if (onInfoPad && !wasOnInfoPadRef.current) {
-      activateInfoPad();
-    }
-
-    if (!onInfoPad && wasOnInfoPadRef.current && activeInfoId === encounter.id) {
-      onInfoClose();
-    }
-
     if (nearVillain !== wasNearVillainRef.current) {
-      setVillainBubbleVisible(nearVillain);
+      setVillainBubbleVisibilitySoon(nearVillain);
     }
 
     if (!defeatedRef.current && encounter.id !== "quick-fix" && nearDialogueArea && !wasNearDialogueRef.current) {
-      onVillainDialogue(
-        encounter.name,
-        villainDialogueText[encounter.id]
-      );
+      window.clearTimeout(villainDialogueTimerRef.current);
+      villainDialogueTimerRef.current = window.setTimeout(() => {
+        onVillainDialogue(encounter.name, villainDialogueText[encounter.id]);
+      }, 0);
     }
 
     wasNearDialogueRef.current = nearDialogueArea;
     wasNearVillainRef.current = nearVillain;
-    wasOnPadRef.current = onPad;
-    wasOnInfoPadRef.current = onInfoPad;
   });
 
   return (
@@ -492,10 +482,10 @@ function ServiceInfoPanel({
         <boxGeometry args={[0.035, 4.25, 0.035]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.18} toneMapped={false} />
       </mesh>
-      <Text color="#ffffff" fontSize={0.3} anchorX="center" anchorY="middle" position={[0, 1.45, 0]} maxWidth={5.75}>
+      <Text color="#ffffff" font={gameTextFont} fontSize={0.3} anchorX="center" anchorY="middle" position={[0, 1.45, 0]} maxWidth={5.75}>
         {title}
       </Text>
-      <Text color="#ffffff" fontSize={0.17} anchorX="center" anchorY="middle" position={[0, -0.25, 0]} maxWidth={5.55} lineHeight={1.35}>
+      <Text color="#ffffff" font={gameTextFont} fontSize={0.17} anchorX="center" anchorY="middle" position={[0, -0.25, 0]} maxWidth={5.55} lineHeight={1.35}>
         {text}
       </Text>
     </group>

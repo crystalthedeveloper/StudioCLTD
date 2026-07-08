@@ -1,5 +1,4 @@
 import { PointerEvent, WheelEvent, useEffect, useRef, useState } from "react";
-import { isControllerDebugEnabled } from "../debug/controllerDebug";
 import { setTrackpadCameraInputBlocked } from "../player/cameraInputGuard";
 import { setGameFocused } from "../player/gameFocus";
 import { MovementControls, setTrackpadControls } from "../player/useKeyboardControls";
@@ -53,16 +52,6 @@ export function TrackpadControl() {
     const nextControls = controlsFromOffset(x, y);
     setThumb({ x, y });
     setTrackpadControls(nextControls);
-    if (!isControllerDebugEnabled()) return;
-
-    console.log("Trackpad moving", {
-      backward: nextControls.backward,
-      forward: nextControls.forward,
-      left: nextControls.left,
-      right: nextControls.right,
-      x,
-      y,
-    });
   };
 
   const resetPointer = (log = true) => {
@@ -71,15 +60,8 @@ export function TrackpadControl() {
     setTrackpadCameraInputBlocked(false);
     setThumb({ x: 0, y: 0 });
     setTrackpadControls({ forward: false, backward: false, left: false, right: false });
-    if (!log || !wasActive) return;
-    if (!isControllerDebugEnabled()) return;
-
-    console.log("Trackpad pointer up", {
-      backward: false,
-      forward: false,
-      left: false,
-      right: false,
-    });
+    void log;
+    void wasActive;
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -89,9 +71,6 @@ export function TrackpadControl() {
     setGameFocused(true);
     document.exitPointerLock?.();
     event.currentTarget.setPointerCapture(event.pointerId);
-    if (isControllerDebugEnabled()) {
-      console.log("Trackpad pointer down");
-    }
     updatePointer(event);
   };
 

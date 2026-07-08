@@ -18,8 +18,6 @@ export function getSpeedBoostRemainingMs() {
 }
 
 export function activateSpeedBoost() {
-  console.log("Speed power-up picked up");
-  console.log("Speed boost active");
   activeUntil = Date.now() + boostDurationMs;
 
   if (endTimeout !== null) {
@@ -29,7 +27,6 @@ export function activateSpeedBoost() {
   endTimeout = window.setTimeout(() => {
     activeUntil = 0;
     endTimeout = null;
-    console.log("Speed boost ended");
     emitSpeedBoostChange();
   }, boostDurationMs);
 

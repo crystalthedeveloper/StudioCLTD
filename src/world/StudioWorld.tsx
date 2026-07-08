@@ -1,4 +1,5 @@
 import { Environment } from "@react-three/drei";
+import { useState } from "react";
 import { CharacterController } from "../player/CharacterController";
 import { CinematicPostProcessing } from "./systems/CinematicPostProcessing";
 import { CombatPrototype } from "./systems/CombatPrototype";
@@ -14,16 +15,18 @@ type StudioWorldProps = {
 };
 
 export function StudioWorld({ onActiveSectionChange }: StudioWorldProps) {
+  const [quickFixResolved, setQuickFixResolved] = useState(false);
+
   return (
     <>
       <WorldLights />
       <SpaceSky />
-      <Environment preset="warehouse" background={false} environmentIntensity={0.06} />
+      <Environment preset="warehouse" background={false} environmentIntensity={0.08} />
       <ModularTerrain radius={7} />
       <GlowCubeField />
       <SpeedPowerUp />
-      <HubSections onActiveSectionChange={onActiveSectionChange} />
-      <CombatPrototype />
+      <HubSections quickFixResolved={quickFixResolved} onActiveSectionChange={onActiveSectionChange} />
+      <CombatPrototype onQuickFixResolved={() => setQuickFixResolved(true)} />
       <CharacterController />
       <CinematicPostProcessing />
     </>

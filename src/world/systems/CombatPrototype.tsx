@@ -42,34 +42,53 @@ function createSectionEncounters(): SectionEncounterConfig[] {
 
 const sectionEncounters = createSectionEncounters();
 
-export function CombatPrototype() {
+type CombatPrototypeProps = {
+  onQuickFixResolved: () => void;
+};
+
+export function CombatPrototype({ onQuickFixResolved }: CombatPrototypeProps) {
   return (
     <group name="SectionPortalEncounters">
       {sectionEncounters.map((encounter) => (
-        <SectionPortalEncounter key={encounter.id} encounter={encounter} />
+        <SectionPortalEncounter
+          key={encounter.id}
+          encounter={encounter}
+          onQuickFixResolved={onQuickFixResolved}
+        />
       ))}
     </group>
   );
 }
 
-function SectionPortalEncounter({ encounter }: { encounter: SectionEncounterConfig }) {
+function SectionPortalEncounter({
+  encounter,
+  onQuickFixResolved,
+}: {
+  encounter: SectionEncounterConfig;
+  onQuickFixResolved: () => void;
+}) {
   const [villainStatus, setVillainStatus] = useState<VillainStatus>("idle");
   const [portalActive, setPortalActive] = useState(false);
   const lastActivatedRef = useRef(0);
   const wasOnPadRef = useRef(false);
+  const defeatedRef = useRef(false);
 
   const activatePad = () => {
     const now = performance.now();
+    if (defeatedRef.current) return;
     if (now - lastActivatedRef.current < cooldownMs) return;
 
+    defeatedRef.current = true;
     lastActivatedRef.current = now;
     setPortalActive(true);
     setVillainStatus("dead");
-    console.log("[StudioCLTD portal] Trigger pad activated", {
-      section: encounter.name,
-      pad: encounter.padPosition.toArray(),
-      villainStatus: "dead",
-    });
+
+    if (encounter.id === "quick-fix") {
+      console.log("[Quick Fix] Trigger activated");
+      console.log("[Quick Fix] Playing dieV");
+      onQuickFixResolved();
+      console.log("[Quick Fix] Screen changed to quick-fix-good.png");
+    }
   };
 
   useEffect(() => {

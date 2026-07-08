@@ -4,7 +4,6 @@ import { MathUtils, Vector3 } from "three";
 import { RapierRigidBody } from "@react-three/rapier";
 import {
   getLastMouseDelta,
-  isControllerDebugEnabled,
   logControllerDebug,
   logTargetChange,
   markCameraUpdate,
@@ -21,8 +20,8 @@ type ThirdPersonCameraProps = {
 };
 
 const cameraSettings = {
-  distance: 7.4,
-  height: 3,
+  distance: 7.6,
+  height: 2,
   targetHeight: 1.45,
   pitch: -0.24,
   minPitch: MathUtils.degToRad(-35),
@@ -41,9 +40,6 @@ const lookDirection = new Vector3();
 const lookAt = new Vector3();
 const smoothedLookAt = new Vector3();
 const worldUp = new Vector3(0, 1, 0);
-const rollTolerance = 0.0005;
-const pitchTolerance = 0.0005;
-const distanceDriftTolerance = 0.55;
 const maxFrameDelta = 1 / 30;
 
 function dampAngle(current: number, target: number, lambda: number, delta: number) {
@@ -64,14 +60,10 @@ export function ThirdPersonCamera({
   const smoothedYawRef = useRef(cameraYawRef.current);
   const smoothedPitchRef = useRef(cameraSettings.pitch);
   const hasCameraStateRef = useRef(false);
-  const lastRollWarningRef = useRef(0);
-  const lastDistanceLogRef = useRef(0);
-  const lastFpsLogRef = useRef(0);
 
   useFrame((_, delta) => {
     const body = targetRef.current;
     if (!body) return;
-    const debugEnabled = isControllerDebugEnabled();
     const frameDelta = Math.min(delta, maxFrameDelta);
 
     const debugFrame = Math.floor(_.clock.elapsedTime * 60);
@@ -105,18 +97,6 @@ export function ThirdPersonCamera({
 
     const yaw = smoothedYawRef.current;
     const pitch = smoothedPitchRef.current;
-    if (
-      (pitch < cameraSettings.minPitch - pitchTolerance || pitch > cameraSettings.maxPitch + pitchTolerance) &&
-      debugEnabled &&
-      performance.now() - lastRollWarningRef.current > 250
-    ) {
-      lastRollWarningRef.current = performance.now();
-      console.warn("[StudioCLTD camera debug] Camera pitch outside clamp", {
-        maxPitch: cameraSettings.maxPitch,
-        minPitch: cameraSettings.minPitch,
-        pitch,
-      });
-    }
     const cameraDistance = cameraSettings.distance;
     const horizontalDistance = Math.cos(pitch) * cameraDistance;
     const verticalOffset = cameraSettings.height + Math.sin(pitch) * cameraDistance;
@@ -138,42 +118,8 @@ export function ThirdPersonCamera({
     camera.rotation.order = "YXZ";
     camera.rotation.set(cameraPitch, cameraYaw, 0);
 
-    if (debugEnabled && Math.abs(camera.rotation.z) > rollTolerance && performance.now() - lastRollWarningRef.current > 250) {
-      lastRollWarningRef.current = performance.now();
-      console.warn("[StudioCLTD camera debug] Camera roll detected after yaw/pitch solve", {
-        pitch: cameraPitch,
-        roll: camera.rotation.z,
-        yaw: cameraYaw,
-      });
-    }
     camera.rotation.z = 0;
     camera.updateMatrixWorld();
-
-    if (performance.now() - lastDistanceLogRef.current > 1000) {
-      lastDistanceLogRef.current = performance.now();
-      const distanceToPlayer = camera.position.distanceTo(smoothedCameraTarget);
-      const expectedDistance = desiredPosition.distanceTo(smoothedCameraTarget);
-      console.log("[StudioCLTD camera debug] Camera distance to player", {
-        configuredDistance: cameraSettings.distance,
-        distanceToPlayer,
-        expectedDistance,
-      });
-
-      if (debugEnabled && Math.abs(distanceToPlayer - expectedDistance) > distanceDriftTolerance) {
-        console.warn("[StudioCLTD camera debug] Camera distance drift detected", {
-          configuredDistance: cameraSettings.distance,
-          distanceToPlayer,
-          expectedDistance,
-        });
-      }
-    }
-
-    if (performance.now() - lastFpsLogRef.current > 1000) {
-      lastFpsLogRef.current = performance.now();
-      console.log("[StudioCLTD camera debug] FPS", {
-        fps: Math.round(1 / Math.max(delta, 0.0001)),
-      });
-    }
 
     logControllerDebug(performance.now(), {
       animationState: animationStateRef.current,

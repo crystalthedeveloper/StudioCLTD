@@ -20,6 +20,7 @@ import { playerWorldState } from "../playerWorldState";
 
 type HubSectionsProps = {
   onActiveSectionChange: (sectionName: string | null) => void;
+  quickFixResolved: boolean;
 };
 
 const center = new Vector3(0, 0, 0);
@@ -93,7 +94,7 @@ function getShowcaseVideoResource() {
   };
 }
 
-export function HubSections({ onActiveSectionChange }: HubSectionsProps) {
+export function HubSections({ onActiveSectionChange, quickFixResolved }: HubSectionsProps) {
   const activeSectionRef = useRef<string | null>(null);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
   const [showcaseVideoState, setShowcaseVideoState] = useState<ShowcaseVideoState>({
@@ -104,9 +105,6 @@ export function HubSections({ onActiveSectionChange }: HubSectionsProps) {
   useEffect(() => {
     offerOptions.forEach((offer) => {
       const image = new Image();
-      image.onerror = () => {
-        console.log(`[StudioCLTD offers] Failed to load offer image: ${offer.imagePath}`);
-      };
       image.src = offer.imagePath;
     });
   }, []);
@@ -121,9 +119,6 @@ export function HubSections({ onActiveSectionChange }: HubSectionsProps) {
     if (activeSectionRef.current !== nextName) {
       activeSectionRef.current = nextName;
       onActiveSectionChange(nextName);
-      if (nextName) {
-        console.log("[StudioCLTD hub] Entered section trigger", nextName);
-      }
     }
   });
 
@@ -134,6 +129,7 @@ export function HubSections({ onActiveSectionChange }: HubSectionsProps) {
         <HubSectionDistrict
           key={section.id}
           section={section}
+          quickFixResolved={quickFixResolved}
           selectedOffer={offerOptions.find((offer) => offer.id === selectedOfferId) ?? null}
           showcaseVideoState={showcaseVideoState}
           onOfferSelect={setSelectedOfferId}
@@ -178,6 +174,7 @@ function HubSectionDistrict({
   onOfferSelect,
   onShowcasePause,
   onShowcasePlay,
+  quickFixResolved,
   section,
   selectedOffer,
   showcaseVideoState,
@@ -185,6 +182,7 @@ function HubSectionDistrict({
   onOfferSelect: (offerId: string | null) => void;
   onShowcasePause: () => void;
   onShowcasePlay: () => void;
+  quickFixResolved: boolean;
   section: HubSection;
   selectedOffer: OfferOption | null;
   showcaseVideoState: ShowcaseVideoState;
@@ -196,7 +194,12 @@ function HubSectionDistrict({
 
   return (
     <group name={`HubSection:${section.id}`} position={section.position} rotation-y={rotation}>
-      <SectionBillboard section={section} selectedOffer={selectedOffer} showcaseVideoState={showcaseVideoState} />
+      <SectionBillboard
+        quickFixResolved={quickFixResolved}
+        section={section}
+        selectedOffer={selectedOffer}
+        showcaseVideoState={showcaseVideoState}
+      />
       {section.id === "offers" && <OffersSelector selectedOfferId={selectedOffer?.id ?? null} onOfferSelect={onOfferSelect} />}
       {section.id === "showcase" && (
         <ShowcaseSelector
@@ -211,15 +214,18 @@ function HubSectionDistrict({
 }
 
 function SectionBillboard({
+  quickFixResolved,
   section,
   selectedOffer,
   showcaseVideoState,
 }: {
+  quickFixResolved: boolean;
   section: HubSection;
   selectedOffer: OfferOption | null;
   showcaseVideoState: ShowcaseVideoState;
 }) {
   const isOffers = section.id === "offers";
+  const isQuickFix = section.id === "quick-fix";
   const isShowcase = section.id === "showcase";
 
   return (
@@ -257,6 +263,8 @@ function SectionBillboard({
       </Text>
       {isOffers ? (
         <OffersScreenContent selectedOffer={selectedOffer} />
+      ) : isQuickFix ? (
+        <QuickFixScreenContent resolved={quickFixResolved} />
       ) : isShowcase ? (
         <ShowcaseScreenContent isPlaying={showcaseVideoState.playing} hasStarted={showcaseVideoState.hasStarted} />
       ) : (
@@ -304,15 +312,6 @@ function OffersScreenContent({ selectedOffer }: { selectedOffer: OfferOption | n
   const selectedIndex = selectedOffer ? offerOptions.findIndex((offer) => offer.id === selectedOffer.id) : -1;
   const texture = selectedIndex >= 0 ? loadedTextures[selectedIndex] : null;
 
-  useEffect(() => {
-    if (selectedOffer && !texture) {
-      console.error("[StudioCLTD offers] Selected offer has no loaded texture", {
-        image: selectedOffer.imagePath,
-        offer: selectedOffer.name,
-      });
-    }
-  }, [selectedOffer, texture]);
-
   return (
     <mesh key={selectedOffer?.id ?? "offers-empty-screen"} position={[0, -0.03, -0.2]} renderOrder={20}>
       <planeGeometry args={[8.4, 4.15]} />
@@ -332,6 +331,36 @@ function OffersScreenContent({ selectedOffer }: { selectedOffer: OfferOption | n
   );
 }
 
+function QuickFixScreenContent({ resolved }: { resolved: boolean }) {
+  const [badTexture, goodTexture] = useLoader(TextureLoader, [
+    "/images/quickFix/quick-fix-bad.png",
+    "/images/quickFix/quick-fix-good.png",
+  ]);
+  const texture = resolved ? goodTexture : badTexture;
+
+  useEffect(() => {
+    [badTexture, goodTexture].forEach((loadedTexture) => {
+      loadedTexture.colorSpace = SRGBColorSpace;
+      loadedTexture.minFilter = LinearFilter;
+      loadedTexture.magFilter = LinearFilter;
+      loadedTexture.needsUpdate = true;
+    });
+  }, [badTexture, goodTexture]);
+
+  return (
+    <mesh position={[0, -0.03, -0.2]} renderOrder={20}>
+      <planeGeometry args={[8.4, 4.15]} />
+      <meshBasicMaterial
+        color="#ffffff"
+        depthTest={false}
+        map={texture}
+        side={DoubleSide}
+        toneMapped
+      />
+    </mesh>
+  );
+}
+
 function ShowcaseScreenContent({ hasStarted, isPlaying }: { hasStarted: boolean; isPlaying: boolean }) {
   const materialRef = useRef<MeshBasicMaterial>(null);
   const screenOpacityRef = useRef(0);
@@ -344,18 +373,12 @@ function ShowcaseScreenContent({ hasStarted, isPlaying }: { hasStarted: boolean;
     if (isPlaying) {
       video
         .play()
-        .then(() => {
-          console.log("[StudioCLTD showcase] Video playing");
-        })
-        .catch((error) => {
-          console.error("[StudioCLTD showcase] Video failed to play", error);
-        });
+        .catch(() => undefined);
       return;
     }
 
     if (!hasStarted || video.paused) return;
     video.pause();
-    console.log("[StudioCLTD showcase] Video paused");
   }, [hasStarted, isPlaying, resource.video]);
 
   useEffect(() => {
@@ -415,9 +438,6 @@ function OffersSelector({
     setCountdownSeconds(3);
     countdownStartedAtRef.current = performance.now();
     pageOpenedRef.current = false;
-    console.log("Offer pad entered", offer.name);
-    console.log("Countdown started", offer.name);
-    console.log(`${offer.name} offer selected`);
   };
 
   const cancelCountdown = (offer: OfferOption) => {
@@ -426,7 +446,6 @@ function OffersSelector({
     setCountdownOfferId(null);
     countdownSecondsRef.current = 0;
     setCountdownSeconds(0);
-    console.log("Countdown cancelled", offer.name);
   };
 
   useFrame(() => {
@@ -445,7 +464,6 @@ function OffersSelector({
     setCountdownOfferId(null);
     countdownSecondsRef.current = 0;
     setCountdownSeconds(0);
-    console.log("Opening offers page", offersPageUrl);
     window.open(offersPageUrl, "_blank", "noopener,noreferrer");
   });
 
@@ -516,16 +534,7 @@ function OfferPortalPad({
       isPlayerIntersection(event.other.rigidBodyObject) ||
       isPlayerIntersection(event.other.colliderObject);
 
-    if (!hitPlayer) {
-      console.log("[StudioCLTD offers] Ignored non-player offer pad intersection", {
-        colliderObject: event.other.colliderObject?.name,
-        offer: offer.name,
-        rigidBodyObject: event.other.rigidBodyObject?.name,
-      });
-      return false;
-    }
-
-    return true;
+    return hitPlayer;
   };
 
   const handleEnter = (event: IntersectionEnterPayload) => {
@@ -665,7 +674,6 @@ function ShowcasePortalPad({
   const activate = () => {
     if (playerInsideRef.current) return;
     playerInsideRef.current = true;
-    console.log("[StudioCLTD showcase] Trigger activated");
     onPlayerEnter();
   };
 

@@ -2,10 +2,12 @@ import { useAnimations, useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import { useEffect, useMemo, useRef } from "react";
-import { Group, Mesh, Vector3 } from "three";
+import { AnimationAction, Group, LoopOnce, LoopRepeat, MathUtils, Mesh, Vector3 } from "three";
 import { SkeletonUtils } from "three-stdlib";
+import { applyCharacterMaterials, villainMaterialProfile } from "../characters/characterMaterials";
+import { playerWorldState } from "../world/playerWorldState";
 
-export type VillainStatus = "idle" | "dead";
+export type VillainStatus = "idle" | "running" | "dead";
 
 type VillainCharacterProps = {
   basePosition: Vector3;
@@ -13,18 +15,34 @@ type VillainCharacterProps = {
 };
 
 const animationByStatus: Record<VillainStatus, string> = {
-  idle: "idle",
-  dead: "die",
+  idle: "idleV",
+  running: "runV",
+  dead: "dieV",
 };
+const lookDirection = new Vector3();
+const rotationDamping = 5.5;
+const modelFacingOffset = Math.PI;
+const modelYOffset = 0.28;
+
+function fadeOutOtherActions(actions: Record<string, AnimationAction | null>, activeAction: AnimationAction) {
+  Object.values(actions).forEach((action) => {
+    if (!action || action === activeAction) return;
+
+    action.fadeOut(0.08);
+  });
+}
 
 export function VillainCharacter({ basePosition, villainStatus }: VillainCharacterProps) {
-  const model = useGLTF("/models/temp-villain.gltf");
+  const model = useGLTF("/characters/char.glb");
   const scene = useMemo(() => SkeletonUtils.clone(model.scene), [model.scene]);
-  const groupRef = useRef<Group>(null);
-  const lastStatusRef = useRef<VillainStatus>(villainStatus);
-  const { actions } = useAnimations(model.animations, groupRef);
+  const rootRef = useRef<Group>(null);
+  const modelRef = useRef<Group>(null);
+  const frozenDeathYawRef = useRef<number | null>(null);
+  const { actions } = useAnimations(model.animations, modelRef);
 
   useEffect(() => {
+    applyCharacterMaterials(scene, model.materials, villainMaterialProfile);
+
     scene.traverse((object) => {
       if (object instanceof Mesh) {
         object.castShadow = true;
@@ -34,39 +52,64 @@ export function VillainCharacter({ basePosition, villainStatus }: VillainCharact
   }, [scene]);
 
   useEffect(() => {
-    if (lastStatusRef.current !== villainStatus) {
-      lastStatusRef.current = villainStatus;
-      console.log("[StudioCLTD villain] State changed", villainStatus);
-    }
-
     const action = actions[animationByStatus[villainStatus]];
     if (!action) return;
 
-    action.reset().fadeIn(0.14).play();
+    fadeOutOtherActions(actions, action);
+    action.reset();
+    action.clampWhenFinished = villainStatus === "dead";
+    action.setLoop(villainStatus === "dead" ? LoopOnce : LoopRepeat, villainStatus === "dead" ? 1 : Infinity);
+    action.fadeIn(0.14).play();
 
     return () => {
       action.fadeOut(0.14);
     };
   }, [actions, villainStatus]);
 
-  useFrame(() => {
-    if (!groupRef.current) return;
+  useFrame((_, delta) => {
+    const root = rootRef.current;
+    const modelGroup = modelRef.current;
+    if (!root || !modelGroup) return;
 
-    const defeatedLean = villainStatus === "dead" ? -Math.PI * 0.46 : 0;
-    groupRef.current.position.set(0, 0, 0);
-    groupRef.current.rotation.y = Math.PI * 0.22;
-    groupRef.current.rotation.z = defeatedLean;
+    modelGroup.position.set(0, modelYOffset, 0);
+    modelGroup.rotation.set(0, 0, 0);
+    root.rotation.x = 0;
+    root.rotation.z = 0;
+
+    if (villainStatus === "dead") {
+      if (frozenDeathYawRef.current === null) {
+        frozenDeathYawRef.current = root.rotation.y;
+      }
+      root.rotation.y = frozenDeathYawRef.current;
+      return;
+    }
+
+    frozenDeathYawRef.current = null;
+
+    lookDirection.subVectors(playerWorldState.position, basePosition);
+    lookDirection.y = 0;
+    if (lookDirection.lengthSq() < 0.0001) return;
+
+    const targetYaw = Math.atan2(lookDirection.x, lookDirection.z) + modelFacingOffset;
+    root.rotation.y = MathUtils.damp(
+      root.rotation.y,
+      targetYaw,
+      rotationDamping,
+      Math.min(delta, 1 / 30)
+    );
   });
 
   return (
     <RigidBody type="fixed" colliders={false} position={[basePosition.x, basePosition.y, basePosition.z]}>
       <CuboidCollider args={[0.5, 1.25, 0.5]} position={[0, 1.2, 0]} />
-      <group ref={groupRef}>
-        <primitive object={scene} scale={1.16} />
+      <group ref={rootRef}>
+        <group ref={modelRef}>
+          <primitive object={scene} scale={1.16} />
+        </group>
         <pointLight color="#ff273a" intensity={8} distance={8} position={[0, 1.8, 0]} />
       </group>
     </RigidBody>
   );
 }
 
-useGLTF.preload("/models/temp-villain.gltf");
+useGLTF.preload("/characters/char.glb");

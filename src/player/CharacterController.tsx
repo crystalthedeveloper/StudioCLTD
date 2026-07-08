@@ -7,7 +7,7 @@ import { ThirdPersonCamera } from "./ThirdPersonCamera";
 import { CharacterAnimationState } from "./playerTypes";
 import { isSpeedBoostActive } from "./speedBoost";
 import { useKeyboardControls } from "./useKeyboardControls";
-import { isControllerDebugEnabled, markPlayerRotationUpdate } from "../debug/controllerDebug";
+import { markPlayerRotationUpdate } from "../debug/controllerDebug";
 import { playerWorldState } from "../world/playerWorldState";
 
 const moveDirection = new Vector3();
@@ -28,7 +28,6 @@ export function CharacterController() {
   const movementDirectionRef = useRef(new Vector3());
   const animationStateRef = useRef<CharacterAnimationState>("idle");
   const forwardBackSpeedRef = useRef(0);
-  const lastMovementLogRef = useRef(0);
   const [animationState, setAnimationState] = useState<CharacterAnimationState>("idle");
   const spawn = useMemo<[number, number, number]>(() => [0, 2.8, 8], []);
 
@@ -91,22 +90,7 @@ export function CharacterController() {
 
     body.setLinvel(nextVelocity, true);
 
-    if (isControllerDebugEnabled() && performance.now() - lastMovementLogRef.current > 500) {
-      lastMovementLogRef.current = performance.now();
-      console.log("[StudioCLTD movement debug] FPS / velocity / input", {
-        fps: Math.round(1 / Math.max(delta, 0.0001)),
-        input: controls,
-        smoothedForwardBackSpeed: forwardBackSpeedRef.current,
-        velocity: {
-          x: nextVelocity.x,
-          y: nextVelocity.y,
-          z: nextVelocity.z,
-        },
-      });
-    }
-
     if (translation.y < -10) {
-      console.log("Player fell off world — respawning.");
       forwardBackSpeedRef.current = 0;
       body.setTranslation({ x: spawn[0], y: spawn[1], z: spawn[2] }, true);
       body.setLinvel({ x: 0, y: 0, z: 0 }, true);

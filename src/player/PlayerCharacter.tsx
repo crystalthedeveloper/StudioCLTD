@@ -1,7 +1,9 @@
 import { useAnimations, useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { MutableRefObject, useEffect, useRef } from "react";
+import { MutableRefObject, useEffect, useMemo, useRef } from "react";
 import { Group, Mesh } from "three";
+import { SkeletonUtils } from "three-stdlib";
+import { applyCharacterMaterials, playerMaterialProfile } from "../characters/characterMaterials";
 import { CharacterAnimationState } from "./playerTypes";
 
 type PlayerCharacterProps = {
@@ -9,22 +11,30 @@ type PlayerCharacterProps = {
   yawRef: MutableRefObject<number>;
 };
 
+const playerAnimationByState: Record<CharacterAnimationState, string> = {
+  idle: "idleH",
+  run: "runH",
+};
+
 export function PlayerCharacter({ animationState, yawRef }: PlayerCharacterProps) {
-  const model = useGLTF("/models/temp-player.gltf");
+  const model = useGLTF("/characters/char.glb");
+  const scene = useMemo(() => SkeletonUtils.clone(model.scene), [model.scene]);
   const group = useRef<Group>(null);
   const { actions } = useAnimations(model.animations, group);
 
   useEffect(() => {
-    model.scene.traverse((object) => {
+    applyCharacterMaterials(scene, model.materials, playerMaterialProfile);
+
+    scene.traverse((object) => {
       if (object instanceof Mesh) {
         object.castShadow = true;
         object.receiveShadow = true;
       }
     });
-  }, [model.scene]);
+  }, [scene]);
 
   useEffect(() => {
-    const action = actions[animationState];
+    const action = actions[playerAnimationByState[animationState]];
     if (!action) return;
 
     action.reset().fadeIn(0.16).play();
@@ -47,9 +57,9 @@ export function PlayerCharacter({ animationState, yawRef }: PlayerCharacterProps
     <group ref={group}>
       <pointLight color="#fff1d0" intensity={3.6} distance={5.6} position={[0, 1.7, -0.8]} />
       <pointLight color="#ccd9ff" intensity={1.8} distance={4.8} position={[0.8, 1.4, 0.9]} />
-      <primitive object={model.scene} scale={1.05} />
+      <primitive object={scene} rotation-y={Math.PI} scale={1.05} />
     </group>
   );
 }
 
-useGLTF.preload("/models/temp-player.gltf");
+useGLTF.preload("/characters/char.glb");

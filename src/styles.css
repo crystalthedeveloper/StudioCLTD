@@ -16,6 +16,61 @@ canvas {
   display: block;
 }
 
+.dialogue-bubble {
+  max-width: 190px;
+  padding: 8px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 8px;
+  background: rgba(3, 4, 8, 0.88);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28), 0 0 18px rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.2;
+  opacity: 0;
+  pointer-events: none;
+  text-align: center;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.18);
+  transform: translateY(6px) scale(0.96);
+  transition: opacity 240ms ease, transform 240ms ease;
+  white-space: normal;
+}
+
+.dialogue-bubble--danger {
+  max-width: 310px;
+  padding: 18px 22px;
+  border-color: rgba(255, 58, 64, 0.86);
+  border-radius: 10px;
+  background: rgba(17, 17, 17, 0.94);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42), 0 0 28px rgba(255, 38, 45, 0.3);
+  color: #ff3038;
+  font-size: 21px;
+  font-weight: 900;
+  line-height: 1.14;
+  text-shadow: 0 0 14px rgba(255, 38, 45, 0.42);
+}
+
+.dialogue-bubble--visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.dialogue-bubble--danger.dialogue-bubble--visible {
+  animation: dialogue-danger-hover 2.2s ease-in-out infinite;
+}
+
+@keyframes dialogue-danger-hover {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-7px) scale(1);
+  }
+}
+
 .game-shell {
   width: 100%;
   height: 100%;

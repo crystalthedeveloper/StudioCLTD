@@ -2,16 +2,9 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { MutableRefObject, useRef } from "react";
 import { MathUtils, Vector3 } from "three";
 import { RapierRigidBody } from "@react-three/rapier";
-import {
-  getLastMouseDelta,
-  logControllerDebug,
-  logTargetChange,
-  markCameraUpdate,
-} from "../debug/controllerDebug";
 import { KeyboardControls } from "./useKeyboardControls";
 
 type ThirdPersonCameraProps = {
-  animationStateRef: MutableRefObject<string>;
   controlsRef: MutableRefObject<KeyboardControls>;
   movementDirectionRef: MutableRefObject<Vector3>;
   playerYawRef: MutableRefObject<number>;
@@ -48,7 +41,6 @@ function dampAngle(current: number, target: number, lambda: number, delta: numbe
 }
 
 export function ThirdPersonCamera({
-  animationStateRef,
   cameraYawRef,
   controlsRef,
   movementDirectionRef,
@@ -66,11 +58,8 @@ export function ThirdPersonCamera({
     if (!body) return;
     const frameDelta = Math.min(delta, maxFrameDelta);
 
-    const debugFrame = Math.floor(_.clock.elapsedTime * 60);
-    markCameraUpdate(debugFrame, "ThirdPersonCamera");
     const translation = body.translation();
     cameraTarget.set(translation.x, translation.y + cameraSettings.targetHeight, translation.z);
-    logTargetChange(cameraTarget);
     if (!hasCameraStateRef.current) {
       smoothedLookAt.copy(cameraTarget);
       smoothedCameraTarget.copy(cameraTarget);
@@ -120,27 +109,6 @@ export function ThirdPersonCamera({
 
     camera.rotation.z = 0;
     camera.updateMatrixWorld();
-
-    logControllerDebug(performance.now(), {
-      animationState: animationStateRef.current,
-      keyboard: controlsRef.current,
-      movementDirection: movementDirectionRef.current,
-      mouseDelta: getLastMouseDelta(),
-      playerPosition: new Vector3(translation.x, translation.y, translation.z),
-      playerYaw: playerYawRef.current,
-    }, {
-      cameraPosition: camera.position,
-      cameraRotation: camera.rotation,
-      cameraTarget,
-      damping: {
-        lookAtDamping: cameraSettings.lookAtDamping,
-        targetDamping: cameraSettings.targetDamping,
-        yawDamping: cameraSettings.yawDamping,
-      },
-      distance: cameraDistance,
-      pitch: cameraPitch,
-      yaw: cameraYaw,
-    });
   });
 
   return null;

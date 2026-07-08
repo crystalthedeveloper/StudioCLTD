@@ -21,8 +21,6 @@ export const villainMaterialProfile: CharacterMaterialProfile = {
   mask: villainMaskMaterialName,
 };
 
-let loggedMaterialCheck = false;
-
 function getMeshMaterials(mesh: Mesh) {
   return Array.isArray(mesh.material) ? mesh.material : [mesh.material];
 }
@@ -51,10 +49,6 @@ function getMaterial(root: Object3D, materials: MaterialMap, materialName: strin
   return clone;
 }
 
-function hasMaterial(root: Object3D, materials: MaterialMap, materialName: string) {
-  return Boolean(materials?.[materialName] ?? findMaterial(root, materialName));
-}
-
 function isBodyMaterial(material: Material | null | undefined) {
   return material?.name === playerBodyMaterialName || material?.name === villainBodyMaterialName;
 }
@@ -64,22 +58,6 @@ function isMaskMaterial(material: Material | null | undefined) {
 }
 
 export function applyCharacterMaterials(root: Object3D, materials: MaterialMap, profile: CharacterMaterialProfile) {
-  if (!loggedMaterialCheck) {
-    const availableMaterials = Object.keys(materials ?? {});
-    console.log("[StudioCLTD character] First, check that the material exists", {
-      availableMaterials,
-      playerBodyMaterial: playerBodyMaterialName,
-      playerBodyMaterialExists: hasMaterial(root, materials, playerBodyMaterialName),
-      playerMaskMaterial: playerMaskMaterialName,
-      playerMaskMaterialExists: hasMaterial(root, materials, playerMaskMaterialName),
-      villainBodyMaterial: villainBodyMaterialName,
-      villainBodyMaterialExists: hasMaterial(root, materials, villainBodyMaterialName),
-      villainMaskMaterial: villainMaskMaterialName,
-      villainMaskMaterialExists: hasMaterial(root, materials, villainMaskMaterialName),
-    });
-    loggedMaterialCheck = true;
-  }
-
   const bodyMaterial = getMaterial(root, materials, profile.body, playerBodyMaterialName);
   const maskMaterial = getMaterial(root, materials, profile.mask, playerMaskMaterialName);
 

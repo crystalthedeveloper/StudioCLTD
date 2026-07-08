@@ -5,12 +5,15 @@ import { useEffect, useMemo, useRef } from "react";
 import { AnimationAction, Group, LoopOnce, LoopRepeat, MathUtils, Mesh, Vector3 } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import { applyCharacterMaterials, villainMaterialProfile } from "../characters/characterMaterials";
+import { DialogueBubble, DialogueMessage } from "../ui/DialogueBubble";
 import { playerWorldState } from "../world/playerWorldState";
 
 export type VillainStatus = "idle" | "running" | "dead";
 
 type VillainCharacterProps = {
   basePosition: Vector3;
+  dialogue: DialogueMessage | null;
+  dialogueVariant?: "default" | "danger";
   villainStatus: VillainStatus;
 };
 
@@ -32,7 +35,7 @@ function fadeOutOtherActions(actions: Record<string, AnimationAction | null>, ac
   });
 }
 
-export function VillainCharacter({ basePosition, villainStatus }: VillainCharacterProps) {
+export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "danger", villainStatus }: VillainCharacterProps) {
   const model = useGLTF("/characters/char.glb");
   const scene = useMemo(() => SkeletonUtils.clone(model.scene), [model.scene]);
   const rootRef = useRef<Group>(null);
@@ -104,6 +107,12 @@ export function VillainCharacter({ basePosition, villainStatus }: VillainCharact
       <CuboidCollider args={[0.5, 1.25, 0.5]} position={[0, 1.2, 0]} />
       <group ref={rootRef}>
         <group ref={modelRef}>
+          <DialogueBubble
+            message={dialogue}
+            persistent={dialogueVariant === "danger"}
+            position={dialogueVariant === "danger" ? [0, 3.75, 0] : [0, 3.25, 0]}
+            variant={dialogueVariant}
+          />
           <primitive object={scene} scale={1.16} />
         </group>
         <pointLight color="#ff273a" intensity={8} distance={8} position={[0, 1.8, 0]} />

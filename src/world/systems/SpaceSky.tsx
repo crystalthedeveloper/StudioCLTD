@@ -6,8 +6,10 @@ import {
 import { useTexture } from "@react-three/drei";
 
 export function SpaceSky() {
+  const earthTexture = useTexture("/images/8k_earth_nightmap.jpg");
   const venusTexture = useTexture("/images/8k_venus_surface.jpg");
   const skyTexture = useTexture("/images/8k_stars_milky_way.jpg");
+  earthTexture.colorSpace = SRGBColorSpace;
   venusTexture.colorSpace = SRGBColorSpace;
   skyTexture.colorSpace = SRGBColorSpace;
 
@@ -25,7 +27,7 @@ export function SpaceSky() {
           toneMapped={false}
         />
       </mesh>
-      <mesh position={[58, 15, -138]} rotation={[0.08, -0.48, 0]}>
+      <mesh position={[68, 32, -210]} rotation={[0.08, -0.48, 0]}>
         <sphereGeometry args={[22, 96, 96]} />
         <meshStandardMaterial
           map={venusTexture}
@@ -37,9 +39,25 @@ export function SpaceSky() {
           envMapIntensity={0.55}
         />
       </mesh>
-      <mesh position={[58, 15, -138]} scale={[1.08, 1.08, 1.08]}>
+      <mesh position={[68, 32, -210]} scale={[1.08, 1.08, 1.08]}>
         <sphereGeometry args={[22, 96, 96]} />
         <meshBasicMaterial color="#ffb75f" transparent opacity={0.16} depthWrite={false} side={BackSide} />
+      </mesh>
+      <mesh position={[-135, 40, 165]} rotation={[0.08, 0.64, -0.06]}>
+        <sphereGeometry args={[17, 96, 96]} />
+        <meshStandardMaterial
+          map={earthTexture}
+          emissiveMap={earthTexture}
+          emissive="#7fb5ff"
+          emissiveIntensity={0.28}
+          metalness={0}
+          roughness={0.66}
+          envMapIntensity={0.45}
+        />
+      </mesh>
+      <mesh position={[-135, 40, 165]} scale={[1.09, 1.09, 1.09]}>
+        <sphereGeometry args={[17, 96, 96]} />
+        <meshBasicMaterial color="#6ca8ff" transparent opacity={0.11} depthWrite={false} side={BackSide} />
       </mesh>
     </group>
   );

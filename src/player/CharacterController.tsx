@@ -7,7 +7,7 @@ import { ThirdPersonCamera } from "./ThirdPersonCamera";
 import { CharacterAnimationState } from "./playerTypes";
 import { isSpeedBoostActive } from "./speedBoost";
 import { useKeyboardControls } from "./useKeyboardControls";
-import { markPlayerRotationUpdate } from "../debug/controllerDebug";
+import { DialogueMessage } from "../ui/DialogueBubble";
 import { playerWorldState } from "../world/playerWorldState";
 
 const moveDirection = new Vector3();
@@ -19,7 +19,19 @@ const forwardBackSmoothing = 11;
 const forwardBackStopSmoothing = 12;
 const maxFrameDelta = 1 / 30;
 
-export function CharacterController() {
+type CharacterControllerProps = {
+  dialogue: DialogueMessage | null;
+  fixedAnimationRequest: number;
+  movementLocked: boolean;
+  onFixedAnimationComplete: () => void;
+};
+
+export function CharacterController({
+  dialogue,
+  fixedAnimationRequest,
+  movementLocked,
+  onFixedAnimationComplete,
+}: CharacterControllerProps) {
   const bodyRef = useRef<RapierRigidBody | null>(null);
   const yawRef = useRef(0);
   const cameraYawRef = useRef(0);
@@ -40,12 +52,29 @@ export function CharacterController() {
     const velocity = body.linvel();
     const translation = body.translation();
     playerWorldState.position.set(translation.x, translation.y, translation.z);
+    if (movementLocked) {
+      forwardBackSpeedRef.current = 0;
+      movementDirectionRef.current.set(0, 0, 0);
+      body.setLinvel({ x: 0, y: velocity.y, z: 0 }, true);
+
+      if (translation.y < -10) {
+        body.setTranslation({ x: spawn[0], y: spawn[1], z: spawn[2] }, true);
+        body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      }
+
+      if (animationStateRef.current !== "idle") {
+        animationStateRef.current = "idle";
+        setAnimationState("idle");
+      }
+      return;
+    }
+
     const hasForwardBackInput = controls.forward !== controls.backward;
     const turnInput = Number(controls.left) - Number(controls.right);
     const forwardBackSpeed = isSpeedBoostActive() ? boostedRunSpeed : baseRunSpeed;
 
     if (turnInput !== 0) {
-      markPlayerRotationUpdate(Math.floor(_.clock.elapsedTime * 60), "CharacterController");
       yawRef.current += turnInput * turnSpeed * frameDelta;
     }
 
@@ -108,7 +137,6 @@ export function CharacterController() {
   return (
     <>
       <ThirdPersonCamera
-        animationStateRef={animationStateRef}
         cameraYawRef={cameraYawRef}
         controlsRef={controlsRef}
         movementDirectionRef={movementDirectionRef}
@@ -126,7 +154,13 @@ export function CharacterController() {
         canSleep={false}
       >
         <CapsuleCollider args={[0.65, 0.38]} friction={0} restitution={0} />
-        <PlayerCharacter animationState={animationState} yawRef={yawRef} />
+        <PlayerCharacter
+          animationState={animationState}
+          dialogue={dialogue}
+          fixedAnimationRequest={fixedAnimationRequest}
+          onFixedAnimationComplete={onFixedAnimationComplete}
+          yawRef={yawRef}
+        />
       </RigidBody>
     </>
   );

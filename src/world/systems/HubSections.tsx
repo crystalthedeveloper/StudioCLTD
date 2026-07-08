@@ -15,21 +15,24 @@ import {
   Vector3,
   VideoTexture,
 } from "three";
+import { BillboardLabel } from "../../ui/BillboardLabel";
 import { hubSections, HubSection } from "../hubSections";
 import { playerWorldState } from "../playerWorldState";
 
 type HubSectionsProps = {
   onActiveSectionChange: (sectionName: string | null) => void;
-  quickFixResolved: boolean;
+  serviceResolutions: Record<string, boolean>;
 };
 
 const center = new Vector3(0, 0, 0);
 const sectionPosition = new Vector3();
 const triggerRadius = 9;
 const offerCountdownMs = 3000;
+const offerDisplayMs = 10000;
 const offersPageUrl = "https://www.crystalthedeveloper.ca/offers";
 const white = "#f5f7fb";
 const softWhite = "#d8dde8";
+const serviceSectionIds = ["quick-fix", "urgent-fix", "performance", "site-improvement"];
 const offerOptions = [
   {
     id: "quick-fix",
@@ -94,7 +97,7 @@ function getShowcaseVideoResource() {
   };
 }
 
-export function HubSections({ onActiveSectionChange, quickFixResolved }: HubSectionsProps) {
+export function HubSections({ onActiveSectionChange, serviceResolutions }: HubSectionsProps) {
   const activeSectionRef = useRef<string | null>(null);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
   const [showcaseVideoState, setShowcaseVideoState] = useState<ShowcaseVideoState>({
@@ -108,6 +111,18 @@ export function HubSections({ onActiveSectionChange, quickFixResolved }: HubSect
       image.src = offer.imagePath;
     });
   }, []);
+
+  useEffect(() => {
+    if (!selectedOfferId) return undefined;
+
+    const clearOfferTimer = window.setTimeout(() => {
+      setSelectedOfferId(null);
+    }, offerDisplayMs);
+
+    return () => {
+      window.clearTimeout(clearOfferTimer);
+    };
+  }, [selectedOfferId]);
 
   useFrame(() => {
     const active = hubSections.find((section) => {
@@ -129,7 +144,7 @@ export function HubSections({ onActiveSectionChange, quickFixResolved }: HubSect
         <HubSectionDistrict
           key={section.id}
           section={section}
-          quickFixResolved={quickFixResolved}
+          serviceResolutions={serviceResolutions}
           selectedOffer={offerOptions.find((offer) => offer.id === selectedOfferId) ?? null}
           showcaseVideoState={showcaseVideoState}
           onOfferSelect={setSelectedOfferId}
@@ -174,7 +189,7 @@ function HubSectionDistrict({
   onOfferSelect,
   onShowcasePause,
   onShowcasePlay,
-  quickFixResolved,
+  serviceResolutions,
   section,
   selectedOffer,
   showcaseVideoState,
@@ -182,7 +197,7 @@ function HubSectionDistrict({
   onOfferSelect: (offerId: string | null) => void;
   onShowcasePause: () => void;
   onShowcasePlay: () => void;
-  quickFixResolved: boolean;
+  serviceResolutions: Record<string, boolean>;
   section: HubSection;
   selectedOffer: OfferOption | null;
   showcaseVideoState: ShowcaseVideoState;
@@ -195,8 +210,8 @@ function HubSectionDistrict({
   return (
     <group name={`HubSection:${section.id}`} position={section.position} rotation-y={rotation}>
       <SectionBillboard
-        quickFixResolved={quickFixResolved}
         section={section}
+        serviceResolutions={serviceResolutions}
         selectedOffer={selectedOffer}
         showcaseVideoState={showcaseVideoState}
       />
@@ -214,18 +229,18 @@ function HubSectionDistrict({
 }
 
 function SectionBillboard({
-  quickFixResolved,
   section,
+  serviceResolutions,
   selectedOffer,
   showcaseVideoState,
 }: {
-  quickFixResolved: boolean;
   section: HubSection;
+  serviceResolutions: Record<string, boolean>;
   selectedOffer: OfferOption | null;
   showcaseVideoState: ShowcaseVideoState;
 }) {
   const isOffers = section.id === "offers";
-  const isQuickFix = section.id === "quick-fix";
+  const isServiceSection = serviceSectionIds.includes(section.id);
   const isShowcase = section.id === "showcase";
 
   return (
@@ -263,8 +278,8 @@ function SectionBillboard({
       </Text>
       {isOffers ? (
         <OffersScreenContent selectedOffer={selectedOffer} />
-      ) : isQuickFix ? (
-        <QuickFixScreenContent resolved={quickFixResolved} />
+      ) : isServiceSection ? (
+        <ServiceScreenContent resolved={Boolean(serviceResolutions[section.id])} section={section} />
       ) : isShowcase ? (
         <ShowcaseScreenContent isPlaying={showcaseVideoState.playing} hasStarted={showcaseVideoState.hasStarted} />
       ) : (
@@ -328,6 +343,44 @@ function OffersScreenContent({ selectedOffer }: { selectedOffer: OfferOption | n
         <meshBasicMaterial key="offer-empty-screen" color="#111827" depthTest={false} side={DoubleSide} toneMapped />
       )}
     </mesh>
+  );
+}
+
+function ServiceScreenContent({ resolved, section }: { resolved: boolean; section: HubSection }) {
+  if (section.id === "quick-fix") return <QuickFixScreenContent resolved={resolved} />;
+
+  return (
+    <group position={[0, -0.03, -0.2]}>
+      <mesh renderOrder={20}>
+        <planeGeometry args={[8.4, 4.15]} />
+        <meshBasicMaterial
+          color={resolved ? "#0f1b14" : "#1b1113"}
+          depthTest={false}
+          side={DoubleSide}
+          toneMapped
+        />
+      </mesh>
+      <Text
+        color={resolved ? "#dfffe7" : "#ffd8d8"}
+        fontSize={0.46}
+        anchorX="center"
+        anchorY="middle"
+        position={[0, 0.55, -0.02]}
+        maxWidth={7.2}
+      >
+        {resolved ? `${section.name} Fixed` : `${section.name} Needs Attention`}
+      </Text>
+      <Text
+        color={resolved ? "#a8f5ba" : "#f3a5a5"}
+        fontSize={0.24}
+        anchorX="center"
+        anchorY="middle"
+        position={[0, -0.25, -0.02]}
+        maxWidth={7.4}
+      >
+        {resolved ? "Good state restored." : "Bad state detected."}
+      </Text>
+    </group>
   );
 }
 
@@ -615,27 +668,23 @@ function OfferPortalPad({
         <ringGeometry args={[0.58, 0.88, 96]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
-      <Text
+      <BillboardLabel
         color={white}
         fontSize={offer.id === "site-improvement" ? 0.22 : 0.28}
-        anchorX="center"
-        anchorY="middle"
         position={[0, 1.05, 0]}
         maxWidth={2.8}
       >
         {offer.name}
-      </Text>
+      </BillboardLabel>
       {countdownSeconds > 0 && (
-        <Text
+        <BillboardLabel
           color="#ffd76b"
           fontSize={0.2}
-          anchorX="center"
-          anchorY="middle"
           position={[0, 1.48, 0]}
           maxWidth={3.2}
         >
           {`Opening offers page in ${countdownSeconds}...`}
-        </Text>
+        </BillboardLabel>
       )}
       <pointLight color="#ffffff" intensity={active ? 2.4 : 0.7} distance={active ? 5.5 : 3} position={[0, 0.72, 0]} />
     </group>
@@ -756,9 +805,9 @@ function ShowcasePortalPad({
         <ringGeometry args={[0.58, 0.88, 96]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
-      <Text color={white} fontSize={0.28} anchorX="center" anchorY="middle" position={[0, 1.05, 0]} maxWidth={3}>
+      <BillboardLabel color={white} fontSize={0.28} position={[0, 1.05, 0]} maxWidth={3}>
         Play Showcase
-      </Text>
+      </BillboardLabel>
       <pointLight color="#ffffff" intensity={active ? 2.2 : 0.6} distance={active ? 5.2 : 3} position={[0, 0.72, 0]} />
     </group>
   );

@@ -15,7 +15,7 @@ export function CinematicPostProcessing() {
   const composer = useMemo(() => new EffectComposer(gl), [gl]);
   const renderPass = useMemo(() => new RenderPass(scene, camera), [camera, scene]);
   const bloomPass = useMemo(
-    () => new UnrealBloomPass(new Vector2(size.width, size.height), 0.34, 0.68, 0.44),
+    () => new UnrealBloomPass(new Vector2(size.width, size.height), 0.28, 0.58, 0.48),
     [size.height, size.width]
   );
 

@@ -785,7 +785,7 @@ function OfferPortalPad({
       </BillboardLabel>
       {countdownSeconds > 0 && (
         <BillboardLabel
-          color="#ffd76b"
+          color="#FFE600"
           fontSize={0.2}
           position={[0, 1.48, 0]}
           maxWidth={3.2}

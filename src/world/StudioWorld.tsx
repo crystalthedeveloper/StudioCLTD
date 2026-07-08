@@ -15,6 +15,13 @@ type StudioWorldProps = {
   onActiveSectionChange: (sectionName: string | null) => void;
 };
 
+const sectionVillainDialogue: Record<string, string> = {
+  "Quick Fix": "😈 Broken Button!",
+  "Urgent Fix": "😈 Broken Images!",
+  Performance: "😈 Poor PageSpeed",
+  "Site Improvement": "😈 Broken Slider",
+};
+
 export function StudioWorld({ onActiveSectionChange }: StudioWorldProps) {
   const dialogueIdRef = useRef(0);
   const fixedAnimationRequestRef = useRef(0);
@@ -39,9 +46,9 @@ export function StudioWorld({ onActiveSectionChange }: StudioWorldProps) {
 
     if (!sectionName) return;
 
-    if (sectionName === "Quick Fix") return;
+    const text = sectionVillainDialogue[sectionName];
+    if (!text) return;
 
-    const text = "No leads today.";
     setVillainDialogue({
       ...createDialogue(text),
       sectionName,

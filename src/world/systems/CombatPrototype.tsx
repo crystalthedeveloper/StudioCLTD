@@ -20,11 +20,18 @@ const serviceInfoText: Record<string, string> = {
   "quick-fix":
     "A button that doesn't work can cost you real customers.\n\nEvery click should lead somewhere-not to frustration.\n\nI help businesses fix website issues so every button, form, and interaction works as expected.",
   "urgent-fix":
-    "Website issues can happen at any time.\n\nFast fixes help prevent lost sales, frustrated visitors, and downtime.\n\nNeed it fixed quickly? I can resolve critical website issues fast.",
+    "Broken images can make your website look untrustworthy fast.\n\nWhen key visuals do not load, visitors may leave before they understand your business.\n\nI help fix urgent website issues quickly so your site looks reliable again.",
   performance:
-    "A slow website loses visitors before they even become customers.\n\nImproving speed creates a faster, smoother experience while helping SEO and conversions.\n\nSmall performance improvements can make a big difference.",
+    "A slow website can cost you visitors before they even contact you.\n\nImproving performance helps pages load faster, feel smoother, and support better SEO.\n\nI help optimize websites so users get a faster, cleaner experience.",
   "site-improvement":
-    "Your website should keep improving over time.\n\nRefreshing content, layout, accessibility, and user experience helps visitors trust your business and take action.\n\nSmall improvements add up.",
+    "A broken slider can make your website feel unfinished.\n\nVisitors should be able to browse your content without glitches or frustration.\n\nI help improve website layouts, interactions, and user experience so your site feels polished and professional.",
+};
+
+const villainDialogueText: Record<string, string> = {
+  "quick-fix": "😈 Broken Button!",
+  "urgent-fix": "😈 Broken Images!",
+  performance: "😈 Poor PageSpeed",
+  "site-improvement": "😈 Broken Slider",
 };
 
 type SectionEncounterConfig = {
@@ -139,11 +146,11 @@ function SectionPortalEncounter({
   const [villainStatus, setVillainStatus] = useState<VillainStatus>("idle");
   const [portalActive, setPortalActive] = useState(false);
   const [infoPortalActive, setInfoPortalActive] = useState(false);
-  const [quickFixDialogueVisible, setQuickFixDialogueVisible] = useState(false);
+  const [villainBubbleVisible, setVillainBubbleVisible] = useState(false);
   const lastActivatedRef = useRef(0);
   const lastInfoActivatedRef = useRef(0);
   const wasNearDialogueRef = useRef(false);
-  const wasNearQuickFixVillainRef = useRef(false);
+  const wasNearVillainRef = useRef(false);
   const wasOnPadRef = useRef(false);
   const wasOnInfoPadRef = useRef(false);
   const defeatedRef = useRef(false);
@@ -212,10 +219,7 @@ function SectionPortalEncounter({
       padDistance <= dialoguePadRadius ||
       infoPadDistance <= dialoguePadRadius ||
       villainDistance <= dialogueVillainRadius;
-    const nearQuickFixVillain =
-      encounter.id === "quick-fix" &&
-      !defeatedRef.current &&
-      villainDistance <= dialogueVillainRadius;
+    const nearVillain = !defeatedRef.current && villainDistance <= dialogueVillainRadius;
 
     if (onPad && !wasOnPadRef.current) {
       activatePad();
@@ -229,19 +233,19 @@ function SectionPortalEncounter({
       onInfoClose();
     }
 
-    if (encounter.id === "quick-fix" && nearQuickFixVillain !== wasNearQuickFixVillainRef.current) {
-      setQuickFixDialogueVisible(nearQuickFixVillain);
+    if (nearVillain !== wasNearVillainRef.current) {
+      setVillainBubbleVisible(nearVillain);
     }
 
-    if (encounter.id !== "quick-fix" && !defeatedRef.current && nearDialogueArea && !wasNearDialogueRef.current) {
+    if (!defeatedRef.current && encounter.id !== "quick-fix" && nearDialogueArea && !wasNearDialogueRef.current) {
       onVillainDialogue(
         encounter.name,
-        "No leads today."
+        villainDialogueText[encounter.id]
       );
     }
 
     wasNearDialogueRef.current = nearDialogueArea;
-    wasNearQuickFixVillainRef.current = nearQuickFixVillain;
+    wasNearVillainRef.current = nearVillain;
     wasOnPadRef.current = onPad;
     wasOnInfoPadRef.current = onInfoPad;
   });
@@ -262,8 +266,8 @@ function SectionPortalEncounter({
         dialogue={
           villainStatus === "dead"
             ? null
-            : encounter.id === "quick-fix" && quickFixDialogueVisible
-              ? { id: 1, text: "😈 Broken Button!" }
+            : villainBubbleVisible
+              ? { id: 1, text: villainDialogueText[encounter.id] }
               : villainDialogue?.sectionName === encounter.name
                 ? villainDialogue
                 : null

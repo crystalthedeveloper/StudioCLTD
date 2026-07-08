@@ -33,6 +33,24 @@ const offersPageUrl = "https://www.crystalthedeveloper.ca/offers";
 const white = "#f5f7fb";
 const softWhite = "#d8dde8";
 const serviceSectionIds = ["quick-fix", "urgent-fix", "performance", "site-improvement"];
+const serviceScreenImages: Record<string, { bad: string; good: string }> = {
+  "quick-fix": {
+    bad: "/images/quickFix/quick-fix-bad.png",
+    good: "/images/quickFix/quick-fix-good.png",
+  },
+  "urgent-fix": {
+    bad: "/images/urgentFix/urgent-fix-bad.png",
+    good: "/images/urgentFix/urgent-fix-good.png",
+  },
+  performance: {
+    bad: "/images/performance/performance-bad.png",
+    good: "/images/performance/performance-good.png",
+  },
+  "site-improvement": {
+    bad: "/images/siteImprovement/site-improvement-bad.png",
+    good: "/images/siteImprovement/site-improvement-good.png",
+  },
+};
 const offerOptions = [
   {
     id: "quick-fix",
@@ -347,48 +365,22 @@ function OffersScreenContent({ selectedOffer }: { selectedOffer: OfferOption | n
 }
 
 function ServiceScreenContent({ resolved, section }: { resolved: boolean; section: HubSection }) {
-  if (section.id === "quick-fix") return <QuickFixScreenContent resolved={resolved} />;
+  const images = serviceScreenImages[section.id];
+  if (!images) return null;
 
-  return (
-    <group position={[0, -0.03, -0.2]}>
-      <mesh renderOrder={20}>
-        <planeGeometry args={[8.4, 4.15]} />
-        <meshBasicMaterial
-          color={resolved ? "#0f1b14" : "#1b1113"}
-          depthTest={false}
-          side={DoubleSide}
-          toneMapped
-        />
-      </mesh>
-      <Text
-        color={resolved ? "#dfffe7" : "#ffd8d8"}
-        fontSize={0.46}
-        anchorX="center"
-        anchorY="middle"
-        position={[0, 0.55, -0.02]}
-        maxWidth={7.2}
-      >
-        {resolved ? `${section.name} Fixed` : `${section.name} Needs Attention`}
-      </Text>
-      <Text
-        color={resolved ? "#a8f5ba" : "#f3a5a5"}
-        fontSize={0.24}
-        anchorX="center"
-        anchorY="middle"
-        position={[0, -0.25, -0.02]}
-        maxWidth={7.4}
-      >
-        {resolved ? "Good state restored." : "Bad state detected."}
-      </Text>
-    </group>
-  );
+  return <ServiceImageScreen badImage={images.bad} goodImage={images.good} resolved={resolved} />;
 }
 
-function QuickFixScreenContent({ resolved }: { resolved: boolean }) {
-  const [badTexture, goodTexture] = useLoader(TextureLoader, [
-    "/images/quickFix/quick-fix-bad.png",
-    "/images/quickFix/quick-fix-good.png",
-  ]);
+function ServiceImageScreen({
+  badImage,
+  goodImage,
+  resolved,
+}: {
+  badImage: string;
+  goodImage: string;
+  resolved: boolean;
+}) {
+  const [badTexture, goodTexture] = useLoader(TextureLoader, [badImage, goodImage]);
   const texture = resolved ? goodTexture : badTexture;
 
   useEffect(() => {

@@ -8,7 +8,7 @@ export function WorldLights() {
         color="#ffe2bd"
         intensity={3.25}
         position={[-16, 30, 24]}
-        shadow-mapSize={[4096, 4096]}
+        shadow-mapSize={[1024, 1024]}
         shadow-bias={-0.00005}
         shadow-normalBias={0.04}
         shadow-camera-left={-75}
@@ -20,16 +20,12 @@ export function WorldLights() {
       <rectAreaLight color="#ffdfbf" intensity={3.15} width={42} height={26} position={[0, 14, 18]} rotation={[-0.72, 0, 0]} />
       <pointLight color="#eef1ff" intensity={22} distance={38} position={[0, 6, 6]} />
       <spotLight
-        castShadow
         color="#fff1d5"
-        intensity={82}
+        intensity={62}
         position={[6, 18, 12]}
         angle={0.5}
         penumbra={0.92}
         distance={70}
-        shadow-mapSize={[2048, 2048]}
-        shadow-bias={-0.00005}
-        shadow-normalBias={0.04}
       />
     </>
   );

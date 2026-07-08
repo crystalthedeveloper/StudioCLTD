@@ -1,7 +1,7 @@
 import { Canvas } from "@react-three/fiber";
-import { AdaptiveDpr, PerformanceMonitor, useProgress } from "@react-three/drei";
+import { useProgress } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ACESFilmicToneMapping, PCFSoftShadowMap, SRGBColorSpace } from "three";
 import { isTrackpadCameraInputBlocked } from "./player/cameraInputGuard";
 import { setGameFocused, useGameFocus } from "./player/gameFocus";
@@ -9,11 +9,13 @@ import { HubOverlay } from "./ui/HubOverlay";
 import { SpeedBoostHud } from "./ui/SpeedBoostHud";
 import { TrackpadControl } from "./ui/TrackpadControl";
 import { StudioWorld } from "./world/StudioWorld";
+import { AssetPreloader } from "./world/systems/AssetPreloader";
 
 export default function App() {
-  const [dpr, setDpr] = useState(1.5);
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [restartKey, setRestartKey] = useState(0);
+  const [worldAssetsReady, setWorldAssetsReady] = useState(false);
+  const [showcaseVideoReady, setShowcaseVideoReady] = useState(false);
   const gameFocused = useGameFocus();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -25,6 +27,27 @@ export default function App() {
   const openWebsite = () => {
     window.open("https://www.crystalthedeveloper.ca/", "_blank", "noopener,noreferrer");
   };
+
+  useEffect(() => {
+    const video = document.createElement("video");
+    video.src = "/videos/showcase.mp4";
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+
+    const markReady = () => setShowcaseVideoReady(true);
+    video.addEventListener("loadedmetadata", markReady, { once: true });
+    video.addEventListener("error", markReady, { once: true });
+    video.load();
+
+    return () => {
+      video.removeEventListener("loadedmetadata", markReady);
+      video.removeEventListener("error", markReady);
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -62,6 +85,10 @@ export default function App() {
     };
   }, []);
 
+  const handleWorldAssetsReady = useCallback(() => {
+    setWorldAssetsReady(true);
+  }, []);
+
   const focusGame = () => {
     if (isTrackpadCameraInputBlocked()) return;
 
@@ -84,7 +111,7 @@ export default function App() {
       <div className={`game-shell${gameFocused ? " game-shell--focused" : ""}`}>
         <Canvas
           shadows
-          dpr={dpr}
+          dpr={1}
           gl={{
             antialias: true,
             outputColorSpace: SRGBColorSpace,
@@ -106,16 +133,15 @@ export default function App() {
         >
           <color attach="background" args={["#03040a"]} />
           <fog attach="fog" args={["#15182b", 58, 260]} />
-          <PerformanceMonitor onDecline={() => setDpr(1)} onIncline={() => setDpr(1.75)} />
           <Suspense fallback={null}>
+            <AssetPreloader onReady={handleWorldAssetsReady} />
             <Physics gravity={[0, -20, 0]}>
               <StudioWorld restartKey={restartKey} onActiveSectionChange={setActiveSection} />
             </Physics>
           </Suspense>
-          <AdaptiveDpr pixelated />
         </Canvas>
       </div>
-      <LoadingScreen />
+      <LoadingScreen assetsReady={worldAssetsReady && showcaseVideoReady} />
       <div className="game-actions">
         <button type="button" onClick={restartGame}>
           Restart
@@ -135,10 +161,15 @@ export default function App() {
   );
 }
 
-function LoadingScreen() {
+type LoadingScreenProps = {
+  assetsReady: boolean;
+};
+
+function LoadingScreen({ assetsReady }: LoadingScreenProps) {
   const { active, progress } = useProgress();
   const [visible, setVisible] = useState(true);
-  const complete = !active && progress >= 100;
+  const complete = !active && progress >= 100 && assetsReady;
+  const displayProgress = complete ? 100 : Math.min(99, Math.round(progress));
 
   useEffect(() => {
     if (!complete) {
@@ -155,8 +186,8 @@ function LoadingScreen() {
   return (
     <div className={`loading-screen${complete ? " loading-screen--ready" : ""}`}>
       <div className="loading-screen__content">
-        <strong>Loading...</strong>
-        <span>{`${Math.round(progress)}%`}</span>
+        <strong>StudioCLTD Loading...</strong>
+        <span>{`${displayProgress}%`}</span>
       </div>
     </div>
   );

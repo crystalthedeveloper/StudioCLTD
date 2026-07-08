@@ -20,15 +20,15 @@ export function GlowCubeField() {
         <RigidBody key={index} type="fixed" colliders={false} position={[beacon.position[0], 0.06, beacon.position[2]]}>
           <CuboidCollider args={[beacon.scale * 0.45, beacon.scale * 0.42, beacon.scale * 0.45]} position={[0, beacon.scale * 0.42, 0]} />
           <mesh receiveShadow rotation-x={-Math.PI / 2} position={[0, 0.012, 0]}>
-            <cylinderGeometry args={[beacon.scale * 0.58, beacon.scale * 0.72, 0.045, 48]} />
+            <cylinderGeometry args={[beacon.scale * 0.58, beacon.scale * 0.72, 0.045, 24]} />
             <meshStandardMaterial color="#161b22" metalness={0.82} roughness={0.28} envMapIntensity={0.8} />
           </mesh>
           <mesh rotation-x={-Math.PI / 2} position={[0, 0.044, 0]}>
-            <ringGeometry args={[beacon.scale * 0.42, beacon.scale * 0.58, 64]} />
+            <ringGeometry args={[beacon.scale * 0.42, beacon.scale * 0.58, 32]} />
             <meshBasicMaterial color={beacon.light} transparent opacity={0.48} depthWrite={false} />
           </mesh>
           <mesh castShadow position={[0, beacon.scale * 0.42, 0]}>
-            <cylinderGeometry args={[beacon.scale * 0.14, beacon.scale * 0.19, beacon.scale * 0.78, 32]} />
+            <cylinderGeometry args={[beacon.scale * 0.14, beacon.scale * 0.19, beacon.scale * 0.78, 18]} />
             <meshStandardMaterial
               color={beacon.color}
               emissive={beacon.light}
@@ -38,11 +38,11 @@ export function GlowCubeField() {
             />
           </mesh>
           <mesh position={[0, beacon.scale * 0.43, 0]} scale={[beacon.scale * 1.25, beacon.scale * 1.25, beacon.scale * 1.25]}>
-            <sphereGeometry args={[0.42, 32, 16]} />
+            <sphereGeometry args={[0.42, 16, 8]} />
             <meshBasicMaterial color={beacon.light} transparent opacity={0.13} depthWrite={false} />
           </mesh>
           <mesh rotation-x={-Math.PI / 2} position={[0, 0.05, 0]}>
-            <circleGeometry args={[beacon.scale * 1.65, 64]} />
+            <circleGeometry args={[beacon.scale * 1.65, 32]} />
             <meshBasicMaterial color={beacon.light} transparent opacity={0.075} depthWrite={false} />
           </mesh>
           <pointLight color={beacon.light} intensity={15} distance={17} decay={1.8} position={[0, beacon.scale * 0.85, 0]} />

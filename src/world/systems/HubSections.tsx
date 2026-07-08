@@ -28,6 +28,7 @@ type HubSectionsProps = {
 const center = new Vector3(0, 0, 0);
 const sectionPosition = new Vector3();
 const triggerRadius = 9;
+const triggerRadiusSq = triggerRadius * triggerRadius;
 const offerCountdownMs = 3000;
 const offerDisplayMs = 10000;
 const simpleDisplayMs = 10000;
@@ -130,6 +131,7 @@ function getShowcaseVideoResource() {
 
 export function HubSections({ onActiveSectionChange, restartKey, serviceResolutions }: HubSectionsProps) {
   const activeSectionRef = useRef<string | null>(null);
+  const activeSectionCheckElapsedRef = useRef(0);
   const displayTimersRef = useRef<Record<string, number>>({});
   const [activeSimpleDisplays, setActiveSimpleDisplays] = useState<Record<string, boolean>>({});
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
@@ -182,10 +184,14 @@ export function HubSections({ onActiveSectionChange, restartKey, serviceResoluti
     }
   }, [restartKey]);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
+    activeSectionCheckElapsedRef.current += delta;
+    if (activeSectionCheckElapsedRef.current < 0.12) return;
+    activeSectionCheckElapsedRef.current = 0;
+
     const active = hubSections.find((section) => {
       sectionPosition.set(...section.position);
-      return playerWorldState.position.distanceTo(sectionPosition) <= triggerRadius;
+      return playerWorldState.position.distanceToSquared(sectionPosition) <= triggerRadiusSq;
     });
     const nextName = active?.name ?? null;
 
@@ -414,6 +420,7 @@ function OffersScreenContent({ selectedOffer }: { selectedOffer: OfferOption | n
   useEffect(() => {
     loadedTextures.forEach((texture) => {
       texture.colorSpace = SRGBColorSpace;
+      texture.generateMipmaps = false;
       texture.minFilter = LinearFilter;
       texture.magFilter = LinearFilter;
       texture.needsUpdate = true;
@@ -447,6 +454,7 @@ function SimpleDisplayScreen({ active, imagePath }: { active: boolean; imagePath
 
   useEffect(() => {
     texture.colorSpace = SRGBColorSpace;
+    texture.generateMipmaps = false;
     texture.minFilter = LinearFilter;
     texture.magFilter = LinearFilter;
     texture.needsUpdate = true;
@@ -486,6 +494,7 @@ function ServiceImageScreen({
   useEffect(() => {
     [badTexture, goodTexture].forEach((loadedTexture) => {
       loadedTexture.colorSpace = SRGBColorSpace;
+      loadedTexture.generateMipmaps = false;
       loadedTexture.minFilter = LinearFilter;
       loadedTexture.magFilter = LinearFilter;
       loadedTexture.needsUpdate = true;
@@ -539,7 +548,6 @@ function ShowcaseScreenContent({ isPlaying }: { isPlaying: boolean }) {
     const targetOpacity = isPlaying ? 1 : 0;
     screenOpacityRef.current = MathUtils.damp(screenOpacityRef.current, targetOpacity, isPlaying ? 8 : 18, Math.min(delta, 1 / 30));
     material.opacity = screenOpacityRef.current;
-    material.needsUpdate = true;
   });
 
   return (
@@ -687,11 +695,9 @@ function OfferPortalPad({
   onPlayerEnter: () => void;
   onPlayerExit: () => void;
 }) {
-  const groupRef = useRef<Group>(null);
   const ringRef = useRef<Mesh>(null);
   const pulseRef = useRef<Mesh>(null);
   const playerInsideRef = useRef(false);
-  const worldPositionRef = useRef(new Vector3());
   const activeStartedAtRef = useRef(0);
   const wasActiveRef = useRef(active);
 
@@ -730,25 +736,6 @@ function OfferPortalPad({
     }
     wasActiveRef.current = active;
 
-    if (groupRef.current) {
-      groupRef.current.getWorldPosition(worldPositionRef.current);
-      const distance = Math.hypot(
-        playerWorldState.position.x - worldPositionRef.current.x,
-        playerWorldState.position.z - worldPositionRef.current.z
-      );
-      const playerInsidePad = distance <= 1.28 && playerWorldState.position.y < 2.3;
-
-      if (playerInsidePad && !playerInsideRef.current) {
-        playerInsideRef.current = true;
-        onPlayerEnter();
-      }
-
-      if (!playerInsidePad && playerInsideRef.current) {
-        playerInsideRef.current = false;
-        onPlayerExit();
-      }
-    }
-
     const activationGlow = active ? Math.max(0, 1 - (clock.elapsedTime - activeStartedAtRef.current) / 1) : 0;
     const pulse = 1 + activationGlow * 0.05;
     const opacity = 0.56 + activationGlow * 0.28;
@@ -757,7 +744,6 @@ function OfferPortalPad({
       ringRef.current.scale.setScalar(pulse);
       const material = ringRef.current.material;
       if (material instanceof MeshBasicMaterial) {
-        material.color.set("#ffffff");
         material.opacity = opacity;
       }
     }
@@ -767,14 +753,13 @@ function OfferPortalPad({
       pulseRef.current.scale.setScalar(1.03 + activationGlow * 0.18);
       const material = pulseRef.current.material;
       if (material instanceof MeshBasicMaterial) {
-        material.color.set("#ffffff");
         material.opacity = activationGlow * 0.16;
       }
     }
   });
 
   return (
-    <group ref={groupRef} name={`OfferPortal:${offer.id}`} position={offer.position}>
+    <group name={`OfferPortal:${offer.id}`} position={offer.position}>
       <CuboidCollider
         sensor
         args={[1.15, 0.28, 1.15]}
@@ -826,11 +811,9 @@ function ShowcasePortalPad({
   onPlayerEnter: () => void;
   onPlayerExit: () => void;
 }) {
-  const groupRef = useRef<Group>(null);
   const ringRef = useRef<Mesh>(null);
   const pulseRef = useRef<Mesh>(null);
   const playerInsideRef = useRef(false);
-  const worldPositionRef = useRef(new Vector3());
   const activeStartedAtRef = useRef(0);
   const wasActiveRef = useRef(active);
 
@@ -874,21 +857,6 @@ function ShowcasePortalPad({
     }
     wasActiveRef.current = active;
 
-    if (groupRef.current) {
-      groupRef.current.getWorldPosition(worldPositionRef.current);
-      const distance = Math.hypot(
-        playerWorldState.position.x - worldPositionRef.current.x,
-        playerWorldState.position.z - worldPositionRef.current.z
-      );
-      const playerInsidePad = distance <= 1.32 && playerWorldState.position.y < 2.3;
-
-      if (playerInsidePad) {
-        activate();
-      } else {
-        deactivate();
-      }
-    }
-
     const activationGlow = active ? Math.max(0, 1 - (clock.elapsedTime - activeStartedAtRef.current) / 1) : 0;
     const steadyGlow = active ? 0.2 : 0;
     const pulse = 1 + activationGlow * 0.05;
@@ -898,7 +866,6 @@ function ShowcasePortalPad({
       ringRef.current.scale.setScalar(pulse);
       const material = ringRef.current.material;
       if (material instanceof MeshBasicMaterial) {
-        material.color.set("#ffffff");
         material.opacity = opacity;
       }
     }
@@ -908,14 +875,13 @@ function ShowcasePortalPad({
       pulseRef.current.scale.setScalar(1.04 + activationGlow * 0.16);
       const material = pulseRef.current.material;
       if (material instanceof MeshBasicMaterial) {
-        material.color.set("#ffffff");
         material.opacity = active ? 0.1 + activationGlow * 0.1 : activationGlow * 0.12;
       }
     }
   });
 
   return (
-    <group ref={groupRef} name={name} position={[0, 0.18, 9.2]}>
+    <group name={name} position={[0, 0.18, 9.2]}>
       <CuboidCollider
         sensor
         args={[1.15, 0.28, 1.15]}

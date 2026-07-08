@@ -1,8 +1,8 @@
 import { Text } from "@react-three/drei";
 import { CuboidCollider } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useRef, useState } from "react";
-import { Group, Mesh, MeshBasicMaterial, Vector3 } from "three";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Group, Mesh, MeshBasicMaterial, SphereGeometry, Vector3 } from "three";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { DialogueMessage } from "../../ui/DialogueBubble";
 import { VillainCharacter, VillainStatus } from "../../villain/VillainCharacter";
@@ -13,6 +13,9 @@ const padRadius = 1.6;
 const cooldownMs = 1800;
 const dialoguePadRadius = 6.5;
 const dialogueVillainRadius = 9;
+const padRadiusSq = padRadius * padRadius;
+const dialoguePadRadiusSq = dialoguePadRadius * dialoguePadRadius;
+const dialogueVillainRadiusSq = dialogueVillainRadius * dialogueVillainRadius;
 const encounterSectionIds = ["quick-fix", "urgent-fix", "performance", "site-improvement"];
 const infoPanelDurationMs = 10000;
 const smokeDurationMs = 1700;
@@ -221,26 +224,23 @@ function SectionPortalEncounter({
   }, [infoPortalActive]);
 
   useFrame(() => {
-    const padDistance = Math.hypot(
-      playerWorldState.position.x - encounter.padPosition.x,
-      playerWorldState.position.z - encounter.padPosition.z
-    );
-    const infoPadDistance = Math.hypot(
-      playerWorldState.position.x - encounter.infoPadPosition.x,
-      playerWorldState.position.z - encounter.infoPadPosition.z
-    );
-    const villainDistance = Math.hypot(
-      playerWorldState.position.x - encounter.villainPosition.x,
-      playerWorldState.position.z - encounter.villainPosition.z
-    );
-    const onPad = padDistance <= padRadius && playerWorldState.position.y < 2.3;
-    const onInfoPad = infoPadDistance <= padRadius && playerWorldState.position.y < 2.3;
+    const padDeltaX = playerWorldState.position.x - encounter.padPosition.x;
+    const padDeltaZ = playerWorldState.position.z - encounter.padPosition.z;
+    const padDistanceSq = padDeltaX * padDeltaX + padDeltaZ * padDeltaZ;
+    const infoPadDeltaX = playerWorldState.position.x - encounter.infoPadPosition.x;
+    const infoPadDeltaZ = playerWorldState.position.z - encounter.infoPadPosition.z;
+    const infoPadDistanceSq = infoPadDeltaX * infoPadDeltaX + infoPadDeltaZ * infoPadDeltaZ;
+    const villainDeltaX = playerWorldState.position.x - encounter.villainPosition.x;
+    const villainDeltaZ = playerWorldState.position.z - encounter.villainPosition.z;
+    const villainDistanceSq = villainDeltaX * villainDeltaX + villainDeltaZ * villainDeltaZ;
+    const onPad = padDistanceSq <= padRadiusSq && playerWorldState.position.y < 2.3;
+    const onInfoPad = infoPadDistanceSq <= padRadiusSq && playerWorldState.position.y < 2.3;
     const nearDialogueArea =
       activeSectionName === encounter.name ||
-      padDistance <= dialoguePadRadius ||
-      infoPadDistance <= dialoguePadRadius ||
-      villainDistance <= dialogueVillainRadius;
-    const nearVillain = !defeatedRef.current && villainDistance <= dialogueVillainRadius;
+      padDistanceSq <= dialoguePadRadiusSq ||
+      infoPadDistanceSq <= dialoguePadRadiusSq ||
+      villainDistanceSq <= dialogueVillainRadiusSq;
+    const nearVillain = !defeatedRef.current && villainDistanceSq <= dialogueVillainRadiusSq;
 
     if (onPad && !wasOnPadRef.current) {
       activatePad();
@@ -305,6 +305,22 @@ function SectionPortalEncounter({
 function SmokeDeathEffect({ position }: { position: Vector3 }) {
   const groupRef = useRef<Group>(null);
   const startedAtRef = useRef(0);
+  const smokeGeometry = useMemo(() => new SphereGeometry(1, 8, 8), []);
+  const smokeMaterials = useMemo(
+    () =>
+      Array.from(
+        { length: 14 },
+        (_, index) =>
+          new MeshBasicMaterial({
+            color: index % 3 === 0 ? "#5a0710" : "#070406",
+            depthWrite: false,
+            opacity: 0.28,
+            toneMapped: false,
+            transparent: true,
+          })
+      ),
+    []
+  );
   const particles = useRef(
     Array.from({ length: 14 }, (_, index) => ({
       angle: (index / 14) * Math.PI * 2,
@@ -338,26 +354,21 @@ function SmokeDeathEffect({ position }: { position: Vector3 }) {
       );
       child.scale.setScalar(particle.scale * (1 + localProgress * 1.4));
 
-      const material = (child as Mesh).material;
-      if (material instanceof MeshBasicMaterial) {
-        material.opacity = Math.max(0, fade * (0.34 - localProgress * 0.12));
-      }
+      const material = smokeMaterials[index];
+      if (material) material.opacity = Math.max(0, fade * (0.34 - localProgress * 0.12));
     });
   });
 
   return (
     <group ref={groupRef} name="VillainSmokeDeathEffect" position={[position.x, position.y, position.z]}>
       {particles.current.map((particle, index) => (
-        <mesh key={index} position={[0, 0.6, 0]} scale={particle.scale}>
-          <sphereGeometry args={[1, 8, 8]} />
-          <meshBasicMaterial
-            color={index % 3 === 0 ? "#5a0710" : "#070406"}
-            depthWrite={false}
-            transparent
-            opacity={0.28}
-            toneMapped={false}
-          />
-        </mesh>
+        <mesh
+          key={index}
+          geometry={smokeGeometry}
+          material={smokeMaterials[index]}
+          position={[0, 0.6, 0]}
+          scale={particle.scale}
+        />
       ))}
       <pointLight color="#8d0e18" intensity={1.2} distance={4.5} position={[0, 1.25, 0]} />
     </group>

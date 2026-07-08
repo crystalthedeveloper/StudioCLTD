@@ -152,7 +152,6 @@ function SpeedPowerUpInstance({ index, position, resources, restartKey }: SpeedP
 
   return (
     <group ref={groupRef} name={`SpeedPowerUp:${index}`} position={basePosition}>
-      <pointLight color={white} intensity={1.45} distance={4.2} position={[0, 0, 0]} />
       <mesh geometry={resources.boltGeometry} material={resources.boltMaterial} name="SpeedPowerUpBolt" scale={[0.9, 0.9, 0.9]} />
       {Array.from({ length: particleCount }, (_, particleIndex) => (
         <mesh

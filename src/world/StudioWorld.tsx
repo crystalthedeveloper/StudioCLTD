@@ -8,6 +8,7 @@ import { CombatPrototype } from "./systems/CombatPrototype";
 import { GlowCubeField } from "./systems/GlowCubeField";
 import { HubSections } from "./systems/HubSections";
 import { ModularTerrain } from "./systems/ModularTerrain";
+import { PerformanceDebug } from "./systems/PerformanceDebug";
 import { SpaceSky } from "./systems/SpaceSky";
 import { SpeedPowerUp } from "./systems/SpeedPowerUp";
 import { WorldLights } from "./systems/WorldLights";
@@ -23,6 +24,7 @@ const sectionVillainDialogue: Record<string, string> = {
   Performance: "😈 Poor PageSpeed",
   "Site Improvement": "😈 Broken Slider",
 };
+const enablePostProcessing = import.meta.env.VITE_ENABLE_POSTPROCESSING === "true";
 
 export function StudioWorld({ onActiveSectionChange, restartKey }: StudioWorldProps) {
   const dialogueIdRef = useRef(0);
@@ -70,8 +72,9 @@ export function StudioWorld({ onActiveSectionChange, restartKey }: StudioWorldPr
   return (
     <>
       <WorldLights />
+      <PerformanceDebug />
       <SpaceSky />
-      <Environment preset="warehouse" background={false} environmentIntensity={0.08} />
+      <Environment preset="warehouse" background={false} environmentIntensity={0.05} />
       <ModularTerrain radius={7} />
       <GlowCubeField />
       <SpeedPowerUp restartKey={restartKey} />
@@ -110,7 +113,7 @@ export function StudioWorld({ onActiveSectionChange, restartKey }: StudioWorldPr
         onFixedAnimationComplete={() => setMovementLocked(false)}
         restartKey={restartKey}
       />
-      <CinematicPostProcessing />
+      {enablePostProcessing && <CinematicPostProcessing />}
     </>
   );
 }

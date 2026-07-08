@@ -21,7 +21,7 @@ const animationByStatus: Record<VillainStatus, string> = {
 };
 const lookDirection = new Vector3();
 const rotationDamping = 5.5;
-const modelFacingOffset = Math.PI;
+const modelFacingOffset = 0;
 const modelYOffset = 0.28;
 
 function fadeOutOtherActions(actions: Record<string, AnimationAction | null>, activeAction: AnimationAction) {

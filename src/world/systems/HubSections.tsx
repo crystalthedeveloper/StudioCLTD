@@ -21,6 +21,7 @@ import { playerWorldState } from "../playerWorldState";
 
 type HubSectionsProps = {
   onActiveSectionChange: (sectionName: string | null) => void;
+  restartKey: number;
   serviceResolutions: Record<string, boolean>;
 };
 
@@ -29,9 +30,12 @@ const sectionPosition = new Vector3();
 const triggerRadius = 9;
 const offerCountdownMs = 3000;
 const offerDisplayMs = 10000;
+const simpleDisplayMs = 10000;
 const offersPageUrl = "https://www.crystalthedeveloper.ca/offers";
 const white = "#f5f7fb";
 const softWhite = "#d8dde8";
+const screenImageTint = "#c7c7c7";
+const screenIdleColor = "#0b1018";
 const serviceSectionIds = ["quick-fix", "urgent-fix", "performance", "site-improvement"];
 const serviceScreenImages: Record<string, { bad: string; good: string }> = {
   "quick-fix": {
@@ -49,6 +53,16 @@ const serviceScreenImages: Record<string, { bad: string; good: string }> = {
   "site-improvement": {
     bad: "/images/siteImprovement/site-improvement-bad.png",
     good: "/images/siteImprovement/site-improvement-good.png",
+  },
+};
+const simpleDisplaySections: Record<string, { imagePath: string; label: string }> = {
+  tips: {
+    imagePath: "/images/tips/tip.png",
+    label: "Show Tip",
+  },
+  value: {
+    imagePath: "/images/values/value.png",
+    label: "Show Value",
   },
 };
 const offerOptions = [
@@ -80,7 +94,6 @@ const offerOptions = [
 
 type OfferOption = (typeof offerOptions)[number];
 type ShowcaseVideoState = {
-  hasStarted: boolean;
   playing: boolean;
 };
 
@@ -115,11 +128,12 @@ function getShowcaseVideoResource() {
   };
 }
 
-export function HubSections({ onActiveSectionChange, serviceResolutions }: HubSectionsProps) {
+export function HubSections({ onActiveSectionChange, restartKey, serviceResolutions }: HubSectionsProps) {
   const activeSectionRef = useRef<string | null>(null);
+  const displayTimersRef = useRef<Record<string, number>>({});
+  const [activeSimpleDisplays, setActiveSimpleDisplays] = useState<Record<string, boolean>>({});
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
   const [showcaseVideoState, setShowcaseVideoState] = useState<ShowcaseVideoState>({
-    hasStarted: false,
     playing: false,
   });
 
@@ -128,6 +142,17 @@ export function HubSections({ onActiveSectionChange, serviceResolutions }: HubSe
       const image = new Image();
       image.src = offer.imagePath;
     });
+
+    Object.values(simpleDisplaySections).forEach((display) => {
+      const image = new Image();
+      image.src = display.imagePath;
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      Object.values(displayTimersRef.current).forEach((timer) => window.clearTimeout(timer));
+    };
   }, []);
 
   useEffect(() => {
@@ -142,6 +167,21 @@ export function HubSections({ onActiveSectionChange, serviceResolutions }: HubSe
     };
   }, [selectedOfferId]);
 
+  useEffect(() => {
+    Object.values(displayTimersRef.current).forEach((timer) => window.clearTimeout(timer));
+    displayTimersRef.current = {};
+    activeSectionRef.current = null;
+    setActiveSimpleDisplays({});
+    setSelectedOfferId(null);
+    setShowcaseVideoState({ playing: false });
+
+    const resource = getShowcaseVideoResource();
+    if (resource.video) {
+      resource.video.pause();
+      resource.video.currentTime = 0;
+    }
+  }, [restartKey]);
+
   useFrame(() => {
     const active = hubSections.find((section) => {
       sectionPosition.set(...section.position);
@@ -155,22 +195,42 @@ export function HubSections({ onActiveSectionChange, serviceResolutions }: HubSe
     }
   });
 
+  const showSimpleDisplay = (sectionId: string) => {
+    const existingTimer = displayTimersRef.current[sectionId];
+    if (existingTimer) window.clearTimeout(existingTimer);
+
+    setActiveSimpleDisplays((current) => ({
+      ...current,
+      [sectionId]: true,
+    }));
+
+    displayTimersRef.current[sectionId] = window.setTimeout(() => {
+      setActiveSimpleDisplays((current) => ({
+        ...current,
+        [sectionId]: false,
+      }));
+      delete displayTimersRef.current[sectionId];
+    }, simpleDisplayMs);
+  };
+
   return (
     <group name="HubSections">
       <HubPaths />
       {hubSections.map((section) => (
         <HubSectionDistrict
-          key={section.id}
+          key={`${section.id}:${restartKey}`}
           section={section}
           serviceResolutions={serviceResolutions}
+          activeSimpleDisplays={activeSimpleDisplays}
           selectedOffer={offerOptions.find((offer) => offer.id === selectedOfferId) ?? null}
           showcaseVideoState={showcaseVideoState}
           onOfferSelect={setSelectedOfferId}
+          onSimpleDisplayTrigger={showSimpleDisplay}
           onShowcasePause={() => {
             setShowcaseVideoState((current) => (current.playing ? { ...current, playing: false } : current));
           }}
           onShowcasePlay={() => {
-            setShowcaseVideoState({ hasStarted: true, playing: true });
+            setShowcaseVideoState({ playing: true });
           }}
         />
       ))}
@@ -204,17 +264,21 @@ function HubPaths() {
 }
 
 function HubSectionDistrict({
+  activeSimpleDisplays,
   onOfferSelect,
   onShowcasePause,
   onShowcasePlay,
+  onSimpleDisplayTrigger,
   serviceResolutions,
   section,
   selectedOffer,
   showcaseVideoState,
 }: {
+  activeSimpleDisplays: Record<string, boolean>;
   onOfferSelect: (offerId: string | null) => void;
   onShowcasePause: () => void;
   onShowcasePlay: () => void;
+  onSimpleDisplayTrigger: (sectionId: string) => void;
   serviceResolutions: Record<string, boolean>;
   section: HubSection;
   selectedOffer: OfferOption | null;
@@ -228,12 +292,21 @@ function HubSectionDistrict({
   return (
     <group name={`HubSection:${section.id}`} position={section.position} rotation-y={rotation}>
       <SectionBillboard
+        activeSimpleDisplays={activeSimpleDisplays}
         section={section}
         serviceResolutions={serviceResolutions}
         selectedOffer={selectedOffer}
         showcaseVideoState={showcaseVideoState}
       />
       {section.id === "offers" && <OffersSelector selectedOfferId={selectedOffer?.id ?? null} onOfferSelect={onOfferSelect} />}
+      {simpleDisplaySections[section.id] && (
+        <SimpleDisplaySelector
+          active={Boolean(activeSimpleDisplays[section.id])}
+          label={simpleDisplaySections[section.id].label}
+          name={`SimpleDisplayPortal:${section.id}`}
+          onPlayerEnter={() => onSimpleDisplayTrigger(section.id)}
+        />
+      )}
       {section.id === "showcase" && (
         <ShowcaseSelector
           isPlaying={showcaseVideoState.playing}
@@ -247,17 +320,20 @@ function HubSectionDistrict({
 }
 
 function SectionBillboard({
+  activeSimpleDisplays,
   section,
   serviceResolutions,
   selectedOffer,
   showcaseVideoState,
 }: {
+  activeSimpleDisplays: Record<string, boolean>;
   section: HubSection;
   serviceResolutions: Record<string, boolean>;
   selectedOffer: OfferOption | null;
   showcaseVideoState: ShowcaseVideoState;
 }) {
   const isOffers = section.id === "offers";
+  const simpleDisplay = simpleDisplaySections[section.id];
   const isServiceSection = serviceSectionIds.includes(section.id);
   const isShowcase = section.id === "showcase";
 
@@ -274,7 +350,7 @@ function SectionBillboard({
           <meshStandardMaterial
             color="#111827"
             emissive="#ffffff"
-            emissiveIntensity={isOffers ? 0.08 : 0.04}
+            emissiveIntensity={isOffers ? 0.035 : 0.018}
             metalness={0.2}
             roughness={0.48}
           />
@@ -296,10 +372,12 @@ function SectionBillboard({
       </Text>
       {isOffers ? (
         <OffersScreenContent selectedOffer={selectedOffer} />
+      ) : simpleDisplay ? (
+        <SimpleDisplayScreen active={Boolean(activeSimpleDisplays[section.id])} imagePath={simpleDisplay.imagePath} />
       ) : isServiceSection ? (
         <ServiceScreenContent resolved={Boolean(serviceResolutions[section.id])} section={section} />
       ) : isShowcase ? (
-        <ShowcaseScreenContent isPlaying={showcaseVideoState.playing} hasStarted={showcaseVideoState.hasStarted} />
+        <ShowcaseScreenContent isPlaying={showcaseVideoState.playing} />
       ) : (
         <Text
           color="#9fb5cc"
@@ -351,14 +429,36 @@ function OffersScreenContent({ selectedOffer }: { selectedOffer: OfferOption | n
       {texture ? (
         <meshBasicMaterial
           key={`offer-image-${selectedOffer?.id}`}
-          color="#ffffff"
+          color={screenImageTint}
           depthTest={false}
           map={texture}
           side={DoubleSide}
           toneMapped
         />
       ) : (
-        <meshBasicMaterial key="offer-empty-screen" color="#111827" depthTest={false} side={DoubleSide} toneMapped />
+        <meshBasicMaterial key="offer-empty-screen" color={screenIdleColor} depthTest={false} side={DoubleSide} toneMapped />
+      )}
+    </mesh>
+  );
+}
+
+function SimpleDisplayScreen({ active, imagePath }: { active: boolean; imagePath: string }) {
+  const texture = useLoader(TextureLoader, imagePath);
+
+  useEffect(() => {
+    texture.colorSpace = SRGBColorSpace;
+    texture.minFilter = LinearFilter;
+    texture.magFilter = LinearFilter;
+    texture.needsUpdate = true;
+  }, [texture]);
+
+  return (
+    <mesh key={active ? imagePath : "simple-display-empty"} position={[0, -0.03, -0.2]} renderOrder={20}>
+      <planeGeometry args={[8.4, 4.15]} />
+      {active ? (
+        <meshBasicMaterial color={screenImageTint} depthTest={false} map={texture} side={DoubleSide} toneMapped />
+      ) : (
+        <meshBasicMaterial color={screenIdleColor} depthTest={false} side={DoubleSide} toneMapped />
       )}
     </mesh>
   );
@@ -396,7 +496,7 @@ function ServiceImageScreen({
     <mesh position={[0, -0.03, -0.2]} renderOrder={20}>
       <planeGeometry args={[8.4, 4.15]} />
       <meshBasicMaterial
-        color="#ffffff"
+        color={screenImageTint}
         depthTest={false}
         map={texture}
         side={DoubleSide}
@@ -406,7 +506,7 @@ function ServiceImageScreen({
   );
 }
 
-function ShowcaseScreenContent({ hasStarted, isPlaying }: { hasStarted: boolean; isPlaying: boolean }) {
+function ShowcaseScreenContent({ isPlaying }: { isPlaying: boolean }) {
   const materialRef = useRef<MeshBasicMaterial>(null);
   const screenOpacityRef = useRef(0);
   const resource = useMemo(() => getShowcaseVideoResource(), []);
@@ -422,9 +522,9 @@ function ShowcaseScreenContent({ hasStarted, isPlaying }: { hasStarted: boolean;
       return;
     }
 
-    if (!hasStarted || video.paused) return;
+    if (video.paused) return;
     video.pause();
-  }, [hasStarted, isPlaying, resource.video]);
+  }, [isPlaying, resource.video]);
 
   useEffect(() => {
     return () => {
@@ -436,8 +536,8 @@ function ShowcaseScreenContent({ hasStarted, isPlaying }: { hasStarted: boolean;
     const material = materialRef.current;
     if (!material) return;
 
-    const targetOpacity = hasStarted ? 1 : 0;
-    screenOpacityRef.current = MathUtils.damp(screenOpacityRef.current, targetOpacity, 5.5, Math.min(delta, 1 / 30));
+    const targetOpacity = isPlaying ? 1 : 0;
+    screenOpacityRef.current = MathUtils.damp(screenOpacityRef.current, targetOpacity, isPlaying ? 8 : 18, Math.min(delta, 1 / 30));
     material.opacity = screenOpacityRef.current;
     material.needsUpdate = true;
   });
@@ -448,7 +548,7 @@ function ShowcaseScreenContent({ hasStarted, isPlaying }: { hasStarted: boolean;
       {resource.texture ? (
         <meshBasicMaterial
           ref={materialRef}
-          color="#ffffff"
+          color={screenImageTint}
           depthTest={false}
           map={resource.texture}
           opacity={0}
@@ -457,7 +557,7 @@ function ShowcaseScreenContent({ hasStarted, isPlaying }: { hasStarted: boolean;
           transparent
         />
       ) : (
-        <meshBasicMaterial color="#111827" depthTest={false} side={DoubleSide} toneMapped />
+        <meshBasicMaterial color={screenIdleColor} depthTest={false} side={DoubleSide} toneMapped />
       )}
     </mesh>
   );
@@ -539,7 +639,37 @@ function ShowcaseSelector({
 }) {
   return (
     <group name="ShowcaseSelector">
-      <ShowcasePortalPad active={isPlaying} onPlayerEnter={onPlayerEnter} onPlayerExit={onPlayerExit} />
+      <ShowcasePortalPad
+        active={isPlaying}
+        label="Play Showcase"
+        name="ShowcasePortal:play"
+        onPlayerEnter={onPlayerEnter}
+        onPlayerExit={onPlayerExit}
+      />
+    </group>
+  );
+}
+
+function SimpleDisplaySelector({
+  active,
+  label,
+  name,
+  onPlayerEnter,
+}: {
+  active: boolean;
+  label: string;
+  name: string;
+  onPlayerEnter: () => void;
+}) {
+  return (
+    <group name={`${name}:selector`}>
+      <ShowcasePortalPad
+        active={active}
+        label={label}
+        name={name}
+        onPlayerEnter={onPlayerEnter}
+        onPlayerExit={() => undefined}
+      />
     </group>
   );
 }
@@ -606,7 +736,7 @@ function OfferPortalPad({
         playerWorldState.position.x - worldPositionRef.current.x,
         playerWorldState.position.z - worldPositionRef.current.z
       );
-      const playerInsidePad = distance <= 1.05 && playerWorldState.position.y < 2.3;
+      const playerInsidePad = distance <= 1.28 && playerWorldState.position.y < 2.3;
 
       if (playerInsidePad && !playerInsideRef.current) {
         playerInsideRef.current = true;
@@ -647,17 +777,17 @@ function OfferPortalPad({
     <group ref={groupRef} name={`OfferPortal:${offer.id}`} position={offer.position}>
       <CuboidCollider
         sensor
-        args={[0.95, 0.28, 0.95]}
+        args={[1.15, 0.28, 1.15]}
         position={[0, 0.45, 0]}
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
       <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
-        <torusGeometry args={[0.84, 0.024, 10, 96]} />
+        <torusGeometry args={[1, 0.026, 10, 96]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.56} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh ref={pulseRef} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false}>
-        <ringGeometry args={[0.58, 0.88, 96]} />
+        <ringGeometry args={[0.68, 1.05, 96]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       <BillboardLabel
@@ -685,10 +815,14 @@ function OfferPortalPad({
 
 function ShowcasePortalPad({
   active,
+  label,
+  name,
   onPlayerEnter,
   onPlayerExit,
 }: {
   active: boolean;
+  label: string;
+  name: string;
   onPlayerEnter: () => void;
   onPlayerExit: () => void;
 }) {
@@ -746,7 +880,7 @@ function ShowcasePortalPad({
         playerWorldState.position.x - worldPositionRef.current.x,
         playerWorldState.position.z - worldPositionRef.current.z
       );
-      const playerInsidePad = distance <= 1.1 && playerWorldState.position.y < 2.3;
+      const playerInsidePad = distance <= 1.32 && playerWorldState.position.y < 2.3;
 
       if (playerInsidePad) {
         activate();
@@ -781,24 +915,24 @@ function ShowcasePortalPad({
   });
 
   return (
-    <group ref={groupRef} name="ShowcasePortal:play" position={[0, 0.18, 9.2]}>
+    <group ref={groupRef} name={name} position={[0, 0.18, 9.2]}>
       <CuboidCollider
         sensor
-        args={[0.95, 0.28, 0.95]}
+        args={[1.15, 0.28, 1.15]}
         position={[0, 0.45, 0]}
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
       <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
-        <torusGeometry args={[0.84, 0.024, 10, 96]} />
+        <torusGeometry args={[1, 0.026, 10, 96]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.58} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh ref={pulseRef} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false}>
-        <ringGeometry args={[0.58, 0.88, 96]} />
+        <ringGeometry args={[0.68, 1.05, 96]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       <BillboardLabel color={white} fontSize={0.28} position={[0, 1.05, 0]} maxWidth={3}>
-        Play Showcase
+        {label}
       </BillboardLabel>
       <pointLight color="#ffffff" intensity={active ? 2.2 : 0.6} distance={active ? 5.2 : 3} position={[0, 0.72, 0]} />
     </group>

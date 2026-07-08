@@ -1,6 +1,7 @@
 import { Environment } from "@react-three/drei";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CharacterController } from "../player/CharacterController";
+import { resetSpeedBoost } from "../player/speedBoost";
 import { DialogueMessage } from "../ui/DialogueBubble";
 import { CinematicPostProcessing } from "./systems/CinematicPostProcessing";
 import { CombatPrototype } from "./systems/CombatPrototype";
@@ -13,6 +14,7 @@ import { WorldLights } from "./systems/WorldLights";
 
 type StudioWorldProps = {
   onActiveSectionChange: (sectionName: string | null) => void;
+  restartKey: number;
 };
 
 const sectionVillainDialogue: Record<string, string> = {
@@ -22,7 +24,7 @@ const sectionVillainDialogue: Record<string, string> = {
   "Site Improvement": "😈 Broken Slider",
 };
 
-export function StudioWorld({ onActiveSectionChange }: StudioWorldProps) {
+export function StudioWorld({ onActiveSectionChange, restartKey }: StudioWorldProps) {
   const dialogueIdRef = useRef(0);
   const fixedAnimationRequestRef = useRef(0);
   const [fixedAnimationRequest, setFixedAnimationRequest] = useState(0);
@@ -31,6 +33,16 @@ export function StudioWorld({ onActiveSectionChange }: StudioWorldProps) {
   const [activeSectionName, setActiveSectionName] = useState<string | null>(null);
   const [playerDialogue, setPlayerDialogue] = useState<DialogueMessage | null>(null);
   const [villainDialogue, setVillainDialogue] = useState<(DialogueMessage & { sectionName: string }) | null>(null);
+
+  useEffect(() => {
+    setMovementLocked(false);
+    setServiceResolutions({});
+    setActiveSectionName(null);
+    setPlayerDialogue(null);
+    setVillainDialogue(null);
+    onActiveSectionChange(null);
+    resetSpeedBoost();
+  }, [onActiveSectionChange, restartKey]);
 
   const createDialogue = (text: string): DialogueMessage => {
     dialogueIdRef.current += 1;
@@ -62,10 +74,15 @@ export function StudioWorld({ onActiveSectionChange }: StudioWorldProps) {
       <Environment preset="warehouse" background={false} environmentIntensity={0.08} />
       <ModularTerrain radius={7} />
       <GlowCubeField />
-      <SpeedPowerUp />
-      <HubSections serviceResolutions={serviceResolutions} onActiveSectionChange={handleActiveSectionChange} />
+      <SpeedPowerUp restartKey={restartKey} />
+      <HubSections
+        restartKey={restartKey}
+        serviceResolutions={serviceResolutions}
+        onActiveSectionChange={handleActiveSectionChange}
+      />
       <CombatPrototype
         activeSectionName={activeSectionName}
+        restartKey={restartKey}
         onPlayerDialogue={(text) => setPlayerDialogue(createDialogue(text))}
         onPlayerFixedAnimation={() => {
           setMovementLocked(true);
@@ -91,6 +108,7 @@ export function StudioWorld({ onActiveSectionChange }: StudioWorldProps) {
         fixedAnimationRequest={fixedAnimationRequest}
         movementLocked={movementLocked}
         onFixedAnimationComplete={() => setMovementLocked(false)}
+        restartKey={restartKey}
       />
       <CinematicPostProcessing />
     </>

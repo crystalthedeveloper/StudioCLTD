@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   ExtrudeGeometry,
   Group,
@@ -37,7 +37,7 @@ function createBoltShape() {
   return shape;
 }
 
-export function SpeedPowerUp() {
+export function SpeedPowerUp({ restartKey }: { restartKey: number }) {
   const resources = useMemo(() => {
     const boltGeometry = new ExtrudeGeometry(createBoltShape(), {
       bevelEnabled: true,
@@ -74,7 +74,7 @@ export function SpeedPowerUp() {
   return (
     <group name="SpeedPowerUps">
       {pickupPositions.map((position, index) => (
-        <SpeedPowerUpInstance key={index} index={index} position={position} resources={resources} />
+        <SpeedPowerUpInstance key={index} index={index} position={position} resources={resources} restartKey={restartKey} />
       ))}
     </group>
   );
@@ -89,14 +89,25 @@ type SpeedPowerUpInstanceProps = {
     particleGeometry: SphereGeometry;
     particleMaterial: MeshBasicMaterial;
   };
+  restartKey: number;
 };
 
-function SpeedPowerUpInstance({ index, position, resources }: SpeedPowerUpInstanceProps) {
+function SpeedPowerUpInstance({ index, position, resources, restartKey }: SpeedPowerUpInstanceProps) {
   const groupRef = useRef<Group>(null);
   const particlesRef = useRef<Mesh[]>([]);
   const availableRef = useRef(true);
   const respawnAtRef = useRef(0);
   const basePosition = useMemo(() => new Vector3(...position), [position]);
+
+  useEffect(() => {
+    availableRef.current = true;
+    respawnAtRef.current = 0;
+    if (!groupRef.current) return;
+
+    groupRef.current.visible = true;
+    groupRef.current.scale.setScalar(1);
+    groupRef.current.position.copy(basePosition);
+  }, [basePosition, restartKey]);
 
   useFrame(({ clock }) => {
     const group = groupRef.current;

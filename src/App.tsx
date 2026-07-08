@@ -1,5 +1,5 @@
 import { Canvas } from "@react-three/fiber";
-import { AdaptiveDpr, PerformanceMonitor } from "@react-three/drei";
+import { AdaptiveDpr, PerformanceMonitor, useProgress } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { ACESFilmicToneMapping, PCFSoftShadowMap, SRGBColorSpace } from "three";
@@ -13,8 +13,18 @@ import { StudioWorld } from "./world/StudioWorld";
 export default function App() {
   const [dpr, setDpr] = useState(1.5);
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [restartKey, setRestartKey] = useState(0);
   const gameFocused = useGameFocus();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const restartGame = () => {
+    setRestartKey((current) => current + 1);
+    setActiveSection(null);
+  };
+
+  const openWebsite = () => {
+    window.open("https://www.crystalthedeveloper.ca/", "_blank", "noopener,noreferrer");
+  };
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -99,11 +109,20 @@ export default function App() {
           <PerformanceMonitor onDecline={() => setDpr(1)} onIncline={() => setDpr(1.75)} />
           <Suspense fallback={null}>
             <Physics gravity={[0, -20, 0]}>
-              <StudioWorld onActiveSectionChange={setActiveSection} />
+              <StudioWorld restartKey={restartKey} onActiveSectionChange={setActiveSection} />
             </Physics>
           </Suspense>
           <AdaptiveDpr pixelated />
         </Canvas>
+      </div>
+      <LoadingScreen />
+      <div className="game-actions">
+        <button type="button" onClick={restartGame}>
+          Restart
+        </button>
+        <button type="button" onClick={openWebsite}>
+          My Site
+        </button>
       </div>
       <HubOverlay activeSection={activeSection} />
       <SpeedBoostHud />
@@ -113,5 +132,32 @@ export default function App() {
       </div>
       <TrackpadControl />
     </>
+  );
+}
+
+function LoadingScreen() {
+  const { active, progress } = useProgress();
+  const [visible, setVisible] = useState(true);
+  const complete = !active && progress >= 100;
+
+  useEffect(() => {
+    if (!complete) {
+      setVisible(true);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setVisible(false), 520);
+    return () => window.clearTimeout(timeout);
+  }, [complete]);
+
+  if (!visible) return null;
+
+  return (
+    <div className={`loading-screen${complete ? " loading-screen--ready" : ""}`}>
+      <div className="loading-screen__content">
+        <strong>Loading...</strong>
+        <span>{`${Math.round(progress)}%`}</span>
+      </div>
+    </div>
   );
 }

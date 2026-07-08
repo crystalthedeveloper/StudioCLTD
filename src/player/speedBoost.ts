@@ -33,6 +33,17 @@ export function activateSpeedBoost() {
   emitSpeedBoostChange();
 }
 
+export function resetSpeedBoost() {
+  activeUntil = 0;
+
+  if (endTimeout !== null) {
+    window.clearTimeout(endTimeout);
+    endTimeout = null;
+  }
+
+  emitSpeedBoostChange();
+}
+
 export function useSpeedBoostRemainingSeconds() {
   const [remainingSeconds, setRemainingSeconds] = useState(() => Math.ceil(getSpeedBoostRemainingMs() / 1000));
 

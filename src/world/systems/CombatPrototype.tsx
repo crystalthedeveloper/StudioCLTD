@@ -2,19 +2,20 @@ import { Text } from "@react-three/drei";
 import { CuboidCollider } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useRef, useState } from "react";
-import { Mesh, MeshBasicMaterial, Vector3 } from "three";
+import { Group, Mesh, MeshBasicMaterial, Vector3 } from "three";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { DialogueMessage } from "../../ui/DialogueBubble";
 import { VillainCharacter, VillainStatus } from "../../villain/VillainCharacter";
 import { hubSections } from "../hubSections";
 import { playerWorldState } from "../playerWorldState";
 
-const padRadius = 1.35;
+const padRadius = 1.6;
 const cooldownMs = 1800;
 const dialoguePadRadius = 6.5;
 const dialogueVillainRadius = 9;
 const encounterSectionIds = ["quick-fix", "urgent-fix", "performance", "site-improvement"];
 const infoPanelDurationMs = 10000;
+const smokeDurationMs = 1700;
 
 const serviceInfoText: Record<string, string> = {
   "quick-fix":
@@ -76,6 +77,7 @@ type CombatPrototypeProps = {
   onPlayerDialogue: (text: string) => void;
   onSectionResolved: (sectionId: string) => void;
   onVillainDialogue: (sectionName: string, text: string) => void;
+  restartKey: number;
   villainDialogue: (DialogueMessage & { sectionName: string }) | null;
 };
 
@@ -85,6 +87,7 @@ export function CombatPrototype({
   onPlayerDialogue,
   onSectionResolved,
   onVillainDialogue,
+  restartKey,
   villainDialogue,
 }: CombatPrototypeProps) {
   const [activeInfoId, setActiveInfoId] = useState<string | null>(null);
@@ -99,11 +102,15 @@ export function CombatPrototype({
     return () => window.clearTimeout(timeout);
   }, [activeInfoId]);
 
+  useEffect(() => {
+    setActiveInfoId(null);
+  }, [restartKey]);
+
   return (
     <group name="SectionPortalEncounters">
       {sectionEncounters.map((encounter) => (
         <SectionPortalEncounter
-          key={encounter.id}
+          key={`${encounter.id}:${restartKey}`}
           activeSectionName={activeSectionName}
           activeInfoId={activeInfoId}
           encounter={encounter}
@@ -146,6 +153,8 @@ function SectionPortalEncounter({
   const [villainStatus, setVillainStatus] = useState<VillainStatus>("idle");
   const [portalActive, setPortalActive] = useState(false);
   const [infoPortalActive, setInfoPortalActive] = useState(false);
+  const [smokeActive, setSmokeActive] = useState(false);
+  const [villainVisible, setVillainVisible] = useState(true);
   const [villainBubbleVisible, setVillainBubbleVisible] = useState(false);
   const lastActivatedRef = useRef(0);
   const lastInfoActivatedRef = useRef(0);
@@ -163,6 +172,7 @@ function SectionPortalEncounter({
     defeatedRef.current = true;
     lastActivatedRef.current = now;
     setPortalActive(true);
+    setSmokeActive(true);
     setVillainStatus("dead");
     onPlayerFixedAnimation();
     onPlayerDialogue("FIXED!");
@@ -188,6 +198,17 @@ function SectionPortalEncounter({
 
     return () => window.clearTimeout(timeout);
   }, [portalActive]);
+
+  useEffect(() => {
+    if (!smokeActive) return;
+
+    const timeout = window.setTimeout(() => {
+      setSmokeActive(false);
+      setVillainVisible(false);
+    }, smokeDurationMs);
+
+    return () => window.clearTimeout(timeout);
+  }, [smokeActive]);
 
   useEffect(() => {
     if (!infoPortalActive) return;
@@ -261,19 +282,84 @@ function SectionPortalEncounter({
           position={encounter.infoPadPosition}
         />
       )}
-      <VillainCharacter
-        basePosition={encounter.villainPosition}
-        dialogue={
-          villainStatus === "dead"
-            ? null
-            : villainBubbleVisible
-              ? { id: 1, text: villainDialogueText[encounter.id] }
-              : villainDialogue?.sectionName === encounter.name
-                ? villainDialogue
-                : null
-        }
-        villainStatus={villainStatus}
-      />
+      {smokeActive && <SmokeDeathEffect position={encounter.villainPosition} />}
+      {villainVisible && (
+        <VillainCharacter
+          basePosition={encounter.villainPosition}
+          dialogue={
+            villainStatus === "dead"
+              ? null
+              : villainBubbleVisible
+                ? { id: 1, text: villainDialogueText[encounter.id] }
+                : villainDialogue?.sectionName === encounter.name
+                  ? villainDialogue
+                  : null
+          }
+          villainStatus={villainStatus}
+        />
+      )}
+    </group>
+  );
+}
+
+function SmokeDeathEffect({ position }: { position: Vector3 }) {
+  const groupRef = useRef<Group>(null);
+  const startedAtRef = useRef(0);
+  const particles = useRef(
+    Array.from({ length: 14 }, (_, index) => ({
+      angle: (index / 14) * Math.PI * 2,
+      delay: (index % 5) * 0.08,
+      radius: 0.22 + (index % 4) * 0.13,
+      rise: 1.15 + (index % 5) * 0.18,
+      scale: 0.34 + (index % 4) * 0.08,
+      speed: 0.65 + (index % 3) * 0.12,
+    }))
+  );
+
+  useFrame(({ clock }) => {
+    const group = groupRef.current;
+    if (!group) return;
+
+    if (startedAtRef.current === 0) startedAtRef.current = clock.elapsedTime;
+    const elapsed = clock.elapsedTime - startedAtRef.current;
+    const progress = Math.min(elapsed / (smokeDurationMs / 1000), 1);
+    const fade = 1 - progress;
+
+    group.children.forEach((child, index) => {
+      const particle = particles.current[index];
+      if (!particle) return;
+
+      const localProgress = Math.max(0, Math.min((elapsed - particle.delay) / 1.35, 1));
+      const driftAngle = particle.angle + elapsed * particle.speed;
+      child.position.set(
+        Math.cos(driftAngle) * particle.radius * (1 + localProgress * 0.85),
+        0.55 + localProgress * particle.rise,
+        Math.sin(driftAngle) * particle.radius * (1 + localProgress * 0.85)
+      );
+      child.scale.setScalar(particle.scale * (1 + localProgress * 1.4));
+
+      const material = (child as Mesh).material;
+      if (material instanceof MeshBasicMaterial) {
+        material.opacity = Math.max(0, fade * (0.34 - localProgress * 0.12));
+      }
+    });
+  });
+
+  return (
+    <group ref={groupRef} name="VillainSmokeDeathEffect" position={[position.x, position.y, position.z]}>
+      {particles.current.map((particle, index) => (
+        <mesh key={index} position={[0, 0.6, 0]} scale={particle.scale}>
+          <sphereGeometry args={[1, 8, 8]} />
+          <meshBasicMaterial
+            color={index % 3 === 0 ? "#5a0710" : "#070406"}
+            depthWrite={false}
+            transparent
+            opacity={0.28}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
+      <pointLight color="#8d0e18" intensity={1.2} distance={4.5} position={[0, 1.25, 0]} />
     </group>
   );
 }
@@ -325,16 +411,16 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
     <group position={position}>
       <CuboidCollider
         sensor
-        args={[1.25, 0.28, 1.25]}
+        args={[1.5, 0.28, 1.5]}
         position={[0, 0.45, 0]}
         onIntersectionEnter={onActivate}
       />
       <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]}>
-        <torusGeometry args={[1.08, 0.028, 10, 128]} />
+        <torusGeometry args={[1.3, 0.03, 10, 128]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.54} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh ref={pulseRef} rotation-x={-Math.PI / 2} position={[0, 0.05, 0]} visible={false}>
-        <ringGeometry args={[0.72, 1.1, 128]} />
+        <ringGeometry args={[0.86, 1.32, 128]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       {label && (

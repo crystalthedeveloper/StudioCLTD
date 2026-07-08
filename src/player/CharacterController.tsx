@@ -1,6 +1,6 @@
 import { CapsuleCollider, RigidBody, RapierRigidBody } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MathUtils, Vector3 } from "three";
 import { PlayerCharacter } from "./PlayerCharacter";
 import { ThirdPersonCamera } from "./ThirdPersonCamera";
@@ -24,6 +24,7 @@ type CharacterControllerProps = {
   fixedAnimationRequest: number;
   movementLocked: boolean;
   onFixedAnimationComplete: () => void;
+  restartKey: number;
 };
 
 export function CharacterController({
@@ -31,6 +32,7 @@ export function CharacterController({
   fixedAnimationRequest,
   movementLocked,
   onFixedAnimationComplete,
+  restartKey,
 }: CharacterControllerProps) {
   const bodyRef = useRef<RapierRigidBody | null>(null);
   const yawRef = useRef(0);
@@ -42,6 +44,24 @@ export function CharacterController({
   const forwardBackSpeedRef = useRef(0);
   const [animationState, setAnimationState] = useState<CharacterAnimationState>("idle");
   const spawn = useMemo<[number, number, number]>(() => [0, 2.8, 8], []);
+
+  useEffect(() => {
+    const body = bodyRef.current;
+
+    yawRef.current = 0;
+    cameraYawRef.current = 0;
+    forwardBackSpeedRef.current = 0;
+    movementDirectionRef.current.set(0, 0, 0);
+    animationStateRef.current = "idle";
+    setAnimationState("idle");
+    playerWorldState.position.set(spawn[0], spawn[1], spawn[2]);
+
+    if (!body) return;
+
+    body.setTranslation({ x: spawn[0], y: spawn[1], z: spawn[2] }, true);
+    body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  }, [restartKey, spawn]);
 
   useFrame((_, delta) => {
     const body = bodyRef.current;

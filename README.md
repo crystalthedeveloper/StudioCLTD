@@ -32,16 +32,16 @@ StudioCLTD is a React Three Fiber open-world hub for the StudioCLTD universe. Th
 - Showcase section with a trigger pad that plays `public/videos/showcase.mp4` on the Showcase TV.
 - Service-section villains and clean portal trigger pads.
 - Quick Fix interaction:
-  - Starts with `quick-fix-bad.png`.
+  - Starts with `quick-fix-bad.jpg`.
   - Trigger pad plays the villain `dieV` animation once.
-  - Screen changes to `quick-fix-good.png`.
+  - Screen changes to `quick-fix-good.jpg`.
 
 ## Characters
 
 The project uses one shared character GLB:
 
 ```text
-public/characters/char.glb
+public/characters/char-optimized.glb
 ```
 
 Player animations:
@@ -69,11 +69,8 @@ Villains face the player while alive, rotate only on the Y axis, and stop rotati
 Key public assets:
 
 ```text
-public/characters/char.glb
-public/images/8k_stars_milky_way.jpg
-public/images/8k_venus_surface.jpg
-public/images/offers/
-public/images/quickFix/
+public/characters/char-optimized.glb
+public/images/optimized/
 public/videos/showcase.mp4
 ```
 

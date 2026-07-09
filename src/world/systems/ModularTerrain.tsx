@@ -40,7 +40,7 @@ export function ModularTerrain({ radius }: ModularTerrainProps) {
   return (
     <group name="SmoothSciFiFloor">
       <CuboidCollider position={[0, -0.09, 0]} args={[platformSize / 2, 0.09, platformSize / 2]} friction={0} restitution={0} />
-      <mesh rotation-x={-Math.PI / 2} receiveShadow material={material}>
+      <mesh rotation-x={-Math.PI / 2} material={material}>
         <planeGeometry args={[platformSize, platformSize, 1, 1]} />
       </mesh>
     </group>

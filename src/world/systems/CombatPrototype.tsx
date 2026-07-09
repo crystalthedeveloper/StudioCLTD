@@ -91,6 +91,7 @@ export function CombatPrototype({
   villainDialogue,
 }: CombatPrototypeProps) {
   const [activeInfoId, setActiveInfoId] = useState<string | null>(null);
+  const [visibleEncounterCount, setVisibleEncounterCount] = useState(1);
 
   useEffect(() => {
     if (!activeInfoId) return undefined;
@@ -104,11 +105,22 @@ export function CombatPrototype({
 
   useEffect(() => {
     setActiveInfoId(null);
+    setVisibleEncounterCount(1);
   }, [restartKey]);
+
+  useEffect(() => {
+    if (visibleEncounterCount >= sectionEncounters.length) return undefined;
+
+    const timeout = window.setTimeout(() => {
+      setVisibleEncounterCount((current) => Math.min(sectionEncounters.length, current + 1));
+    }, 220);
+
+    return () => window.clearTimeout(timeout);
+  }, [visibleEncounterCount]);
 
   return (
     <group name="SectionPortalEncounters">
-      {sectionEncounters.map((encounter) => (
+      {sectionEncounters.slice(0, visibleEncounterCount).map((encounter) => (
         <SectionPortalEncounter
           key={`${encounter.id}:${restartKey}`}
           activeInfoId={activeInfoId}
@@ -295,11 +307,12 @@ function SectionPortalEncounter({
 function SmokeDeathEffect({ position }: { position: Vector3 }) {
   const groupRef = useRef<Group>(null);
   const startedAtRef = useRef(0);
+  const lastSmokeFrameRef = useRef(-1);
   const smokeGeometry = useMemo(() => new SphereGeometry(1, 8, 8), []);
   const smokeMaterials = useMemo(
     () =>
       Array.from(
-        { length: 14 },
+        { length: 8 },
         (_, index) =>
           new MeshBasicMaterial({
             color: index % 3 === 0 ? "#5a0710" : "#070406",
@@ -312,8 +325,8 @@ function SmokeDeathEffect({ position }: { position: Vector3 }) {
     []
   );
   const particles = useRef(
-    Array.from({ length: 14 }, (_, index) => ({
-      angle: (index / 14) * Math.PI * 2,
+    Array.from({ length: 8 }, (_, index) => ({
+      angle: (index / 8) * Math.PI * 2,
       delay: (index % 5) * 0.08,
       radius: 0.22 + (index % 4) * 0.13,
       rise: 1.15 + (index % 5) * 0.18,
@@ -323,6 +336,10 @@ function SmokeDeathEffect({ position }: { position: Vector3 }) {
   );
 
   useFrame(({ clock }) => {
+    const frameSlot = Math.floor(clock.elapsedTime * 20);
+    if (frameSlot === lastSmokeFrameRef.current) return;
+    lastSmokeFrameRef.current = frameSlot;
+
     const group = groupRef.current;
     if (!group) return;
 
@@ -360,7 +377,6 @@ function SmokeDeathEffect({ position }: { position: Vector3 }) {
           scale={particle.scale}
         />
       ))}
-      <pointLight color="#8d0e18" intensity={1.2} distance={4.5} position={[0, 1.25, 0]} />
     </group>
   );
 }
@@ -379,14 +395,16 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
   const wasActiveRef = useRef(active);
 
   useFrame(({ clock }) => {
+    if (!active && !wasActiveRef.current) return;
+
     if (active && !wasActiveRef.current) {
       activeStartedAtRef.current = clock.elapsedTime;
     }
-    wasActiveRef.current = active;
 
     const activationGlow = active ? Math.max(0, 1 - (clock.elapsedTime - activeStartedAtRef.current) / 1) : 0;
     const pulse = 1 + activationGlow * 0.05;
     const glow = 0.54 + activationGlow * 0.32;
+    wasActiveRef.current = active;
 
     if (ringRef.current) {
       ringRef.current.scale.setScalar(pulse);
@@ -417,11 +435,11 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
         onIntersectionEnter={onActivate}
       />
       <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]}>
-        <torusGeometry args={[1.3, 0.03, 10, 128]} />
+        <torusGeometry args={[1.3, 0.03, 8, 64]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.54} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh ref={pulseRef} rotation-x={-Math.PI / 2} position={[0, 0.05, 0]} visible={false}>
-        <ringGeometry args={[0.86, 1.32, 128]} />
+        <ringGeometry args={[0.86, 1.32, 64]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       {label && (
@@ -434,7 +452,6 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
           {label}
         </BillboardLabel>
       )}
-      <pointLight color="#ffffff" intensity={active ? 3.2 : 0.8} distance={active ? 6 : 3.5} position={[0, 0.8, 0]} />
     </group>
   );
 }

@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { CharacterController } from "../player/CharacterController";
 import { resetSpeedBoost } from "../player/speedBoost";
 import { DialogueMessage } from "../ui/DialogueBubble";
-import { CinematicPostProcessing } from "./systems/CinematicPostProcessing";
 import { CombatPrototype } from "./systems/CombatPrototype";
 import { GlowCubeField } from "./systems/GlowCubeField";
 import { HubSections } from "./systems/HubSections";
@@ -15,8 +14,6 @@ import { WorldLights } from "./systems/WorldLights";
 type StudioWorldProps = {
   restartKey: number;
 };
-
-const enablePostProcessing = import.meta.env.VITE_ENABLE_POSTPROCESSING === "true";
 
 export function StudioWorld({ restartKey }: StudioWorldProps) {
   const dialogueIdRef = useRef(0);
@@ -81,7 +78,6 @@ export function StudioWorld({ restartKey }: StudioWorldProps) {
         onFixedAnimationComplete={() => setMovementLocked(false)}
         restartKey={restartKey}
       />
-      {enablePostProcessing && <CinematicPostProcessing />}
     </>
   );
 }

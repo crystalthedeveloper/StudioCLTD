@@ -28,13 +28,15 @@ export function BillboardLabel({
   position = [0, 1.05, 0],
 }: BillboardLabelProps) {
   const groupRef = useRef<Group>(null);
-  const baseYRef = useRef(position[1]);
+  const lastUpdateRef = useRef(0);
 
   useFrame(({ camera, clock }) => {
+    if (clock.elapsedTime - lastUpdateRef.current < 0.1) return;
+    lastUpdateRef.current = clock.elapsedTime;
+
     const group = groupRef.current;
     if (!group) return;
 
-    group.position.y = baseYRef.current + Math.sin(clock.elapsedTime * 2.1) * 0.045;
     group.getWorldPosition(worldPosition);
 
     const yaw = Math.atan2(camera.position.x - worldPosition.x, camera.position.z - worldPosition.z);

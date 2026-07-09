@@ -22,7 +22,7 @@ const pickupPositions = [
 ] as const;
 
 const white = "#ffffff";
-const particleCount = 3;
+const particleCount = 2;
 
 function createBoltShape() {
   const shape = new Shape();
@@ -97,6 +97,7 @@ function SpeedPowerUpInstance({ index, position, resources, restartKey }: SpeedP
   const particlesRef = useRef<Mesh[]>([]);
   const availableRef = useRef(true);
   const respawnAtRef = useRef(0);
+  const lastVisualFrameRef = useRef(-1);
   const basePosition = useMemo(() => new Vector3(...position), [position]);
 
   useEffect(() => {
@@ -122,24 +123,28 @@ function SpeedPowerUpInstance({ index, position, resources, restartKey }: SpeedP
       group.scale.setScalar(1);
     }
 
-    const elapsed = clock.elapsedTime + index * 0.7;
-    group.position.set(
-      basePosition.x,
-      basePosition.y + Math.sin(elapsed * 2.2) * 0.18,
-      basePosition.z
-    );
-    group.rotation.y = elapsed * 1.45;
-
-    for (let particleIndex = 0; particleIndex < particlesRef.current.length; particleIndex += 1) {
-      const particle = particlesRef.current[particleIndex];
-      if (!particle) continue;
-
-      const angle = elapsed * 1.25 + (particleIndex / particleCount) * Math.PI * 2;
-      particle.position.set(
-        Math.cos(angle) * 0.42,
-        -0.22 + particleIndex * 0.22 + Math.sin(elapsed * 2 + particleIndex) * 0.035,
-        Math.sin(angle) * 0.42
+    const visualFrame = Math.floor(clock.elapsedTime * 24);
+    if (visualFrame !== lastVisualFrameRef.current) {
+      lastVisualFrameRef.current = visualFrame;
+      const elapsed = clock.elapsedTime + index * 0.7;
+      group.position.set(
+        basePosition.x,
+        basePosition.y + Math.sin(elapsed * 1.8) * 0.12,
+        basePosition.z
       );
+      group.rotation.y = elapsed * 1.1;
+
+      for (let particleIndex = 0; particleIndex < particlesRef.current.length; particleIndex += 1) {
+        const particle = particlesRef.current[particleIndex];
+        if (!particle) continue;
+
+        const angle = elapsed * 1.05 + (particleIndex / particleCount) * Math.PI * 2;
+        particle.position.set(
+          Math.cos(angle) * 0.34,
+          -0.16 + particleIndex * 0.24 + Math.sin(elapsed * 1.7 + particleIndex) * 0.025,
+          Math.sin(angle) * 0.34
+        );
+      }
     }
 
     if (playerWorldState.position.distanceTo(group.position) > pickupRadius) return;

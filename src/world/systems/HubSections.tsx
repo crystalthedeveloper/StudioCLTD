@@ -1,6 +1,6 @@
 import { Text } from "@react-three/drei";
 import { CuboidCollider, IntersectionEnterPayload, IntersectionExitPayload, RigidBody } from "@react-three/rapier";
-import { useFrame, useLoader } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DoubleSide,
@@ -11,6 +11,7 @@ import {
   MeshBasicMaterial,
   Object3D,
   SRGBColorSpace,
+  Texture,
   TextureLoader,
   Vector3,
   VideoTexture,
@@ -34,57 +35,59 @@ const white = "#f5f7fb";
 const softWhite = "#d8dde8";
 const screenImageTint = "#c7c7c7";
 const screenIdleColor = "#0b1018";
+const screenContentSize: [number, number] = [9.05, 4.62];
+const screenContentAspect = screenContentSize[0] / screenContentSize[1];
 const serviceSectionIds = ["quick-fix", "urgent-fix", "performance", "site-improvement"];
 const serviceScreenImages: Record<string, { bad: string; good: string }> = {
   "quick-fix": {
-    bad: "/images/quickFix/quick-fix-bad.png",
-    good: "/images/quickFix/quick-fix-good.png",
+    bad: "/images/optimized/quickFix/quick-fix-bad.jpg",
+    good: "/images/optimized/quickFix/quick-fix-good.jpg",
   },
   "urgent-fix": {
-    bad: "/images/urgentFix/urgent-fix-bad.png",
-    good: "/images/urgentFix/urgent-fix-good.png",
+    bad: "/images/optimized/urgentFix/urgent-fix-bad.jpg",
+    good: "/images/optimized/urgentFix/urgent-fix-good.jpg",
   },
   performance: {
-    bad: "/images/performance/performance-bad.png",
-    good: "/images/performance/performance-good.png",
+    bad: "/images/optimized/performance/performance-bad.jpg",
+    good: "/images/optimized/performance/performance-good.jpg",
   },
   "site-improvement": {
-    bad: "/images/siteImprovement/site-improvement-bad.png",
-    good: "/images/siteImprovement/site-improvement-good.png",
+    bad: "/images/optimized/siteImprovement/site-improvement-bad.jpg",
+    good: "/images/optimized/siteImprovement/site-improvement-good.jpg",
   },
 };
 const simpleDisplaySections: Record<string, { imagePath: string; label: string }> = {
   tips: {
-    imagePath: "/images/tips/tip.png",
+    imagePath: "/images/optimized/tips/tip.jpg",
     label: "Show Tip",
   },
   value: {
-    imagePath: "/images/values/value.png",
+    imagePath: "/images/optimized/values/value.jpg",
     label: "Show Value",
   },
 };
 const offerOptions = [
   {
     id: "quick-fix",
-    imagePath: "/images/offers/quick-fix.png",
+    imagePath: "/images/optimized/offers/quick-fix.jpg",
     name: "Quick Fix",
     position: [-5.4, 0.18, 9.2] as [number, number, number],
   },
   {
     id: "urgent-fix",
-    imagePath: "/images/offers/urgent-fix.png",
+    imagePath: "/images/optimized/offers/urgent-fix.jpg",
     name: "Urgent Fix",
     position: [-1.8, 0.18, 9.2] as [number, number, number],
   },
   {
     id: "performance",
-    imagePath: "/images/offers/performance.png",
+    imagePath: "/images/optimized/offers/performance.jpg",
     name: "Performance",
     position: [1.8, 0.18, 9.2] as [number, number, number],
   },
   {
     id: "site-improvement",
-    imagePath: "/images/offers/site-improvement.png",
+    imagePath: "/images/optimized/offers/site-improvement.jpg",
     name: "Site Improvement",
     position: [5.4, 0.18, 9.2] as [number, number, number],
   },
@@ -95,10 +98,113 @@ type ShowcaseVideoState = {
   playing: boolean;
 };
 
+const textureLoader = new TextureLoader();
+const lazyTextureCache = new Map<string, Texture>();
+const lazyTexturePromises = new Map<string, Promise<Texture>>();
+let lazyTextureRequestIndex = 0;
 let showcaseVideoElement: HTMLVideoElement | null = null;
 let showcaseVideoTexture: VideoTexture | null = null;
+const requiredScreenImagePaths = Array.from(
+  new Set([
+    ...Object.values(serviceScreenImages).flatMap((images) => [images.bad, images.good]),
+    ...Object.values(simpleDisplaySections).map((display) => display.imagePath),
+    ...offerOptions.map((offer) => offer.imagePath),
+  ])
+);
 
-function getShowcaseVideoResource() {
+function configureScreenTexture(texture: Texture) {
+  texture.colorSpace = SRGBColorSpace;
+  texture.generateMipmaps = false;
+  texture.minFilter = LinearFilter;
+  texture.magFilter = LinearFilter;
+  configureTextureCover(texture, screenContentAspect);
+  texture.needsUpdate = true;
+}
+
+function loadScreenTexture(path: string) {
+  const cached = lazyTextureCache.get(path);
+  if (cached) return Promise.resolve(cached);
+
+  const existingPromise = lazyTexturePromises.get(path);
+  if (existingPromise) return existingPromise;
+
+  const loadPromise = textureLoader.loadAsync(path).then((loadedTexture) => {
+    configureScreenTexture(loadedTexture);
+    lazyTextureCache.set(path, loadedTexture);
+    lazyTexturePromises.delete(path);
+    return loadedTexture;
+  });
+
+  lazyTexturePromises.set(path, loadPromise);
+  return loadPromise;
+}
+
+export function preloadScreenTextures() {
+  return Promise.allSettled(requiredScreenImagePaths.map(loadScreenTexture)).then(() => undefined);
+}
+
+function configureTextureCover(texture: Texture, targetAspect: number) {
+  const image = texture.image as
+    | { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number; videoWidth?: number; videoHeight?: number }
+    | undefined;
+  const width = image?.naturalWidth || image?.videoWidth || image?.width || 0;
+  const height = image?.naturalHeight || image?.videoHeight || image?.height || 0;
+  if (!width || !height) return;
+
+  const imageAspect = width / height;
+  texture.offset.set(0, 0);
+  texture.repeat.set(1, 1);
+
+  if (imageAspect > targetAspect) {
+    const repeatX = targetAspect / imageAspect;
+    texture.repeat.x = repeatX;
+    texture.offset.x = (1 - repeatX) / 2;
+    return;
+  }
+
+  const repeatY = imageAspect / targetAspect;
+  texture.repeat.y = repeatY;
+  texture.offset.y = (1 - repeatY) / 2;
+}
+
+function useLazyScreenTexture(path: string | null, enabled: boolean, delayMs = 0) {
+  const [texture, setTexture] = useState<Texture | null>(() => (path ? lazyTextureCache.get(path) ?? null : null));
+  const cachedTexture = path && enabled ? lazyTextureCache.get(path) ?? null : null;
+
+  useEffect(() => {
+    if (!path || !enabled) {
+      setTexture(null);
+      return undefined;
+    }
+
+    const cached = lazyTextureCache.get(path);
+    if (cached) {
+      setTexture(cached);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const requestDelay = delayMs + lazyTextureRequestIndex * 90;
+    lazyTextureRequestIndex += 1;
+
+    const timeout = window.setTimeout(() => {
+      loadScreenTexture(path).then((loadedTexture) => {
+        if (cancelled) return;
+
+        setTexture(loadedTexture);
+      }).catch(() => undefined);
+    }, requestDelay);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [delayMs, enabled, path]);
+
+  return enabled ? texture ?? cachedTexture : null;
+}
+
+function getShowcaseVideoElement() {
   if (!showcaseVideoElement) {
     const video = document.createElement("video");
     video.src = "/videos/showcase.mp4";
@@ -106,45 +212,36 @@ function getShowcaseVideoResource() {
     video.loop = true;
     video.muted = true;
     video.playsInline = true;
-    video.preload = "auto";
-    video.load();
+    video.preload = "none";
 
+    showcaseVideoElement = video;
+  }
+
+  return showcaseVideoElement;
+}
+
+function getShowcaseVideoTexture(video: HTMLVideoElement) {
+  if (!showcaseVideoTexture) {
     const texture = new VideoTexture(video);
     texture.colorSpace = SRGBColorSpace;
     texture.minFilter = LinearFilter;
     texture.magFilter = LinearFilter;
     texture.generateMipmaps = false;
-    texture.needsUpdate = true;
-
-    showcaseVideoElement = video;
+    texture.needsUpdate = false;
     showcaseVideoTexture = texture;
   }
 
-  return {
-    texture: showcaseVideoTexture,
-    video: showcaseVideoElement,
-  };
+  return showcaseVideoTexture;
 }
 
 export function HubSections({ restartKey, serviceResolutions }: HubSectionsProps) {
   const displayTimersRef = useRef<Record<string, number>>({});
   const [activeSimpleDisplays, setActiveSimpleDisplays] = useState<Record<string, boolean>>({});
+  const [visibleSectionCount, setVisibleSectionCount] = useState(2);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
   const [showcaseVideoState, setShowcaseVideoState] = useState<ShowcaseVideoState>({
     playing: false,
   });
-
-  useEffect(() => {
-    offerOptions.forEach((offer) => {
-      const image = new Image();
-      image.src = offer.imagePath;
-    });
-
-    Object.values(simpleDisplaySections).forEach((display) => {
-      const image = new Image();
-      image.src = display.imagePath;
-    });
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -167,16 +264,26 @@ export function HubSections({ restartKey, serviceResolutions }: HubSectionsProps
   useEffect(() => {
     Object.values(displayTimersRef.current).forEach((timer) => window.clearTimeout(timer));
     displayTimersRef.current = {};
+    setVisibleSectionCount(2);
     setActiveSimpleDisplays({});
     setSelectedOfferId(null);
     setShowcaseVideoState({ playing: false });
 
-    const resource = getShowcaseVideoResource();
-    if (resource.video) {
-      resource.video.pause();
-      resource.video.currentTime = 0;
+    if (showcaseVideoElement) {
+      showcaseVideoElement.pause();
+      showcaseVideoElement.currentTime = 0;
     }
   }, [restartKey]);
+
+  useEffect(() => {
+    if (visibleSectionCount >= hubSections.length) return undefined;
+
+    const timeout = window.setTimeout(() => {
+      setVisibleSectionCount((current) => Math.min(hubSections.length, current + 2));
+    }, 180);
+
+    return () => window.clearTimeout(timeout);
+  }, [visibleSectionCount]);
 
   const showSimpleDisplay = (sectionId: string) => {
     const existingTimer = displayTimersRef.current[sectionId];
@@ -199,7 +306,7 @@ export function HubSections({ restartKey, serviceResolutions }: HubSectionsProps
   return (
     <group name="HubSections">
       <HubPaths />
-      {hubSections.map((section) => (
+      {hubSections.slice(0, visibleSectionCount).map((section) => (
         <HubSectionDistrict
           key={`${section.id}:${restartKey}`}
           section={section}
@@ -319,7 +426,7 @@ function SectionBillboard({
     <group name={`Billboard:${section.id}`} position={[0, 4.8, 0]}>
       <RigidBody type="fixed" colliders={false}>
         <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
-        <mesh castShadow receiveShadow position={[0, 0, -0.08]}>
+        <mesh position={[0, 0, -0.08]}>
           <boxGeometry args={[10.4, 5.8, 0.32]} />
           <meshStandardMaterial color="#101621" metalness={0.72} roughness={0.34} />
         </mesh>
@@ -390,24 +497,11 @@ function SectionBillboard({
 }
 
 function OffersScreenContent({ selectedOffer }: { selectedOffer: OfferOption | null }) {
-  const loadedTextures = useLoader(TextureLoader, offerOptions.map((offer) => offer.imagePath));
-
-  useEffect(() => {
-    loadedTextures.forEach((texture) => {
-      texture.colorSpace = SRGBColorSpace;
-      texture.generateMipmaps = false;
-      texture.minFilter = LinearFilter;
-      texture.magFilter = LinearFilter;
-      texture.needsUpdate = true;
-    });
-  }, [loadedTextures]);
-
-  const selectedIndex = selectedOffer ? offerOptions.findIndex((offer) => offer.id === selectedOffer.id) : -1;
-  const texture = selectedIndex >= 0 ? loadedTextures[selectedIndex] : null;
+  const texture = useLazyScreenTexture(selectedOffer?.imagePath ?? null, Boolean(selectedOffer));
 
   return (
     <mesh key={selectedOffer?.id ?? "offers-empty-screen"} position={[0, -0.03, -0.2]} renderOrder={20}>
-      <planeGeometry args={[8.4, 4.15]} />
+      <planeGeometry args={screenContentSize} />
       {texture ? (
         <meshBasicMaterial
           key={`offer-image-${selectedOffer?.id}`}
@@ -425,20 +519,12 @@ function OffersScreenContent({ selectedOffer }: { selectedOffer: OfferOption | n
 }
 
 function SimpleDisplayScreen({ active, imagePath }: { active: boolean; imagePath: string }) {
-  const texture = useLoader(TextureLoader, imagePath);
-
-  useEffect(() => {
-    texture.colorSpace = SRGBColorSpace;
-    texture.generateMipmaps = false;
-    texture.minFilter = LinearFilter;
-    texture.magFilter = LinearFilter;
-    texture.needsUpdate = true;
-  }, [texture]);
+  const texture = useLazyScreenTexture(imagePath, active);
 
   return (
     <mesh key={active ? imagePath : "simple-display-empty"} position={[0, -0.03, -0.2]} renderOrder={20}>
-      <planeGeometry args={[8.4, 4.15]} />
-      {active ? (
+      <planeGeometry args={screenContentSize} />
+      {active && texture ? (
         <meshBasicMaterial color={screenImageTint} depthTest={false} map={texture} side={DoubleSide} toneMapped />
       ) : (
         <meshBasicMaterial color={screenIdleColor} depthTest={false} side={DoubleSide} toneMapped />
@@ -463,29 +549,17 @@ function ServiceImageScreen({
   goodImage: string;
   resolved: boolean;
 }) {
-  const [badTexture, goodTexture] = useLoader(TextureLoader, [badImage, goodImage]);
-  const texture = resolved ? goodTexture : badTexture;
-
-  useEffect(() => {
-    [badTexture, goodTexture].forEach((loadedTexture) => {
-      loadedTexture.colorSpace = SRGBColorSpace;
-      loadedTexture.generateMipmaps = false;
-      loadedTexture.minFilter = LinearFilter;
-      loadedTexture.magFilter = LinearFilter;
-      loadedTexture.needsUpdate = true;
-    });
-  }, [badTexture, goodTexture]);
+  const texturePath = resolved ? goodImage : badImage;
+  const texture = useLazyScreenTexture(texturePath, true, 240);
 
   return (
     <mesh position={[0, -0.03, -0.2]} renderOrder={20}>
-      <planeGeometry args={[8.4, 4.15]} />
-      <meshBasicMaterial
-        color={screenImageTint}
-        depthTest={false}
-        map={texture}
-        side={DoubleSide}
-        toneMapped
-      />
+      <planeGeometry args={screenContentSize} />
+      {texture ? (
+        <meshBasicMaterial color={screenImageTint} depthTest={false} map={texture} side={DoubleSide} toneMapped />
+      ) : (
+        <meshBasicMaterial color={screenIdleColor} depthTest={false} side={DoubleSide} toneMapped />
+      )}
     </mesh>
   );
 }
@@ -493,47 +567,68 @@ function ServiceImageScreen({
 function ShowcaseScreenContent({ isPlaying }: { isPlaying: boolean }) {
   const materialRef = useRef<MeshBasicMaterial>(null);
   const screenOpacityRef = useRef(0);
-  const resource = useMemo(() => getShowcaseVideoResource(), []);
+  const [videoTexture, setVideoTexture] = useState<VideoTexture | null>(() => showcaseVideoTexture);
 
   useEffect(() => {
-    const video = resource.video;
-    if (!video) return;
+    if (!isPlaying && !showcaseVideoElement) return undefined;
+
+    const video = getShowcaseVideoElement();
+    let disposed = false;
+
+    const attachTextureWhenReady = () => {
+      if (disposed || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+      setVideoTexture(getShowcaseVideoTexture(video));
+    };
+
+    video.addEventListener("loadeddata", attachTextureWhenReady);
+    video.addEventListener("canplay", attachTextureWhenReady);
+    video.addEventListener("playing", attachTextureWhenReady);
 
     if (isPlaying) {
+      video.load();
       video
         .play()
         .catch(() => undefined);
-      return;
+      attachTextureWhenReady();
+    } else if (!video.paused) {
+      video.pause();
+      attachTextureWhenReady();
+      if (showcaseVideoTexture) showcaseVideoTexture.needsUpdate = false;
     }
 
-    if (video.paused) return;
-    video.pause();
-  }, [isPlaying, resource.video]);
+    return () => {
+      disposed = true;
+      video.removeEventListener("loadeddata", attachTextureWhenReady);
+      video.removeEventListener("canplay", attachTextureWhenReady);
+      video.removeEventListener("playing", attachTextureWhenReady);
+    };
+  }, [isPlaying]);
 
   useEffect(() => {
     return () => {
-      resource.video?.pause();
+      showcaseVideoElement?.pause();
     };
-  }, [resource.video]);
+  }, []);
 
   useFrame((_, delta) => {
     const material = materialRef.current;
     if (!material) return;
+    if (!isPlaying && screenOpacityRef.current <= 0.01) return;
 
-    const targetOpacity = isPlaying ? 1 : 0;
+    const targetOpacity = isPlaying && videoTexture ? 1 : 0;
     screenOpacityRef.current = MathUtils.damp(screenOpacityRef.current, targetOpacity, isPlaying ? 8 : 18, Math.min(delta, 1 / 30));
     material.opacity = screenOpacityRef.current;
   });
 
   return (
     <mesh position={[0, -0.03, -0.2]} renderOrder={20}>
-      <planeGeometry args={[8.4, 4.15]} />
-      {resource.texture ? (
+      <planeGeometry args={screenContentSize} />
+      {videoTexture ? (
         <meshBasicMaterial
           ref={materialRef}
           color={screenImageTint}
           depthTest={false}
-          map={resource.texture}
+          map={videoTexture}
           opacity={0}
           side={DoubleSide}
           toneMapped
@@ -718,14 +813,16 @@ function OfferPortalPad({
   };
 
   useFrame(({ clock }) => {
+    if (!active && !wasActiveRef.current) return;
+
     if (active && !wasActiveRef.current) {
       activeStartedAtRef.current = clock.elapsedTime;
     }
-    wasActiveRef.current = active;
 
     const activationGlow = active ? Math.max(0, 1 - (clock.elapsedTime - activeStartedAtRef.current) / 1) : 0;
     const pulse = 1 + activationGlow * 0.05;
     const opacity = 0.56 + activationGlow * 0.28;
+    wasActiveRef.current = active;
 
     if (ringRef.current) {
       ringRef.current.scale.setScalar(pulse);
@@ -755,11 +852,11 @@ function OfferPortalPad({
         onIntersectionExit={handleExit}
       />
       <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
-        <torusGeometry args={[1, 0.026, 10, 96]} />
+        <torusGeometry args={[1, 0.026, 8, 48]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.56} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh ref={pulseRef} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false}>
-        <ringGeometry args={[0.68, 1.05, 96]} />
+        <ringGeometry args={[0.68, 1.05, 48]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       <BillboardLabel
@@ -780,7 +877,6 @@ function OfferPortalPad({
           {`Opening offers page in ${countdownSeconds}...`}
         </BillboardLabel>
       )}
-      <pointLight color="#ffffff" intensity={active ? 2.4 : 0.7} distance={active ? 5.5 : 3} position={[0, 0.72, 0]} />
     </group>
   );
 }
@@ -839,15 +935,17 @@ function ShowcasePortalPad({
   };
 
   useFrame(({ clock }) => {
+    if (!active && !wasActiveRef.current) return;
+
     if (active && !wasActiveRef.current) {
       activeStartedAtRef.current = clock.elapsedTime;
     }
-    wasActiveRef.current = active;
 
     const activationGlow = active ? Math.max(0, 1 - (clock.elapsedTime - activeStartedAtRef.current) / 1) : 0;
     const steadyGlow = active ? 0.2 : 0;
     const pulse = 1 + activationGlow * 0.05;
     const opacity = 0.58 + steadyGlow + activationGlow * 0.16;
+    wasActiveRef.current = active;
 
     if (ringRef.current) {
       ringRef.current.scale.setScalar(pulse);
@@ -877,17 +975,16 @@ function ShowcasePortalPad({
         onIntersectionExit={handleExit}
       />
       <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
-        <torusGeometry args={[1, 0.026, 10, 96]} />
+        <torusGeometry args={[1, 0.026, 8, 48]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.58} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh ref={pulseRef} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false}>
-        <ringGeometry args={[0.68, 1.05, 96]} />
+        <ringGeometry args={[0.68, 1.05, 48]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       <BillboardLabel color={white} fontSize={0.28} position={[0, 1.05, 0]} maxWidth={3}>
         {label}
       </BillboardLabel>
-      <pointLight color="#ffffff" intensity={active ? 2.2 : 0.6} distance={active ? 5.2 : 3} position={[0, 0.72, 0]} />
     </group>
   );
 }

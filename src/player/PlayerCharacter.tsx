@@ -35,7 +35,7 @@ export function PlayerCharacter({
   onFixedAnimationComplete,
   yawRef,
 }: PlayerCharacterProps) {
-  const model = useGLTF("/characters/char.glb");
+  const model = useGLTF("/characters/char-optimized.glb", false, true);
   const scene = useMemo(() => SkeletonUtils.clone(model.scene), [model.scene]);
   const group = useRef<Group>(null);
   const { actions } = useAnimations(model.animations, group);
@@ -53,8 +53,8 @@ export function PlayerCharacter({
 
     scene.traverse((object) => {
       if (object instanceof Mesh) {
-        object.castShadow = true;
-        object.receiveShadow = true;
+        object.castShadow = false;
+        object.receiveShadow = false;
       }
     });
   }, [scene]);
@@ -140,12 +140,8 @@ export function PlayerCharacter({
 
   return (
     <group ref={group}>
-      <pointLight color="#fff1d0" intensity={3.6} distance={5.6} position={[0, 1.7, -0.8]} />
-      <pointLight color="#ccd9ff" intensity={1.8} distance={4.8} position={[0.8, 1.4, 0.9]} />
       <DialogueBubble message={dialogue} position={[0, 2.65, 0]} />
       <primitive object={scene} rotation-y={Math.PI} scale={1.05} />
     </group>
   );
 }
-
-useGLTF.preload("/characters/char.glb");

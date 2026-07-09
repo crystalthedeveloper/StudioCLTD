@@ -36,7 +36,7 @@ function fadeOutOtherActions(actions: Record<string, AnimationAction | null>, ac
 }
 
 export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "danger", villainStatus }: VillainCharacterProps) {
-  const model = useGLTF("/characters/char.glb");
+  const model = useGLTF("/characters/char-optimized.glb", false, true);
   const scene = useMemo(() => SkeletonUtils.clone(model.scene), [model.scene]);
   const rootRef = useRef<Group>(null);
   const modelRef = useRef<Group>(null);
@@ -48,8 +48,8 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
 
     scene.traverse((object) => {
       if (object instanceof Mesh) {
-        object.castShadow = true;
-        object.receiveShadow = true;
+        object.castShadow = false;
+        object.receiveShadow = false;
       }
     });
   }, [scene]);
@@ -115,10 +115,7 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
           />
           <primitive object={scene} scale={1.16} />
         </group>
-        <pointLight color="#ff273a" intensity={8} distance={8} position={[0, 1.8, 0]} />
       </group>
     </RigidBody>
   );
 }
-
-useGLTF.preload("/characters/char.glb");

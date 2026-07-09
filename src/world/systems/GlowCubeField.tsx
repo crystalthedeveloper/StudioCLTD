@@ -1,7 +1,7 @@
 import { useFrame } from "@react-three/fiber";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import { useRef } from "react";
-import { AdditiveBlending, DoubleSide, Group, Mesh, MeshBasicMaterial, PointLight } from "three";
+import { AdditiveBlending, DoubleSide, Group, Mesh, MeshBasicMaterial } from "three";
 
 const glowBeacons = [
   { position: [-18, 0.45, -14] as [number, number, number], color: "#FFE600", light: "#FFE600", scale: 0.55 },
@@ -39,14 +39,18 @@ function BeaconMarker({ position, color, light, scale, phase }: BeaconMarkerProp
   const ringRef = useRef<Group>(null);
   const verticalGlowRef = useRef<Mesh>(null);
   const groundGlowRef = useRef<Mesh>(null);
-  const pointLightRef = useRef<PointLight>(null);
   const coreMaterialRef = useRef<MeshBasicMaterial>(null);
+  const lastVisualFrameRef = useRef(-1);
 
   const visualScale = scale * 0.58;
   const isWarning = color.toLowerCase() !== "#ffe600";
 
   useFrame(({ clock }) => {
     const elapsed = clock.getElapsedTime();
+    const frameSlot = Math.floor(elapsed * 18);
+    if (frameSlot === lastVisualFrameRef.current) return;
+    lastVisualFrameRef.current = frameSlot;
+
     const pulse = 0.78 + Math.sin(elapsed * 1.08 + phase) * 0.18;
 
     if (markerRef.current) {
@@ -70,16 +74,13 @@ function BeaconMarker({ position, color, light, scale, phase }: BeaconMarkerProp
       groundGlowRef.current.material.opacity = (isWarning ? 0.075 : 0.065) * pulse;
     }
 
-    if (pointLightRef.current) {
-      pointLightRef.current.intensity = (isWarning ? 5.2 : 4.6) * pulse;
-    }
   });
 
   return (
     <RigidBody type="fixed" colliders={false} position={[position[0], 0.06, position[2]]}>
       <CuboidCollider args={[visualScale * 0.32, visualScale * 0.52, visualScale * 0.32]} position={[0, visualScale * 0.5, 0]} />
       <group ref={markerRef}>
-        <mesh receiveShadow rotation-x={-Math.PI / 2} position={[0, 0.012, 0]}>
+        <mesh rotation-x={-Math.PI / 2} position={[0, 0.012, 0]}>
           <cylinderGeometry args={[visualScale * 0.48, visualScale * 0.58, 0.035, 24]} />
           <meshStandardMaterial color="#151a22" metalness={0.88} roughness={0.26} envMapIntensity={0.76} />
         </mesh>
@@ -89,7 +90,7 @@ function BeaconMarker({ position, color, light, scale, phase }: BeaconMarkerProp
           <meshBasicMaterial color={light} transparent opacity={0.24} depthWrite={false} blending={AdditiveBlending} />
         </mesh>
 
-        <mesh castShadow position={[0, visualScale * 0.48, 0]}>
+        <mesh position={[0, visualScale * 0.48, 0]}>
           <cylinderGeometry args={[visualScale * 0.085, visualScale * 0.13, visualScale * 0.7, 18]} />
           <meshStandardMaterial
             color={color}
@@ -142,14 +143,6 @@ function BeaconMarker({ position, color, light, scale, phase }: BeaconMarkerProp
           <meshBasicMaterial color={light} transparent opacity={0.07} depthWrite={false} blending={AdditiveBlending} />
         </mesh>
 
-        <pointLight
-          ref={pointLightRef}
-          color={light}
-          intensity={isWarning ? 5.2 : 4.6}
-          distance={7.8}
-          decay={2.6}
-          position={[0, visualScale * 0.7, 0]}
-        />
       </group>
     </RigidBody>
   );

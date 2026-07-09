@@ -16,6 +16,31 @@ canvas {
   display: block;
 }
 
+.studio-launch {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 40%, rgba(255, 230, 0, 0.08), transparent 32%), #03040a;
+}
+
+.studio-launch__button {
+  min-width: 220px;
+  padding: 14px 28px;
+  border: 1px solid rgba(255, 230, 0, 0.48);
+  background: rgba(7, 9, 14, 0.82);
+  color: #FFE600;
+  cursor: pointer;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.studio-launch__button:hover {
+  background: rgba(255, 230, 0, 0.12);
+}
+
 .dialogue-bubble {
   max-width: 190px;
   padding: 8px 11px;

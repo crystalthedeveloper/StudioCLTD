@@ -1,7 +1,7 @@
 import { useFrame } from "@react-three/fiber";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import { useRef } from "react";
-import { AdditiveBlending, DoubleSide, Group, Mesh, MeshBasicMaterial } from "three";
+import { AdditiveBlending, Group, Mesh, MeshBasicMaterial, PointLight } from "three";
 
 const glowBeacons = [
   { position: [-18, 0.45, -14] as [number, number, number], color: "#FFE600", light: "#FFE600", scale: 0.55 },
@@ -37,9 +37,8 @@ type BeaconMarkerProps = {
 function BeaconMarker({ position, color, light, scale, phase }: BeaconMarkerProps) {
   const markerRef = useRef<Group>(null);
   const ringRef = useRef<Group>(null);
-  const verticalGlowRef = useRef<Mesh>(null);
-  const groundGlowRef = useRef<Mesh>(null);
   const coreMaterialRef = useRef<MeshBasicMaterial>(null);
+  const pointLightRef = useRef<PointLight>(null);
   const lastVisualFrameRef = useRef(-1);
 
   const visualScale = scale * 0.58;
@@ -63,15 +62,11 @@ function BeaconMarker({ position, color, light, scale, phase }: BeaconMarkerProp
     }
 
     if (coreMaterialRef.current) {
-      coreMaterialRef.current.opacity = 0.74 + pulse * 0.12;
+      coreMaterialRef.current.opacity = 0.88 + pulse * 0.08;
     }
 
-    if (verticalGlowRef.current?.material instanceof MeshBasicMaterial) {
-      verticalGlowRef.current.material.opacity = (isWarning ? 0.12 : 0.1) * pulse;
-    }
-
-    if (groundGlowRef.current?.material instanceof MeshBasicMaterial) {
-      groundGlowRef.current.material.opacity = (isWarning ? 0.075 : 0.065) * pulse;
+    if (pointLightRef.current) {
+      pointLightRef.current.intensity = (isWarning ? 0.58 : 0.66) * pulse;
     }
 
   });
@@ -82,12 +77,12 @@ function BeaconMarker({ position, color, light, scale, phase }: BeaconMarkerProp
       <group ref={markerRef}>
         <mesh rotation-x={-Math.PI / 2} position={[0, 0.012, 0]}>
           <cylinderGeometry args={[visualScale * 0.48, visualScale * 0.58, 0.035, 24]} />
-          <meshStandardMaterial color="#151a22" metalness={0.88} roughness={0.26} envMapIntensity={0.76} />
+          <meshStandardMaterial color="#242a32" metalness={0.82} roughness={0.22} envMapIntensity={0.86} />
         </mesh>
 
         <mesh rotation-x={-Math.PI / 2} position={[0, 0.04, 0]}>
-          <ringGeometry args={[visualScale * 0.34, visualScale * 0.43, 36]} />
-          <meshBasicMaterial color={light} transparent opacity={0.24} depthWrite={false} blending={AdditiveBlending} />
+          <ringGeometry args={[visualScale * 0.31, visualScale * 0.39, 32]} />
+          <meshBasicMaterial color={light} transparent opacity={0.32} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
         </mesh>
 
         <mesh position={[0, visualScale * 0.48, 0]}>
@@ -95,9 +90,10 @@ function BeaconMarker({ position, color, light, scale, phase }: BeaconMarkerProp
           <meshStandardMaterial
             color={color}
             emissive={light}
-            emissiveIntensity={isWarning ? 1.9 : 1.65}
+            emissiveIntensity={isWarning ? 2.25 : 2.15}
             metalness={0.36}
-            roughness={0.16}
+            roughness={0.12}
+            toneMapped={false}
           />
         </mesh>
 
@@ -107,7 +103,7 @@ function BeaconMarker({ position, color, light, scale, phase }: BeaconMarkerProp
             ref={coreMaterialRef}
             color={light}
             transparent
-            opacity={0.82}
+            opacity={0.92}
             depthWrite={false}
             toneMapped={false}
             blending={AdditiveBlending}
@@ -117,32 +113,23 @@ function BeaconMarker({ position, color, light, scale, phase }: BeaconMarkerProp
         <group ref={ringRef} position={[0, visualScale * 0.56, 0]} rotation={[Math.PI / 2.65, 0, Math.PI / 8]}>
           <mesh>
             <torusGeometry args={[visualScale * 0.34, visualScale * 0.012, 8, 48]} />
-            <meshBasicMaterial color="#ffffff" transparent opacity={0.52} depthWrite={false} toneMapped={false} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.46} depthWrite={false} toneMapped={false} />
           </mesh>
         </group>
 
-        <mesh ref={verticalGlowRef} position={[0, visualScale * 0.52, 0]}>
-          <cylinderGeometry args={[visualScale * 0.28, visualScale * 0.36, visualScale * 1.12, 24, 1, true]} />
-          <meshBasicMaterial
-            color={light}
-            transparent
-            opacity={0.1}
-            depthWrite={false}
-            side={DoubleSide}
-            blending={AdditiveBlending}
-          />
-        </mesh>
-
         <mesh rotation-x={-Math.PI / 2} position={[0, 0.045, 0]}>
-          <ringGeometry args={[visualScale * 0.46, visualScale * 0.68, 40]} />
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.16} depthWrite={false} toneMapped={false} />
+          <ringGeometry args={[visualScale * 0.42, visualScale * 0.58, 36]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.1} depthWrite={false} toneMapped={false} />
         </mesh>
 
-        <mesh ref={groundGlowRef} rotation-x={-Math.PI / 2} position={[0, 0.05, 0]}>
-          <circleGeometry args={[visualScale * 1.08, 32]} />
-          <meshBasicMaterial color={light} transparent opacity={0.07} depthWrite={false} blending={AdditiveBlending} />
-        </mesh>
-
+        <pointLight
+          ref={pointLightRef}
+          color={light}
+          intensity={isWarning ? 0.58 : 0.66}
+          distance={isWarning ? 2.8 : 3.2}
+          decay={2}
+          position={[0, visualScale * 0.68, 0]}
+        />
       </group>
     </RigidBody>
   );

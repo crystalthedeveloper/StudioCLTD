@@ -1,10 +1,16 @@
 import { useAnimations, useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { MutableRefObject, useEffect, useMemo, useRef } from "react";
-import { AnimationAction, Group, LoopOnce, LoopRepeat, Mesh } from "three";
+import { MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
+import { AnimationAction, Group, LoopOnce, LoopRepeat, Material, Mesh, Object3D } from "three";
 import { SkeletonUtils } from "three-stdlib";
-import { applyCharacterMaterials, playerMaterialProfile } from "../characters/characterMaterials";
+import {
+  applyCharacterMaterials,
+  playerBodyMaterialName,
+  playerMaskMaterialName,
+  playerMaterialProfile,
+} from "../characters/characterMaterials";
 import { DialogueBubble, DialogueMessage } from "../ui/DialogueBubble";
+import { isSpeedBoostActive, subscribeSpeedBoostChange } from "./speedBoost";
 import { CharacterAnimationState } from "./playerTypes";
 
 type PlayerCharacterProps = {
@@ -18,6 +24,13 @@ type PlayerCharacterProps = {
 const playerAnimationByState: Record<CharacterAnimationState, string> = {
   idle: "idleH",
   run: "runH",
+};
+const playerPoweredMaterialName = "HWhiteClown_material";
+
+type PlayerMaterialSlot = {
+  index: number | null;
+  material: Material;
+  mesh: Mesh;
 };
 
 function fadeOutOtherActions(actions: Record<string, AnimationAction | null>, activeAction: AnimationAction) {
@@ -43,6 +56,11 @@ export function PlayerCharacter({
   const fixedActionRef = useRef<AnimationAction | null>(null);
   const activeLocomotionStateRef = useRef<CharacterAnimationState | null>(null);
   const onFixedAnimationCompleteRef = useRef(onFixedAnimationComplete);
+  const materialSlotsRef = useRef<PlayerMaterialSlot[]>([]);
+  const poweredBodyMaterialRef = useRef<Material | null>(null);
+  const activeMaterialModeRef = useRef<"default" | "powered">("default");
+  const speedBoostActiveRef = useRef(isSpeedBoostActive());
+  const [speedBoostActive, setSpeedBoostActive] = useState(() => isSpeedBoostActive());
 
   useEffect(() => {
     onFixedAnimationCompleteRef.current = onFixedAnimationComplete;
@@ -57,7 +75,64 @@ export function PlayerCharacter({
         object.receiveShadow = false;
       }
     });
+
+    poweredBodyMaterialRef.current = model.materials?.[playerPoweredMaterialName] ?? findMaterialByName(scene, playerPoweredMaterialName);
+    materialSlotsRef.current = collectBodyMaterialSlots(scene);
+    activeMaterialModeRef.current = "default";
   }, [scene]);
+
+  useEffect(() => {
+    const updateSpeedBoostActive = () => {
+      const nextActive = isSpeedBoostActive();
+      speedBoostActiveRef.current = nextActive;
+      setSpeedBoostActive(nextActive);
+    };
+
+    updateSpeedBoostActive();
+    return subscribeSpeedBoostChange(updateSpeedBoostActive);
+  }, []);
+
+  useEffect(() => {
+    speedBoostActiveRef.current = speedBoostActive;
+
+    if (speedBoostActive) {
+      applyPoweredMaterial();
+      return;
+    }
+
+    restoreDefaultMaterialIfIdle();
+  }, [speedBoostActive]);
+
+  const applyPoweredMaterial = () => {
+    const poweredMaterial = poweredBodyMaterialRef.current;
+    if (!poweredMaterial || activeMaterialModeRef.current === "powered") return;
+
+    materialSlotsRef.current.forEach((slot) => {
+      if (slot.index === null) {
+        slot.mesh.material = poweredMaterial;
+        return;
+      }
+
+      if (!Array.isArray(slot.mesh.material)) return;
+      slot.mesh.material[slot.index] = poweredMaterial;
+    });
+    activeMaterialModeRef.current = "powered";
+  };
+
+  const restoreDefaultMaterialIfIdle = () => {
+    if (speedBoostActiveRef.current || fixedActionRef.current || activeMaterialModeRef.current === "default") return;
+
+    materialSlotsRef.current.forEach((slot) => {
+      if (slot.index === null) {
+        slot.mesh.material = slot.material;
+        return;
+      }
+
+      if (!Array.isArray(slot.mesh.material)) return;
+      slot.mesh.material[slot.index] = slot.material;
+    });
+    activeMaterialModeRef.current = "default";
+  };
 
   const playLocomotionAction = (nextState: CharacterAnimationState) => {
     if (fixedActionRef.current || activeLocomotionStateRef.current === nextState) return;
@@ -88,6 +163,7 @@ export function PlayerCharacter({
     }
 
     fixedActionRef.current = action;
+    applyPoweredMaterial();
     fadeOutOtherActions(actions, action);
     action.reset();
     action.setLoop(LoopOnce, 1);
@@ -104,6 +180,7 @@ export function PlayerCharacter({
       fixedActionRef.current = null;
       action.fadeOut(0.08);
       onFixedAnimationCompleteRef.current();
+      restoreDefaultMaterialIfIdle();
 
       activeLocomotionStateRef.current = null;
       playLocomotionAction(animationStateRef.current);
@@ -144,4 +221,39 @@ export function PlayerCharacter({
       <primitive object={scene} rotation-y={Math.PI} scale={1.05} />
     </group>
   );
+}
+
+function findMaterialByName(root: Object3D, materialName: string) {
+  let found: Material | null = null;
+
+  root.traverse((object) => {
+    if (found || !(object instanceof Mesh)) return;
+
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    found = materials.find((material) => material?.name === materialName) ?? null;
+  });
+
+  return found;
+}
+
+function collectBodyMaterialSlots(root: Object3D) {
+  const slots: PlayerMaterialSlot[] = [];
+
+  root.traverse((object) => {
+    if (!(object instanceof Mesh)) return;
+
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    materials.forEach((material, index) => {
+      if (!material || material.name === playerMaskMaterialName) return;
+      if (object.name !== "WhiteClown" && material.name !== playerBodyMaterialName) return;
+
+      slots.push({
+        index: Array.isArray(object.material) ? index : null,
+        material,
+        mesh: object,
+      });
+    });
+  });
+
+  return slots;
 }

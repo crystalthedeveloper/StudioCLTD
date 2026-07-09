@@ -13,6 +13,13 @@ export function isSpeedBoostActive() {
   return Date.now() < activeUntil;
 }
 
+export function subscribeSpeedBoostChange(subscriber: () => void) {
+  subscribers.add(subscriber);
+  return () => {
+    subscribers.delete(subscriber);
+  };
+}
+
 export function getSpeedBoostRemainingMs() {
   return Math.max(0, activeUntil - Date.now());
 }
@@ -51,12 +58,12 @@ export function useSpeedBoostRemainingSeconds() {
     const update = () => setRemainingSeconds(Math.ceil(getSpeedBoostRemainingMs() / 1000));
     const interval = window.setInterval(update, 200);
 
-    subscribers.add(update);
+    const unsubscribe = subscribeSpeedBoostChange(update);
     update();
 
     return () => {
       window.clearInterval(interval);
-      subscribers.delete(update);
+      unsubscribe();
     };
   }, []);
 

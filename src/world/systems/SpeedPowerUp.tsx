@@ -21,7 +21,7 @@ const pickupPositions = [
   [24, 1.35, 22],
 ] as const;
 
-const white = "#ffffff";
+const powerUpColor = "#facc15";
 const particleCount = 2;
 
 function createBoltShape() {
@@ -48,15 +48,15 @@ export function SpeedPowerUp({ restartKey }: { restartKey: number }) {
     });
     const particleGeometry = new SphereGeometry(0.025, 8, 8);
     const boltMaterial = new MeshStandardMaterial({
-      color: white,
-      emissive: white,
+      color: powerUpColor,
+      emissive: powerUpColor,
       emissiveIntensity: 0.72,
       metalness: 0.18,
       roughness: 0.28,
       toneMapped: false,
     });
     const particleMaterial = new MeshBasicMaterial({
-      color: white,
+      color: powerUpColor,
       depthWrite: false,
       opacity: 0.28,
       toneMapped: false,

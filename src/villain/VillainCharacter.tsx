@@ -2,9 +2,13 @@ import { useAnimations, useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import { useEffect, useMemo, useRef } from "react";
-import { AnimationAction, Group, LoopOnce, LoopRepeat, MathUtils, Mesh, Vector3 } from "three";
+import { AnimationAction, Color, Group, LoopOnce, LoopRepeat, Material, MathUtils, Mesh, Object3D, Vector3 } from "three";
 import { SkeletonUtils } from "three-stdlib";
-import { applyCharacterMaterials, villainMaterialProfile } from "../characters/characterMaterials";
+import {
+  applyCharacterMaterials,
+  villainBodyMaterialName,
+  villainMaterialProfile,
+} from "../characters/characterMaterials";
 import { DialogueBubble, DialogueMessage } from "../ui/DialogueBubble";
 import { playerWorldState } from "../world/playerWorldState";
 
@@ -26,6 +30,15 @@ const lookDirection = new Vector3();
 const rotationDamping = 5.5;
 const modelFacingOffset = 0;
 const modelYOffset = 0.28;
+
+type HighlightableMaterial = Material & {
+  color?: Color;
+  emissive?: Color;
+  emissiveIntensity?: number;
+  envMapIntensity?: number;
+  metalness?: number;
+  roughness?: number;
+};
 
 function fadeOutOtherActions(actions: Record<string, AnimationAction | null>, activeAction: AnimationAction) {
   Object.values(actions).forEach((action) => {
@@ -52,6 +65,8 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
         object.receiveShadow = false;
       }
     });
+
+    enhanceVillainSuitMaterial(model.materials?.[villainBodyMaterialName] ?? findVillainSuitMaterial(scene));
   }, [scene]);
 
   useEffect(() => {
@@ -113,9 +128,53 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
             position={dialogueVariant === "danger" ? [0, 3.75, 0] : [0, 3.25, 0]}
             variant={dialogueVariant}
           />
+          <pointLight color="#fff0dc" intensity={0.44} distance={2.5} decay={2} position={[0, 1.88, 0.16]} castShadow={false} />
           <primitive object={scene} scale={1.16} />
         </group>
       </group>
     </RigidBody>
   );
+}
+
+function findVillainSuitMaterial(root: Object3D) {
+  let found: Material | null = null;
+
+  root.traverse((object) => {
+    if (found || !(object instanceof Mesh)) return;
+
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    found = materials.find((material) => material?.name === villainBodyMaterialName) ?? null;
+  });
+
+  return found;
+}
+
+function enhanceVillainSuitMaterial(material: Material | null | undefined) {
+  if (!material || material.userData.villainVisibilityEnhanced) return;
+
+  const suitMaterial = material as HighlightableMaterial;
+
+  if (suitMaterial.color) {
+    suitMaterial.color.lerp(new Color("#ffffff"), 0.07);
+  }
+
+  if (suitMaterial.emissive) {
+    suitMaterial.emissive.set("#15100c");
+    suitMaterial.emissiveIntensity = Math.max(suitMaterial.emissiveIntensity ?? 0, 0.09);
+  }
+
+  if (typeof suitMaterial.envMapIntensity === "number") {
+    suitMaterial.envMapIntensity = Math.max(suitMaterial.envMapIntensity, 1.25);
+  }
+
+  if (typeof suitMaterial.roughness === "number") {
+    suitMaterial.roughness = Math.min(suitMaterial.roughness, 0.54);
+  }
+
+  if (typeof suitMaterial.metalness === "number") {
+    suitMaterial.metalness = Math.max(suitMaterial.metalness, 0.1);
+  }
+
+  suitMaterial.needsUpdate = true;
+  suitMaterial.userData.villainVisibilityEnhanced = true;
 }

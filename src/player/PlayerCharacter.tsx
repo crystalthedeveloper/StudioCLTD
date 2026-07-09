@@ -1,7 +1,7 @@
 import { useAnimations, useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
-import { AnimationAction, Group, LoopOnce, LoopRepeat, Material, Mesh, Object3D } from "three";
+import { AnimationAction, Color, Group, LoopOnce, LoopRepeat, Material, Mesh, Object3D } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import {
   applyCharacterMaterials,
@@ -31,6 +31,15 @@ type PlayerMaterialSlot = {
   index: number | null;
   material: Material;
   mesh: Mesh;
+};
+
+type HighlightableMaterial = Material & {
+  color?: Color;
+  emissive?: Color;
+  emissiveIntensity?: number;
+  envMapIntensity?: number;
+  metalness?: number;
+  roughness?: number;
 };
 
 function fadeOutOtherActions(actions: Record<string, AnimationAction | null>, activeAction: AnimationAction) {
@@ -78,6 +87,8 @@ export function PlayerCharacter({
 
     poweredBodyMaterialRef.current = model.materials?.[playerPoweredMaterialName] ?? findMaterialByName(scene, playerPoweredMaterialName);
     materialSlotsRef.current = collectBodyMaterialSlots(scene);
+    materialSlotsRef.current.forEach((slot) => enhancePlayerSuitMaterial(slot.material));
+    if (poweredBodyMaterialRef.current) enhancePlayerSuitMaterial(poweredBodyMaterialRef.current);
     activeMaterialModeRef.current = "default";
   }, [scene]);
 
@@ -218,6 +229,7 @@ export function PlayerCharacter({
   return (
     <group ref={group}>
       <DialogueBubble message={dialogue} position={[0, 2.65, 0]} />
+      <pointLight color="#fff2dc" intensity={0.5} distance={2.6} decay={2} position={[0, 1.72, 0.18]} castShadow={false} />
       <primitive object={scene} rotation-y={Math.PI} scale={1.05} />
     </group>
   );
@@ -256,4 +268,34 @@ function collectBodyMaterialSlots(root: Object3D) {
   });
 
   return slots;
+}
+
+function enhancePlayerSuitMaterial(material: Material) {
+  if (material.userData.playerVisibilityEnhanced) return;
+
+  const suitMaterial = material as HighlightableMaterial;
+
+  if (suitMaterial.color) {
+    suitMaterial.color.lerp(new Color("#ffffff"), 0.08);
+  }
+
+  if (suitMaterial.emissive) {
+    suitMaterial.emissive.set("#15120c");
+    suitMaterial.emissiveIntensity = Math.max(suitMaterial.emissiveIntensity ?? 0, 0.1);
+  }
+
+  if (typeof suitMaterial.envMapIntensity === "number") {
+    suitMaterial.envMapIntensity = Math.max(suitMaterial.envMapIntensity, 1.3);
+  }
+
+  if (typeof suitMaterial.roughness === "number") {
+    suitMaterial.roughness = Math.min(suitMaterial.roughness, 0.52);
+  }
+
+  if (typeof suitMaterial.metalness === "number") {
+    suitMaterial.metalness = Math.max(suitMaterial.metalness, 0.1);
+  }
+
+  suitMaterial.needsUpdate = true;
+  suitMaterial.userData.playerVisibilityEnhanced = true;
 }

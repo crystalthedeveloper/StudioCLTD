@@ -18,6 +18,11 @@ const dialogueVillainRadiusSq = dialogueVillainRadius * dialogueVillainRadius;
 const encounterSectionIds = ["quick-fix", "urgent-fix", "performance", "site-improvement"];
 const infoPanelDurationMs = 10000;
 const smokeDurationMs = 1700;
+const villainFrontOffset = 6.5;
+const villainSideOffset = 5;
+const fixPadFrontOffset = 11;
+const infoPadFrontOffset = 8.5;
+const infoPadSideOffset = -5;
 
 const serviceInfoText: Record<string, string> = {
   "quick-fix":
@@ -52,10 +57,9 @@ function createSectionEncounters(): SectionEncounterConfig[] {
       const sectionPosition = new Vector3(...section.position);
       const towardCenter = new Vector3(-sectionPosition.x, 0, -sectionPosition.z).normalize();
       const tangent = new Vector3(-towardCenter.z, 0, towardCenter.x);
-      const sideOffset = section.id === "urgent-fix" ? -4 : 4;
-      const villainPosition = sectionPosition.clone().add(towardCenter.clone().multiplyScalar(9)).add(tangent.clone().multiplyScalar(sideOffset));
-      const padPosition = sectionPosition.clone().add(towardCenter.clone().multiplyScalar(14)).add(tangent.clone().multiplyScalar(sideOffset));
-      const infoPadPosition = sectionPosition.clone().add(towardCenter.clone().multiplyScalar(7)).add(tangent.clone().multiplyScalar(-3.2));
+      const villainPosition = sectionPosition.clone().add(towardCenter.clone().multiplyScalar(villainFrontOffset)).add(tangent.clone().multiplyScalar(villainSideOffset));
+      const padPosition = sectionPosition.clone().add(towardCenter.clone().multiplyScalar(fixPadFrontOffset));
+      const infoPadPosition = sectionPosition.clone().add(towardCenter.clone().multiplyScalar(infoPadFrontOffset)).add(tangent.clone().multiplyScalar(infoPadSideOffset));
 
       villainPosition.y = 0;
       padPosition.y = 0.07;
@@ -169,6 +173,7 @@ function SectionPortalEncounter({
   const villainBubbleVisibleRef = useRef(false);
   const villainBubbleUpdateTimerRef = useRef(0);
   const villainDialogueTimerRef = useRef(0);
+  const sectionResolvedTimerRef = useRef(0);
   const defeatedRef = useRef(false);
 
   const setVillainBubbleVisibilitySoon = (visible: boolean) => {
@@ -183,6 +188,7 @@ function SectionPortalEncounter({
     return () => {
       window.clearTimeout(villainBubbleUpdateTimerRef.current);
       window.clearTimeout(villainDialogueTimerRef.current);
+      window.clearTimeout(sectionResolvedTimerRef.current);
     };
   }, []);
 
@@ -193,13 +199,17 @@ function SectionPortalEncounter({
 
     defeatedRef.current = true;
     lastActivatedRef.current = now;
+    window.clearTimeout(villainBubbleUpdateTimerRef.current);
+    window.clearTimeout(villainDialogueTimerRef.current);
     setPortalActive(true);
     setSmokeActive(true);
+    setVillainBubbleVisible(false);
     setVillainStatus("dead");
     onPlayerFixedAnimation();
     onPlayerDialogue("FIXED!");
-    onSectionResolved(encounter.id);
-
+    sectionResolvedTimerRef.current = window.setTimeout(() => {
+      onSectionResolved(encounter.id);
+    }, 240);
   };
 
   const activateInfoPad = () => {
@@ -273,6 +283,15 @@ function SectionPortalEncounter({
     wasNearVillainRef.current = nearVillain;
   });
 
+  const villainCharacterDialogue =
+    villainStatus === "dead"
+      ? null
+      : villainBubbleVisible
+        ? { id: 1, text: villainDialogueText[encounter.id] }
+        : villainDialogue?.sectionName === encounter.name
+          ? villainDialogue
+          : null;
+
   return (
     <group name={`PortalEncounter:${encounter.id}`}>
       <TriggerPad label="Fix" position={encounter.padPosition} active={portalActive} onActivate={activatePad} />
@@ -288,15 +307,7 @@ function SectionPortalEncounter({
       {villainVisible && (
         <VillainCharacter
           basePosition={encounter.villainPosition}
-          dialogue={
-            villainStatus === "dead"
-              ? null
-              : villainBubbleVisible
-                ? { id: 1, text: villainDialogueText[encounter.id] }
-                : villainDialogue?.sectionName === encounter.name
-                  ? villainDialogue
-                  : null
-          }
+          dialogue={villainCharacterDialogue}
           villainStatus={villainStatus}
         />
       )}

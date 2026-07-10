@@ -50,11 +50,11 @@ const serviceScreenImages: Record<string, { bad: string; good: string }> = {
   },
   performance: {
     bad: "/images/optimized/performance/performance-bad.jpg",
-    good: "/images/optimized/performance/performance-good.jpg",
+    good: "/images/optimized/performance/performance-good.webp",
   },
   "site-improvement": {
     bad: "/images/optimized/siteImprovement/site-improvement-bad.jpg",
-    good: "/images/optimized/siteImprovement/site-improvement-good.jpg",
+    good: "/images/optimized/siteImprovement/site-improvement-good.webp",
   },
 };
 const simpleDisplaySections: Record<string, { imagePath: string; label: string }> = {

@@ -12,8 +12,25 @@ body {
   font-family: system-ui, sans-serif;
 }
 
+html.game-input-locked,
+body.game-input-locked {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
 canvas {
   display: block;
+}
+
+.game-shell--focused,
+.game-shell--focused canvas {
+  overscroll-behavior: none;
+  touch-action: none;
 }
 
 .studio-launch {
@@ -304,10 +321,10 @@ canvas {
 
 .trackpad {
   position: relative;
-  width: clamp(112px, 18vw, 148px);
-  height: clamp(112px, 18vw, 148px);
+  width: clamp(132px, 18vw, 156px);
+  height: clamp(132px, 18vw, 156px);
   border: 1px solid rgba(245, 247, 251, 0.22);
-  border-radius: 22px;
+  border-radius: 50%;
   background: rgba(10, 13, 20, 0.34);
   box-shadow: inset 0 0 24px rgba(255, 255, 255, 0.05), 0 12px 38px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(8px);
@@ -325,15 +342,15 @@ canvas {
 
 .trackpad::before {
   left: 50%;
-  top: 16px;
-  bottom: 16px;
+  top: 20px;
+  bottom: 20px;
   width: 1px;
 }
 
 .trackpad::after {
   top: 50%;
-  left: 16px;
-  right: 16px;
+  left: 20px;
+  right: 20px;
   height: 1px;
 }
 
@@ -347,17 +364,28 @@ canvas {
   border-radius: 50%;
   background: rgba(245, 247, 251, 0.2);
   box-shadow: 0 0 24px rgba(255, 255, 255, 0.12);
-  transition: transform 60ms linear;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.trackpad--active .trackpad__thumb {
+  transition: none;
 }
 
 @media (max-width: 640px) {
   .trackpad-shell {
-    bottom: max(16px, env(safe-area-inset-bottom));
+    bottom: max(18px, env(safe-area-inset-bottom));
   }
 
   .trackpad {
-    width: 118px;
-    height: 118px;
-    border-radius: 20px;
+    width: clamp(158px, 42vw, 176px);
+    height: clamp(158px, 42vw, 176px);
+  }
+
+  .trackpad__thumb {
+    width: 64px;
+    height: 64px;
   }
 }

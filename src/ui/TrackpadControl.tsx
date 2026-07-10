@@ -3,7 +3,7 @@ import { setTrackpadCameraInputBlocked } from "../player/cameraInputGuard";
 import { setGameFocused } from "../player/gameFocus";
 import { MovementControls, setTrackpadControls } from "../player/useKeyboardControls";
 
-const deadZone = 0.18;
+const deadZone = 0.14;
 
 function controlsFromOffset(x: number, y: number): MovementControls {
   return {
@@ -16,8 +16,10 @@ function controlsFromOffset(x: number, y: number): MovementControls {
 
 export function TrackpadControl() {
   const padRef = useRef<HTMLDivElement | null>(null);
+  const thumbRef = useRef<HTMLDivElement | null>(null);
   const activePointerRef = useRef<number | null>(null);
-  const [thumb, setThumb] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [thumbOffset, setThumbOffset] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     return () => {
@@ -48,25 +50,28 @@ export function TrackpadControl() {
     const scale = length > 1 ? 1 / length : 1;
     const x = rawX * scale;
     const y = rawY * scale;
+    const thumbRadius = (thumbRef.current?.getBoundingClientRect().width ?? 0) / 2;
+    const travelRadius = Math.max(0, radius - thumbRadius - 8);
 
     const nextControls = controlsFromOffset(x, y);
-    setThumb({ x, y });
+    setThumbOffset({ x: x * travelRadius, y: y * travelRadius });
     setTrackpadControls(nextControls);
   };
 
-  const resetPointer = (log = true) => {
-    const wasActive = activePointerRef.current !== null;
+  const resetPointer = () => {
     activePointerRef.current = null;
     setTrackpadCameraInputBlocked(false);
-    setThumb({ x: 0, y: 0 });
     setTrackpadControls({ forward: false, backward: false, left: false, right: false });
-    void log;
-    void wasActive;
+    setIsDragging(false);
+    setThumbOffset({ x: 0, y: 0 });
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     blockCameraInput(event);
+    if (activePointerRef.current !== null) return;
+
     activePointerRef.current = event.pointerId;
+    setIsDragging(true);
     setTrackpadCameraInputBlocked(true);
     setGameFocused(true);
     document.exitPointerLock?.();
@@ -83,7 +88,9 @@ export function TrackpadControl() {
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
     blockCameraInput(event);
     if (activePointerRef.current !== event.pointerId) return;
-    event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
     resetPointer();
   };
 
@@ -94,22 +101,23 @@ export function TrackpadControl() {
   };
 
   return (
-    <div className="trackpad-shell" aria-label="Movement trackpad" onWheel={handleWheel}>
+    <div className="trackpad-shell" aria-label="Movement joystick" onWheel={handleWheel}>
       <div
         ref={padRef}
-        className="trackpad"
+        className={`trackpad${isDragging ? " trackpad--active" : ""}`}
         onPointerCancel={handlePointerUp}
         onPointerDown={handlePointerDown}
-        onPointerLeave={handlePointerUp}
-        onLostPointerCapture={() => resetPointer(false)}
+        onLostPointerCapture={resetPointer}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         role="application"
+        aria-label="Move character"
       >
         <div
+          ref={thumbRef}
           className="trackpad__thumb"
           style={{
-            transform: `translate(calc(-50% + ${thumb.x * 42}px), calc(-50% + ${thumb.y * 42}px))`,
+            transform: `translate(calc(-50% + ${thumbOffset.x}px), calc(-50% + ${thumbOffset.y}px))`,
           }}
         />
       </div>

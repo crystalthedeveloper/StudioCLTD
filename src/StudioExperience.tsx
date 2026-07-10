@@ -38,6 +38,43 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   }, []);
 
   useEffect(() => {
+    if (!gameFocused) return undefined;
+
+    const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    const previousViewport = viewport?.content;
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    const preventBrowserGesture = (event: Event) => event.preventDefault();
+    const preventMultiTouch = (event: TouchEvent) => {
+      if (event.touches.length > 1) event.preventDefault();
+    };
+
+    document.documentElement.classList.add("game-input-locked");
+    document.body.classList.add("game-input-locked");
+    if (viewport) {
+      viewport.content = "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover";
+    }
+
+    document.addEventListener("touchstart", preventMultiTouch, { capture: true, passive: false });
+    document.addEventListener("touchmove", preventBrowserGesture, { capture: true, passive: false });
+    document.addEventListener("gesturestart", preventBrowserGesture, { capture: true, passive: false });
+    document.addEventListener("gesturechange", preventBrowserGesture, { capture: true, passive: false });
+    document.addEventListener("gestureend", preventBrowserGesture, { capture: true, passive: false });
+
+    return () => {
+      document.documentElement.classList.remove("game-input-locked");
+      document.body.classList.remove("game-input-locked");
+      if (viewport && previousViewport !== undefined) viewport.content = previousViewport;
+      document.removeEventListener("touchstart", preventMultiTouch, { capture: true });
+      document.removeEventListener("touchmove", preventBrowserGesture, { capture: true });
+      document.removeEventListener("gesturestart", preventBrowserGesture, { capture: true });
+      document.removeEventListener("gesturechange", preventBrowserGesture, { capture: true });
+      document.removeEventListener("gestureend", preventBrowserGesture, { capture: true });
+      window.scrollTo(scrollX, scrollY);
+    };
+  }, [gameFocused]);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       setGameFocused(false);
@@ -55,7 +92,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
 
     const handleBlur = () => setGameFocused(false);
     const handleWheel = (event: WheelEvent) => {
-      if (document.pointerLockElement !== canvasRef.current) return;
+      if (!gameFocused) return;
       event.preventDefault();
       event.stopPropagation();
     };
@@ -71,7 +108,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
       window.removeEventListener("wheel", handleWheel, { capture: true });
       document.removeEventListener("pointerlockchange", handlePointerLockChange);
     };
-  }, []);
+  }, [gameFocused]);
 
   const focusGame = () => {
     if (isTrackpadCameraInputBlocked()) return;

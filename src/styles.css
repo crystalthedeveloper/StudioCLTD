@@ -239,6 +239,22 @@ canvas {
   transform: translateX(-50%);
 }
 
+.showcase-play-fallback {
+  min-width: 170px;
+  padding: 12px 18px;
+  border: 1px solid rgba(250, 204, 21, 0.72);
+  border-radius: 8px;
+  background: rgba(5, 7, 12, 0.94);
+  box-shadow: 0 0 24px rgba(250, 204, 21, 0.2);
+  color: #facc15;
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  touch-action: manipulation;
+  white-space: nowrap;
+}
+
 .game-actions {
   position: fixed;
   top: 18px;

@@ -1,4 +1,4 @@
-import { Text } from "@react-three/drei";
+import { Html, Text } from "@react-three/drei";
 import { CuboidCollider, IntersectionEnterPayload, IntersectionExitPayload, RigidBody } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -104,6 +104,7 @@ const lazyTexturePromises = new Map<string, Promise<Texture>>();
 let lazyTextureRequestIndex = 0;
 let showcaseVideoElement: HTMLVideoElement | null = null;
 let showcaseVideoTexture: VideoTexture | null = null;
+let showcaseUnlockPromise: Promise<void> | null = null;
 const requiredScreenImagePaths = Array.from(
   new Set([
     ...Object.values(serviceScreenImages).flatMap((images) => [images.bad, images.good]),
@@ -207,17 +208,54 @@ function useLazyScreenTexture(path: string | null, enabled: boolean, delayMs = 0
 function getShowcaseVideoElement() {
   if (!showcaseVideoElement) {
     const video = document.createElement("video");
-    video.src = "/videos/showcase.mp4";
+    video.src = "/videos/showcase-mobile.mp4";
     video.crossOrigin = "anonymous";
     video.loop = true;
     video.muted = true;
     video.playsInline = true;
-    video.preload = "none";
+    video.autoplay = false;
+    video.preload = "auto";
+    video.setAttribute("playsinline", "");
+    video.setAttribute("webkit-playsinline", "");
 
     showcaseVideoElement = video;
+    console.info("[Showcase] Video initialized");
   }
 
   return showcaseVideoElement;
+}
+
+function pauseShowcaseVideo(video = getShowcaseVideoElement(), reset = false) {
+  video.pause();
+  if (reset) video.currentTime = 0;
+  console.info("[Showcase] Video paused");
+}
+
+function playShowcaseVideo(video = getShowcaseVideoElement(), restart = true) {
+  if (restart) video.currentTime = 0;
+
+  return video.play().then(() => {
+    console.info("[Showcase] Video playing");
+    return true;
+  }).catch((error: unknown) => {
+    console.error("[Showcase] Video playback failed", error);
+    return false;
+  });
+}
+
+export function unlockShowcaseVideoPlayback() {
+  if (showcaseUnlockPromise) return showcaseUnlockPromise;
+
+  const video = getShowcaseVideoElement();
+  showcaseUnlockPromise = video.play().then(() => {
+    pauseShowcaseVideo(video, true);
+    console.info("[Showcase] Mobile playback unlocked");
+  }).catch((error: unknown) => {
+    showcaseUnlockPromise = null;
+    console.error("[Showcase] Video playback failed", error);
+  });
+
+  return showcaseUnlockPromise;
 }
 
 function getShowcaseVideoTexture(video: HTMLVideoElement) {
@@ -270,8 +308,7 @@ export function HubSections({ restartKey, serviceResolutions }: HubSectionsProps
     setShowcaseVideoState({ playing: false });
 
     if (showcaseVideoElement) {
-      showcaseVideoElement.pause();
-      showcaseVideoElement.currentTime = 0;
+      pauseShowcaseVideo(showcaseVideoElement, true);
     }
   }, [restartKey]);
 
@@ -317,6 +354,7 @@ export function HubSections({ restartKey, serviceResolutions }: HubSectionsProps
           onOfferSelect={setSelectedOfferId}
           onSimpleDisplayTrigger={showSimpleDisplay}
           onShowcasePause={() => {
+            if (showcaseVideoElement) pauseShowcaseVideo(showcaseVideoElement);
             setShowcaseVideoState((current) => (current.playing ? { ...current, playing: false } : current));
           }}
           onShowcasePlay={() => {
@@ -568,6 +606,7 @@ function ShowcaseScreenContent({ isPlaying }: { isPlaying: boolean }) {
   const materialRef = useRef<MeshBasicMaterial>(null);
   const screenOpacityRef = useRef(0);
   const [videoTexture, setVideoTexture] = useState<VideoTexture | null>(() => showcaseVideoTexture);
+  const [showTapToPlay, setShowTapToPlay] = useState(false);
 
   useEffect(() => {
     if (!isPlaying && !showcaseVideoElement) return undefined;
@@ -585,14 +624,18 @@ function ShowcaseScreenContent({ isPlaying }: { isPlaying: boolean }) {
     video.addEventListener("playing", attachTextureWhenReady);
 
     if (isPlaying) {
-      video.load();
-      video
-        .play()
-        .catch(() => undefined);
+      setShowTapToPlay(false);
+      void playShowcaseVideo(video).then((playing) => {
+        if (disposed) return;
+        setShowTapToPlay(!playing);
+        if (playing) attachTextureWhenReady();
+      });
       attachTextureWhenReady();
-    } else if (!video.paused) {
-      video.pause();
-      attachTextureWhenReady();
+    } else {
+      pauseShowcaseVideo(video);
+      setShowTapToPlay(false);
+      screenOpacityRef.current = 0;
+      if (materialRef.current) materialRef.current.opacity = 0;
       if (showcaseVideoTexture) showcaseVideoTexture.needsUpdate = false;
     }
 
@@ -606,9 +649,19 @@ function ShowcaseScreenContent({ isPlaying }: { isPlaying: boolean }) {
 
   useEffect(() => {
     return () => {
-      showcaseVideoElement?.pause();
+      if (showcaseVideoElement) pauseShowcaseVideo(showcaseVideoElement);
     };
   }, []);
+
+  const handleTapToPlay = () => {
+    const video = getShowcaseVideoElement();
+    void playShowcaseVideo(video).then((playing) => {
+      setShowTapToPlay(!playing);
+      if (playing && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        setVideoTexture(getShowcaseVideoTexture(video));
+      }
+    });
+  };
 
   useFrame((_, delta) => {
     const material = materialRef.current;
@@ -621,23 +674,32 @@ function ShowcaseScreenContent({ isPlaying }: { isPlaying: boolean }) {
   });
 
   return (
-    <mesh position={[0, -0.03, -0.2]} renderOrder={20}>
-      <planeGeometry args={screenContentSize} />
-      {videoTexture ? (
-        <meshBasicMaterial
-          ref={materialRef}
-          color={screenImageTint}
-          depthTest={false}
-          map={videoTexture}
-          opacity={0}
-          side={DoubleSide}
-          toneMapped
-          transparent
-        />
-      ) : (
-        <meshBasicMaterial color={screenIdleColor} depthTest={false} side={DoubleSide} toneMapped />
+    <>
+      <mesh position={[0, -0.03, -0.2]} renderOrder={20}>
+        <planeGeometry args={screenContentSize} />
+        {videoTexture ? (
+          <meshBasicMaterial
+            ref={materialRef}
+            color={screenImageTint}
+            depthTest={false}
+            map={videoTexture}
+            opacity={0}
+            side={DoubleSide}
+            toneMapped
+            transparent
+          />
+        ) : (
+          <meshBasicMaterial color={screenIdleColor} depthTest={false} side={DoubleSide} toneMapped />
+        )}
+      </mesh>
+      {isPlaying && showTapToPlay && (
+        <Html center position={[0, -0.03, -0.42]} transform distanceFactor={8} zIndexRange={[50, 40]}>
+          <button className="showcase-play-fallback" type="button" onClick={handleTapToPlay}>
+            Tap to Play Video
+          </button>
+        </Html>
       )}
-    </mesh>
+    </>
   );
 }
 

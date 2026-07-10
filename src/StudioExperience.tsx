@@ -9,7 +9,7 @@ import { HubOverlay } from "./ui/HubOverlay";
 import { SpeedBoostHud } from "./ui/SpeedBoostHud";
 import { TrackpadControl } from "./ui/TrackpadControl";
 import { StudioWorld } from "./world/StudioWorld";
-import { preloadScreenTextures } from "./world/systems/HubSections";
+import { preloadScreenTextures, unlockShowcaseVideoPlayback } from "./world/systems/HubSections";
 
 type StudioExperienceProps = {
   onOpenWebsite: () => void;
@@ -112,6 +112,8 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
 
   const focusGame = () => {
     if (isTrackpadCameraInputBlocked()) return;
+
+    void unlockShowcaseVideoPlayback();
 
     const canvas = canvasRef.current;
     if (!canvas) return;

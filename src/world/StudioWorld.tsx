@@ -9,6 +9,7 @@ import { HubSections } from "./systems/HubSections";
 import { ModularTerrain } from "./systems/ModularTerrain";
 import { SpaceSky } from "./systems/SpaceSky";
 import { SpeedPowerUp } from "./systems/SpeedPowerUp";
+import { StudioLogo } from "./systems/StudioLogo";
 import { WorldLights } from "./systems/WorldLights";
 
 type StudioWorldProps = {
@@ -47,6 +48,7 @@ export function StudioWorld({ restartKey }: StudioWorldProps) {
       <Environment preset="warehouse" background={false} environmentIntensity={0.05} />
       <ModularTerrain radius={7} />
       <GlowCubeField />
+      <StudioLogo />
       <SpeedPowerUp restartKey={restartKey} />
       <HubSections restartKey={restartKey} serviceResolutions={serviceResolutions} />
       <CombatPrototype

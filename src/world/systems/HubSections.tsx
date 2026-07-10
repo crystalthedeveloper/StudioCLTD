@@ -30,6 +30,7 @@ const sectionPosition = new Vector3();
 const offerCountdownMs = 3000;
 const offerDisplayMs = 10000;
 const simpleDisplayMs = 10000;
+const portalTriggerHalfExtent = 1.61;
 const offersPageUrl = "https://www.crystalthedeveloper.ca/offers";
 const white = "#f5f7fb";
 const softWhite = "#d8dde8";
@@ -908,7 +909,7 @@ function OfferPortalPad({
     <group name={`OfferPortal:${offer.id}`} position={offer.position}>
       <CuboidCollider
         sensor
-        args={[1.15, 0.28, 1.15]}
+        args={[portalTriggerHalfExtent, 0.28, portalTriggerHalfExtent]}
         position={[0, 0.45, 0]}
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
@@ -1031,7 +1032,7 @@ function ShowcasePortalPad({
     <group name={name} position={[0, 0.18, 9.2]}>
       <CuboidCollider
         sensor
-        args={[1.15, 0.28, 1.15]}
+        args={[portalTriggerHalfExtent, 0.28, portalTriggerHalfExtent]}
         position={[0, 0.45, 0]}
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}

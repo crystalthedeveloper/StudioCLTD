@@ -11,6 +11,7 @@ import { hubSections } from "../hubSections";
 import { playerWorldState } from "../playerWorldState";
 
 const cooldownMs = 1800;
+const triggerPadHalfExtent = 2.1;
 const dialoguePadRadius = 6.5;
 const dialogueVillainRadius = 9;
 const dialoguePadRadiusSq = dialoguePadRadius * dialoguePadRadius;
@@ -441,7 +442,7 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
     <group position={position}>
       <CuboidCollider
         sensor
-        args={[1.5, 0.28, 1.5]}
+        args={[triggerPadHalfExtent, 0.28, triggerPadHalfExtent]}
         position={[0, 0.45, 0]}
         onIntersectionEnter={onActivate}
       />

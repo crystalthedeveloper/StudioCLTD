@@ -140,7 +140,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
             outputColorSpace: SRGBColorSpace,
             powerPreference: "high-performance",
             toneMapping: ACESFilmicToneMapping,
-            toneMappingExposure: 1.12,
+            toneMappingExposure: 0.96,
           }}
           camera={{ position: [11, 7, 15], fov: 58, near: 0.1, far: 10000 }}
           onPointerDown={focusGame}

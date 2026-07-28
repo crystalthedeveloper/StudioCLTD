@@ -209,13 +209,14 @@ function useLazyScreenTexture(path: string | null, enabled: boolean, delayMs = 0
 function getShowcaseVideoElement() {
   if (!showcaseVideoElement) {
     const video = document.createElement("video");
-    video.src = "/videos/showcase-mobile.mp4";
+    const useMobileVideo = window.matchMedia("(max-width: 768px)").matches;
+    video.src = useMobileVideo ? "/videos/showcase-mobile.mp4" : "/videos/showcase.mp4";
     video.crossOrigin = "anonymous";
     video.loop = true;
     video.muted = true;
     video.playsInline = true;
     video.autoplay = false;
-    video.preload = "auto";
+    video.preload = "metadata";
     video.setAttribute("playsinline", "");
     video.setAttribute("webkit-playsinline", "");
 
@@ -460,6 +461,7 @@ function SectionBillboard({
   const simpleDisplay = simpleDisplaySections[section.id];
   const isServiceSection = serviceSectionIds.includes(section.id);
   const isShowcase = section.id === "showcase";
+  const isFramePrototype = section.id === "value";
 
   return (
     <group name={`Billboard:${section.id}`} position={[0, 4.8, 0]}>
@@ -467,7 +469,13 @@ function SectionBillboard({
         <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
         <mesh position={[0, 0, -0.08]}>
           <boxGeometry args={[10.4, 5.8, 0.32]} />
-          <meshStandardMaterial color="#101621" metalness={0.72} roughness={0.34} />
+          <meshStandardMaterial
+            color={isFramePrototype ? "#28313b" : "#101621"}
+            emissive={isFramePrototype ? "#111820" : "#000000"}
+            emissiveIntensity={isFramePrototype ? 0.32 : 0}
+            metalness={isFramePrototype ? 0.82 : 0.72}
+            roughness={isFramePrototype ? 0.24 : 0.34}
+          />
         </mesh>
         <mesh position={[0, 0.1, -0.26]}>
           <planeGeometry args={[9.25, 4.85]} />
@@ -481,8 +489,14 @@ function SectionBillboard({
         </mesh>
         <mesh position={[0, 2.85, -0.14]}>
           <boxGeometry args={[10.8, 0.15, 0.18]} />
-          <meshBasicMaterial color={softWhite} transparent opacity={0.64} />
+          <meshBasicMaterial
+            color={softWhite}
+            transparent
+            opacity={0.64}
+            toneMapped={false}
+          />
         </mesh>
+        {isFramePrototype && <BrightTvFrame />}
       </RigidBody>
       <Text
         color={white}
@@ -530,6 +544,45 @@ function SectionBillboard({
             {selectedOffer?.name ?? "Select an offer"}
           </Text>
         </>
+      )}
+    </group>
+  );
+}
+
+function BrightTvFrame() {
+  const railColor = "#ffd66b";
+  const cornerX = 5.31;
+  const cornerY = 2.84;
+  const horizontalLength = 0.72;
+  const verticalLength = 0.72;
+
+  return (
+    <group name="BrightTvFramePrototype" position={[0, 0, -0.3]}>
+      {([-1, 1] as const).flatMap((xDirection) =>
+        ([-1, 1] as const).map((yDirection) => (
+          <group key={`${xDirection}-${yDirection}`}>
+            <mesh
+              position={[
+                xDirection * (cornerX - horizontalLength / 2),
+                yDirection * cornerY,
+                0,
+              ]}
+            >
+              <boxGeometry args={[horizontalLength, 0.1, 0.12]} />
+              <meshBasicMaterial color={railColor} toneMapped={false} />
+            </mesh>
+            <mesh
+              position={[
+                xDirection * cornerX,
+                yDirection * (cornerY - verticalLength / 2),
+                0,
+              ]}
+            >
+              <boxGeometry args={[0.1, verticalLength, 0.12]} />
+              <meshBasicMaterial color={railColor} toneMapped={false} />
+            </mesh>
+          </group>
+        )),
       )}
     </group>
   );

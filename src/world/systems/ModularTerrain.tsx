@@ -1,47 +1,51 @@
+import { useTexture } from "@react-three/drei";
 import { CuboidCollider } from "@react-three/rapier";
-import { useMemo } from "react";
-import { CanvasTexture, Color, MeshStandardMaterial, RepeatWrapping } from "three";
+import { LinearFilter, LinearMipmapLinearFilter, RepeatWrapping, SRGBColorSpace, Texture, Vector2 } from "three";
 
 type ModularTerrainProps = {
   radius: number;
 };
 
-function createPanelTexture() {
-  const canvas = document.createElement("canvas");
-  canvas.width = 1024;
-  canvas.height = 1024;
-  const ctx = canvas.getContext("2d")!;
+const floorTexturePaths = [
+  "/images/optimized/floor/plaza-microcement-albedo.webp",
+  "/images/optimized/floor/plaza-microcement-normal.webp",
+  "/images/optimized/floor/plaza-microcement-roughness.webp",
+];
+const floorNormalScale = new Vector2(0.04, 0.04);
 
-  ctx.fillStyle = "#171c26";
-  ctx.fillRect(0, 0, 1024, 1024);
-
-  const texture = new CanvasTexture(canvas);
+function configureFloorTexture(texture: Texture, repeat: number) {
   texture.wrapS = RepeatWrapping;
   texture.wrapT = RepeatWrapping;
-  return texture;
+  texture.repeat.set(repeat, repeat);
+  texture.minFilter = LinearMipmapLinearFilter;
+  texture.magFilter = LinearFilter;
+  texture.generateMipmaps = true;
 }
 
 export function ModularTerrain({ radius }: ModularTerrainProps) {
-  const panelTexture = useMemo(createPanelTexture, []);
   const platformSize = radius * 20 + 10;
-  panelTexture.repeat.set(platformSize / 20, platformSize / 20);
-  const material = useMemo(
-    () =>
-      new MeshStandardMaterial({
-        color: new Color("#293141"),
-        map: panelTexture,
-        roughness: 0.2,
-        metalness: 0.9,
-        envMapIntensity: 0.68,
-      }),
-    [panelTexture]
-  );
+  const [albedoMap, normalMap, roughnessMap] = useTexture(floorTexturePaths);
+  const textureRepeat = platformSize / 40;
+
+  configureFloorTexture(albedoMap, textureRepeat);
+  configureFloorTexture(normalMap, textureRepeat);
+  configureFloorTexture(roughnessMap, textureRepeat);
+  albedoMap.colorSpace = SRGBColorSpace;
 
   return (
-    <group name="SmoothSciFiFloor">
+    <group name="PremiumMicrocementFloor">
       <CuboidCollider position={[0, -0.09, 0]} args={[platformSize / 2, 0.09, platformSize / 2]} friction={0} restitution={0} />
-      <mesh rotation-x={-Math.PI / 2} material={material}>
+      <mesh rotation-x={-Math.PI / 2}>
         <planeGeometry args={[platformSize, platformSize, 1, 1]} />
+        <meshStandardMaterial
+          map={albedoMap}
+          normalMap={normalMap}
+          normalScale={floorNormalScale}
+          roughnessMap={roughnessMap}
+          roughness={1}
+          metalness={0}
+          envMapIntensity={0.18}
+        />
       </mesh>
     </group>
   );

@@ -29,7 +29,7 @@ export function SpaceSky() {
         <sphereGeometry args={[5000, 32, 24]} />
         <meshBasicMaterial
           map={skyTexture}
-          color="#6f7480"
+          color="#818692"
           side={BackSide}
           depthWrite={false}
           depthTest={false}

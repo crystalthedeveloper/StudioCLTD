@@ -6,6 +6,7 @@ import { DialogueMessage } from "../ui/DialogueBubble";
 import { CombatPrototype } from "./systems/CombatPrototype";
 import { GlowCubeField } from "./systems/GlowCubeField";
 import { HubSections } from "./systems/HubSections";
+import { InteractiveBall } from "./systems/InteractiveBall";
 import { ModularTerrain } from "./systems/ModularTerrain";
 import { SpaceSky } from "./systems/SpaceSky";
 import { SpeedPowerUp } from "./systems/SpeedPowerUp";
@@ -45,9 +46,10 @@ export function StudioWorld({ restartKey }: StudioWorldProps) {
     <>
       <WorldLights />
       <SpaceSky />
-      <Environment preset="warehouse" background={false} environmentIntensity={0.05} />
+      <Environment preset="warehouse" background={false} environmentIntensity={0.035} />
       <ModularTerrain radius={7} />
       <GlowCubeField />
+      <InteractiveBall restartKey={restartKey} />
       <StudioLogo />
       <SpeedPowerUp restartKey={restartKey} />
       <HubSections restartKey={restartKey} serviceResolutions={serviceResolutions} />

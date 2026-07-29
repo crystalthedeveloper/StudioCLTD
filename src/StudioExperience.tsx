@@ -22,7 +22,12 @@ type StudioExperienceProps = {
 export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRestart, restartKey }: StudioExperienceProps) {
   const gameFocused = useGameFocus();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [ballHits, setBallHits] = useState(0);
   const [screenAssetsReady, setScreenAssetsReady] = useState(false);
+
+  useEffect(() => {
+    setBallHits(0);
+  }, [restartKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -157,7 +162,11 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
           <fog attach="fog" args={["#15182b", 58, 260]} />
           <Suspense fallback={null}>
             <Physics gravity={[0, -20, 0]}>
-              <StudioWorld restartKey={restartKey} />
+              <StudioWorld
+                onBallFloorContact={() => setBallHits(0)}
+                onBallPlayerHit={() => setBallHits((current) => current + 1)}
+                restartKey={restartKey}
+              />
             </Physics>
           </Suspense>
         </Canvas>
@@ -173,6 +182,9 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
       </div>
       <HubOverlay />
       <SpeedBoostHud />
+      {ballHits > 0 && (
+        <div className="ball-hit-counter" aria-live="polite">{`Hits: ${ballHits}`}</div>
+      )}
       <div className={`game-focus-hint${gameFocused ? "" : " game-focus-hint--visible"}`}>
         <strong>Click to Play</strong>
         <span>Press ESC to exit</span>

@@ -1,25 +1,36 @@
 import { BallCollider, CollisionEnterPayload, RapierRigidBody, RigidBody } from "@react-three/rapier";
 import { useEffect, useRef } from "react";
 
-const ballRadius = 0.58;
 const brandYellow = "#facc15";
-const hitImpulse = 1.65;
-const upwardImpulse = 0.48;
-const maxHorizontalSpeed = 15;
-const maxVerticalSpeed = 7;
+const beachBallRadius = 0.78;
+const forwardImpulse = 0.35;
+const upwardImpulse = 1.15;
+const minimumLaunchSpeed = 8;
+const maxHorizontalSpeed = 8;
+const maxVerticalSpeed = 10;
+const hitCooldownMs = 300;
+const floorContactGraceMs = 180;
 const safeBallSpawns = [
-  [-15, ballRadius + 0.08, -1],
-  [14, ballRadius + 0.08, -8],
-  [-11, ballRadius + 0.08, 21],
-  [22, ballRadius + 0.08, -3],
+  [-15, beachBallRadius + 0.08, -1],
+  [14, beachBallRadius + 0.08, -8],
+  [-11, beachBallRadius + 0.08, 21],
+  [22, beachBallRadius + 0.08, -3],
 ] as const;
 const ballSpawn = safeBallSpawns[Math.floor(Math.random() * safeBallSpawns.length)];
 
-export function InteractiveBall({ restartKey }: { restartKey: number }) {
+type InteractiveBallProps = {
+  onFloorContact: () => void;
+  onPlayerHit: () => void;
+  restartKey: number;
+};
+
+export function InteractiveBall({ onFloorContact, onPlayerHit, restartKey }: InteractiveBallProps) {
   const bodyRef = useRef<RapierRigidBody | null>(null);
+  const lastHitTimeRef = useRef(-Infinity);
 
   useEffect(() => {
     const body = bodyRef.current;
+    lastHitTimeRef.current = -Infinity;
     if (!body) return;
 
     body.setTranslation({ x: ballSpawn[0], y: ballSpawn[1], z: ballSpawn[2] }, true);
@@ -28,11 +39,21 @@ export function InteractiveBall({ restartKey }: { restartKey: number }) {
   }, [restartKey]);
 
   const handleCollisionEnter = ({ other }: CollisionEnterPayload) => {
+    const now = performance.now();
+
+    if (other.rigidBodyObject?.name === "StudioCLTDFloor") {
+      if (now - lastHitTimeRef.current < floorContactGraceMs) return;
+      onFloorContact();
+      return;
+    }
+
     if (other.rigidBodyObject?.name !== "StudioCLTDPlayer") return;
+    if (now - lastHitTimeRef.current < hitCooldownMs) return;
 
     const ball = bodyRef.current;
     const player = other.rigidBody;
     if (!ball || !player) return;
+    lastHitTimeRef.current = now;
 
     const ballPosition = ball.translation();
     const playerPosition = player.translation();
@@ -42,9 +63,9 @@ export function InteractiveBall({ restartKey }: { restartKey: number }) {
 
     ball.applyImpulse(
       {
-        x: (deltaX / distance) * hitImpulse,
+        x: (deltaX / distance) * forwardImpulse,
         y: upwardImpulse,
-        z: (deltaZ / distance) * hitImpulse,
+        z: (deltaZ / distance) * forwardImpulse,
       },
       true,
     );
@@ -55,11 +76,12 @@ export function InteractiveBall({ restartKey }: { restartKey: number }) {
     ball.setLinvel(
       {
         x: velocity.x * horizontalScale,
-        y: Math.min(velocity.y, maxVerticalSpeed),
+        y: Math.min(maxVerticalSpeed, Math.max(velocity.y, minimumLaunchSpeed)),
         z: velocity.z * horizontalScale,
       },
       true,
     );
+    onPlayerHit();
   };
 
   return (
@@ -71,14 +93,15 @@ export function InteractiveBall({ restartKey }: { restartKey: number }) {
       position={ballSpawn}
       canSleep
       ccd
-      mass={0.45}
-      linearDamping={0.055}
-      angularDamping={0.12}
+      mass={0.28}
+      gravityScale={0.42}
+      linearDamping={0.24}
+      angularDamping={0.3}
       onCollisionEnter={handleCollisionEnter}
     >
-      <BallCollider args={[ballRadius]} friction={0.38} restitution={0.46} />
+      <BallCollider args={[beachBallRadius]} friction={0.32} restitution={0.58} />
       <mesh castShadow={false} receiveShadow={false}>
-        <sphereGeometry args={[ballRadius, 20, 14]} />
+        <sphereGeometry args={[beachBallRadius, 20, 14]} />
         <meshStandardMaterial color={brandYellow} metalness={0.04} roughness={0.56} envMapIntensity={0.24} />
       </mesh>
     </RigidBody>

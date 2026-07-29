@@ -14,10 +14,12 @@ import { StudioLogo } from "./systems/StudioLogo";
 import { WorldLights } from "./systems/WorldLights";
 
 type StudioWorldProps = {
+  onBallFloorContact: () => void;
+  onBallPlayerHit: () => void;
   restartKey: number;
 };
 
-export function StudioWorld({ restartKey }: StudioWorldProps) {
+export function StudioWorld({ onBallFloorContact, onBallPlayerHit, restartKey }: StudioWorldProps) {
   const dialogueIdRef = useRef(0);
   const fixedAnimationRequestRef = useRef(0);
   const [fixedAnimationRequest, setFixedAnimationRequest] = useState(0);
@@ -49,7 +51,11 @@ export function StudioWorld({ restartKey }: StudioWorldProps) {
       <Environment preset="warehouse" background={false} environmentIntensity={0.035} />
       <ModularTerrain radius={7} />
       <GlowCubeField />
-      <InteractiveBall restartKey={restartKey} />
+      <InteractiveBall
+        onFloorContact={onBallFloorContact}
+        onPlayerHit={onBallPlayerHit}
+        restartKey={restartKey}
+      />
       <StudioLogo />
       <SpeedPowerUp restartKey={restartKey} />
       <HubSections restartKey={restartKey} serviceResolutions={serviceResolutions} />

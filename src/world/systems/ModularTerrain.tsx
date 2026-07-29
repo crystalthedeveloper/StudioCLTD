@@ -1,5 +1,5 @@
 import { useTexture } from "@react-three/drei";
-import { CuboidCollider } from "@react-three/rapier";
+import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import { LinearFilter, LinearMipmapLinearFilter, RepeatWrapping, SRGBColorSpace, Texture, Vector2 } from "three";
 
 type ModularTerrainProps = {
@@ -34,7 +34,14 @@ export function ModularTerrain({ radius }: ModularTerrainProps) {
 
   return (
     <group name="PremiumMicrocementFloor">
-      <CuboidCollider position={[0, -0.09, 0]} args={[platformSize / 2, 0.09, platformSize / 2]} friction={0} restitution={0} />
+      <RigidBody name="StudioCLTDFloor" type="fixed" colliders={false}>
+        <CuboidCollider
+          position={[0, -0.09, 0]}
+          args={[platformSize / 2, 0.09, platformSize / 2]}
+          friction={0}
+          restitution={0.18}
+        />
+      </RigidBody>
       <mesh rotation-x={-Math.PI / 2}>
         <planeGeometry args={[platformSize, platformSize, 1, 1]} />
         <meshStandardMaterial

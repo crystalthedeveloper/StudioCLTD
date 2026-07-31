@@ -4,13 +4,12 @@ import { CharacterController } from "../player/CharacterController";
 import { resetSpeedBoost } from "../player/speedBoost";
 import { DialogueMessage } from "../ui/DialogueBubble";
 import { CombatPrototype } from "./systems/CombatPrototype";
-import { GlowCubeField } from "./systems/GlowCubeField";
 import { HubSections } from "./systems/HubSections";
 import { InteractiveBall } from "./systems/InteractiveBall";
+import { LogoLightField } from "./systems/LogoLightField";
 import { ModularTerrain } from "./systems/ModularTerrain";
 import { SpaceSky } from "./systems/SpaceSky";
 import { SpeedPowerUp } from "./systems/SpeedPowerUp";
-import { StudioLogo } from "./systems/StudioLogo";
 import { WorldLights } from "./systems/WorldLights";
 
 type StudioWorldProps = {
@@ -50,13 +49,12 @@ export function StudioWorld({ onBallFloorContact, onBallPlayerHit, restartKey }:
       <SpaceSky />
       <Environment preset="warehouse" background={false} environmentIntensity={0.035} />
       <ModularTerrain radius={7} />
-      <GlowCubeField />
+      <LogoLightField />
       <InteractiveBall
         onFloorContact={onBallFloorContact}
         onPlayerHit={onBallPlayerHit}
         restartKey={restartKey}
       />
-      <StudioLogo />
       <SpeedPowerUp restartKey={restartKey} />
       <HubSections restartKey={restartKey} serviceResolutions={serviceResolutions} />
       <CombatPrototype

@@ -1,9 +1,11 @@
 import { useGLTF } from "@react-three/drei";
-import { BallCollider, IntersectionEnterPayload, RigidBody } from "@react-three/rapier";
+import { useFrame } from "@react-three/fiber";
+import { BallCollider, IntersectionEnterPayload, IntersectionExitPayload, RigidBody } from "@react-three/rapier";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Color, Group, Mesh, MeshStandardMaterial, Object3D } from "three";
 import { activateSpeedBoost } from "../../player/speedBoost";
 import { InteractiveOutline } from "../InteractiveOutline";
+import { BillboardLabel } from "../../ui/BillboardLabel";
 
 const logoPath = "/logo/logo-optimized.glb";
 const logoScale = 1.8;
@@ -11,8 +13,11 @@ const floorLogoY = 0.04;
 const worldLogoRotation = -0.35;
 const pickupColliderRadius = 1.55;
 const speedRespawnMs = 28000;
+const contactCountdownMs = 3000;
+const contactCooldownMs = 1200;
+const contactUrl = "https://www.crystalthedeveloper.ca/contact";
 
-type LogoKind = "coin" | "speed" | "penalty" | "light";
+type LogoKind = "coin" | "speed" | "penalty" | "contact" | "light";
 
 type PlazaLogo = {
   id: string;
@@ -52,12 +57,14 @@ const plazaLogos: PlazaLogo[] = [
   { id: "speed-center-1", kind: "speed", position: [-15, 25], rotationOffset: -0.11, scaleMultiplier: 1.05 },
   { id: "speed-center-2", kind: "speed", position: [26, -10], rotationOffset: 0.09, scaleMultiplier: 0.93 },
   { id: "penalty-center-1", kind: "penalty", position: [-25, -8], rotationOffset: -0.15, scaleMultiplier: 1.04 },
+  { id: "contact", kind: "contact", position: [0, 18], rotationOffset: 0.08, scaleMultiplier: 1.06 },
 ];
 
 const logoColors: Record<LogoKind, string> = {
   coin: "#3f7d3a",
   speed: "#facc15",
   penalty: "#991b1b",
+  contact: "#2583e8",
   light: "#ffffff",
 };
 
@@ -66,7 +73,7 @@ function createSharedMaterial(kind: LogoKind) {
   return new MeshStandardMaterial({
     color,
     emissive: color,
-    emissiveIntensity: kind === "light" ? 1.5 : kind === "coin" ? 1 : 0.88,
+    emissiveIntensity: kind === "light" ? 1.5 : kind === "coin" ? 1 : kind === "contact" ? 0.94 : 0.88,
     metalness: 0.08,
     roughness: 0.38,
     toneMapped: false,
@@ -100,6 +107,7 @@ export function LogoLightField({ onCoinCollect, onPenaltyCollect, restartKey }: 
       coin: createSharedMaterial("coin"),
       speed: createSharedMaterial("speed"),
       penalty: createSharedMaterial("penalty"),
+      contact: createSharedMaterial("contact"),
       light: createSharedMaterial("light"),
     }),
     [],
@@ -109,6 +117,7 @@ export function LogoLightField({ onCoinCollect, onPenaltyCollect, restartKey }: 
       coin: createLogoTemplate(scene, materials.coin),
       speed: createLogoTemplate(scene, materials.speed),
       penalty: createLogoTemplate(scene, materials.penalty),
+      contact: createLogoTemplate(scene, materials.contact),
       light: createLogoTemplate(scene, materials.light),
     }),
     [materials, scene],
@@ -150,12 +159,64 @@ type PlazaLogoInstanceProps = {
 function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }: PlazaLogoInstanceProps) {
   const [available, setAvailable] = useState(true);
   const respawnTimerRef = useRef<number | null>(null);
+  const contactIntervalRef = useRef<number | null>(null);
+  const contactOpenTimerRef = useRef<number | null>(null);
+  const contactActiveRef = useRef(false);
+  const contactOpenedRef = useRef(false);
+  const contactCooldownUntilRef = useRef(0);
+  const [contactCountdown, setContactCountdown] = useState(0);
+
+  const clearContactTimers = useCallback(() => {
+    if (contactIntervalRef.current !== null) window.clearInterval(contactIntervalRef.current);
+    if (contactOpenTimerRef.current !== null) window.clearTimeout(contactOpenTimerRef.current);
+    contactIntervalRef.current = null;
+    contactOpenTimerRef.current = null;
+  }, []);
+
+  const cancelContactCountdown = useCallback(() => {
+    if (!contactActiveRef.current || contactOpenedRef.current) return;
+    clearContactTimers();
+    contactActiveRef.current = false;
+    setContactCountdown(0);
+  }, [clearContactTimers]);
+
+  const startContactCountdown = useCallback(() => {
+    const now = performance.now();
+    if (contactActiveRef.current || now < contactCooldownUntilRef.current) return;
+
+    clearContactTimers();
+    contactActiveRef.current = true;
+    contactOpenedRef.current = false;
+    contactCooldownUntilRef.current = now + contactCooldownMs;
+    setContactCountdown(3);
+    const startedAt = performance.now();
+
+    contactIntervalRef.current = window.setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((contactCountdownMs - (performance.now() - startedAt)) / 1000));
+      setContactCountdown(remaining);
+    }, 180);
+
+    contactOpenTimerRef.current = window.setTimeout(() => {
+      if (!contactActiveRef.current || contactOpenedRef.current) return;
+      contactOpenedRef.current = true;
+      contactActiveRef.current = false;
+      contactCooldownUntilRef.current = performance.now() + contactCooldownMs;
+      clearContactTimers();
+      setContactCountdown(0);
+      window.open(contactUrl, "_blank", "noopener,noreferrer");
+    }, contactCountdownMs);
+  }, [clearContactTimers]);
 
   useEffect(() => {
     if (respawnTimerRef.current !== null) {
       window.clearTimeout(respawnTimerRef.current);
       respawnTimerRef.current = null;
     }
+    clearContactTimers();
+    contactActiveRef.current = false;
+    contactOpenedRef.current = false;
+    contactCooldownUntilRef.current = 0;
+    setContactCountdown(0);
     setAvailable(true);
 
     return () => {
@@ -163,11 +224,12 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
         window.clearTimeout(respawnTimerRef.current);
         respawnTimerRef.current = null;
       }
+      clearContactTimers();
     };
-  }, [restartKey]);
+  }, [clearContactTimers, restartKey]);
 
   const collect = useCallback(
-    ({ other }: IntersectionEnterPayload) => {
+    ({ other }: IntersectionExitPayload) => {
       if (!available || other.rigidBodyObject?.name !== "StudioCLTDPlayer") return;
 
       if (logo.kind === "coin") {
@@ -189,15 +251,26 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
           respawnTimerRef.current = null;
           setAvailable(true);
         }, speedRespawnMs);
+        return;
       }
+
+      if (logo.kind === "contact") startContactCountdown();
     },
-    [available, logo.kind, onCoinCollect, onPenaltyCollect],
+    [available, logo.kind, onCoinCollect, onPenaltyCollect, startContactCountdown],
+  );
+
+  const handleExit = useCallback(
+    ({ other }: IntersectionEnterPayload) => {
+      if (logo.kind !== "contact" || other.rigidBodyObject?.name !== "StudioCLTDPlayer") return;
+      cancelContactCountdown();
+    },
+    [cancelContactCountdown, logo.kind],
   );
 
   if (!available && logo.kind !== "light") return null;
 
   const position: [number, number, number] = [logo.position[0], floorLogoY, logo.position[1]];
-  const visual = (
+  const standardVisual = (
     <>
       <primitive
         object={logo.object}
@@ -208,6 +281,13 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
       {logo.kind !== "light" && <InteractiveOutline object={logo.object} />}
     </>
   );
+  const visual = logo.kind === "contact" ? (
+    <ContactLogoVisual
+      object={logo.object}
+      rotation={worldLogoRotation + (logo.rotationOffset ?? 0)}
+      scale={logoScale * (logo.scaleMultiplier ?? 1)}
+    />
+  ) : standardVisual;
 
   if (logo.kind === "light") {
     return <group position={position}>{visual}</group>;
@@ -215,9 +295,39 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
 
   return (
     <RigidBody type="fixed" colliders={false} position={position} name={`PlazaLogo:${logo.id}`}>
-      <BallCollider args={[pickupColliderRadius]} position={[0, 0.65, 0]} sensor onIntersectionEnter={collect} />
+      <BallCollider
+        args={[pickupColliderRadius]}
+        position={[0, 0.65, 0]}
+        sensor
+        onIntersectionEnter={collect}
+        onIntersectionExit={handleExit}
+      />
       {visual}
+      {contactCountdown > 0 && (
+        <BillboardLabel color="#75baff" fontSize={0.25} position={[0, 1.75, 0]} maxWidth={4}>
+          {`Opening Contact in ${contactCountdown}…`}
+        </BillboardLabel>
+      )}
     </RigidBody>
+  );
+}
+
+function ContactLogoVisual({ object, rotation, scale }: { object: Object3D; rotation: number; scale: number }) {
+  const groupRef = useRef<Group>(null);
+  const lastUpdateRef = useRef(-Infinity);
+
+  useFrame(({ clock }) => {
+    if (!groupRef.current || clock.elapsedTime - lastUpdateRef.current < 1 / 24) return;
+    lastUpdateRef.current = clock.elapsedTime;
+    groupRef.current.position.y = 0.1 + Math.sin(clock.elapsedTime * 0.85) * 0.08;
+    groupRef.current.rotation.y = rotation + clock.elapsedTime * 0.22;
+  });
+
+  return (
+    <group ref={groupRef} rotation-y={rotation}>
+      <primitive object={object} scale={scale} dispose={null} />
+      <InteractiveOutline object={object} />
+    </group>
   );
 }
 

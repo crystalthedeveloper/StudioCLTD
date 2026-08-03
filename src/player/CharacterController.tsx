@@ -9,6 +9,7 @@ import { isSpeedBoostActive } from "./speedBoost";
 import { useKeyboardControls } from "./useKeyboardControls";
 import { DialogueMessage } from "../ui/DialogueBubble";
 import { playerWorldState } from "../world/playerWorldState";
+import type { TransportDestination } from "../world/systems/TransportPads";
 
 const moveDirection = new Vector3();
 const playerForward = new Vector3();
@@ -25,6 +26,7 @@ type CharacterControllerProps = {
   movementLocked: boolean;
   onFixedAnimationComplete: () => void;
   restartKey: number;
+  transportDestination: TransportDestination | null;
 };
 
 export function CharacterController({
@@ -33,6 +35,7 @@ export function CharacterController({
   movementLocked,
   onFixedAnimationComplete,
   restartKey,
+  transportDestination,
 }: CharacterControllerProps) {
   const bodyRef = useRef<RapierRigidBody | null>(null);
   const yawRef = useRef(0);
@@ -60,6 +63,21 @@ export function CharacterController({
     body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     body.setAngvel({ x: 0, y: 0, z: 0 }, true);
   }, [restartKey, spawn]);
+
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body || !transportDestination) return;
+
+    const [x, y, z] = transportDestination.position;
+    yawRef.current = transportDestination.yaw;
+    cameraYawRef.current = transportDestination.yaw;
+    forwardBackSpeedRef.current = 0;
+    movementDirectionRef.current.set(0, 0, 0);
+    playerWorldState.position.set(x, y, z);
+    body.setTranslation({ x, y, z }, true);
+    body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+  }, [transportDestination]);
 
   useFrame((_, delta) => {
     const body = bodyRef.current;

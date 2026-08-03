@@ -1,8 +1,8 @@
 import { Text } from "@react-three/drei";
-import { CuboidCollider } from "@react-three/rapier";
+import { CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Group, Mesh, MeshBasicMaterial, SphereGeometry, Vector3 } from "three";
+import { Group, Mesh, MeshBasicMaterial, Object3D, SphereGeometry, Vector3 } from "three";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { DialogueMessage } from "../../ui/DialogueBubble";
 import { gameTextFont } from "../../ui/textFont";
@@ -11,7 +11,8 @@ import { hubSections } from "../hubSections";
 import { playerWorldState } from "../playerWorldState";
 
 const cooldownMs = 1800;
-const triggerPadHalfExtent = 2.1;
+const triggerPadRadius = 1.33;
+const padActivationCooldownMs = 900;
 const dialoguePadRadius = 6.5;
 const dialogueVillainRadius = 9;
 const dialoguePadRadiusSq = dialoguePadRadius * dialoguePadRadius;
@@ -405,6 +406,32 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
   const pulseRef = useRef<Mesh>(null);
   const activeStartedAtRef = useRef(0);
   const wasActiveRef = useRef(active);
+  const playerInsideRef = useRef(false);
+  const lastTriggeredAtRef = useRef(-Infinity);
+
+  const isPlayerEvent = (event: IntersectionEnterPayload | IntersectionExitPayload) => {
+    let object: Object3D | null | undefined = event.other.rigidBodyObject ?? event.other.colliderObject;
+    while (object) {
+      if (object.name === "StudioCLTDPlayer") return true;
+      object = object.parent;
+    }
+    return false;
+  };
+
+  const handleEnter = (event: IntersectionEnterPayload) => {
+    if (!isPlayerEvent(event) || playerInsideRef.current) return;
+    playerInsideRef.current = true;
+
+    const now = performance.now();
+    if (now - lastTriggeredAtRef.current < padActivationCooldownMs) return;
+    lastTriggeredAtRef.current = now;
+    onActivate();
+  };
+
+  const handleExit = (event: IntersectionExitPayload) => {
+    if (!isPlayerEvent(event)) return;
+    playerInsideRef.current = false;
+  };
 
   useFrame(({ clock }) => {
     if (!active && !wasActiveRef.current) return;
@@ -440,11 +467,12 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
 
   return (
     <group position={position}>
-      <CuboidCollider
+      <CylinderCollider
         sensor
-        args={[triggerPadHalfExtent, 0.28, triggerPadHalfExtent]}
-        position={[0, 0.45, 0]}
-        onIntersectionEnter={onActivate}
+        args={[0.28, triggerPadRadius]}
+        position={[0, 0.32, 0]}
+        onIntersectionEnter={handleEnter}
+        onIntersectionExit={handleExit}
       />
       <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]}>
         <torusGeometry args={[1.3, 0.03, 8, 64]} />
@@ -460,6 +488,7 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
           fontSize={label === "More Info" ? 0.24 : 0.28}
           position={[0, 1.02, 0]}
           maxWidth={2.5}
+          maxVisibleDistance={12}
         >
           {label}
         </BillboardLabel>

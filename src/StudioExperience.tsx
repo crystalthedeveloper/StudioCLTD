@@ -22,11 +22,11 @@ type StudioExperienceProps = {
 export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRestart, restartKey }: StudioExperienceProps) {
   const gameFocused = useGameFocus();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [ballHits, setBallHits] = useState(0);
+  const [coins, setCoins] = useState(0);
   const [screenAssetsReady, setScreenAssetsReady] = useState(false);
 
   useEffect(() => {
-    setBallHits(0);
+    setCoins(0);
   }, [restartKey]);
 
   useEffect(() => {
@@ -163,8 +163,8 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
           <Suspense fallback={null}>
             <Physics gravity={[0, -20, 0]}>
               <StudioWorld
-                onBallFloorContact={() => setBallHits(0)}
-                onBallPlayerHit={() => setBallHits((current) => current + 1)}
+                onCoinCollect={() => setCoins((current) => current + 1)}
+                onPenaltyCollect={() => setCoins(0)}
                 restartKey={restartKey}
               />
             </Physics>
@@ -179,12 +179,15 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         <button type="button" onClick={onOpenWebsite}>
           My Site
         </button>
+        {coins > 0 && (
+          <div className="coins-counter" aria-label={`${coins} coins`} aria-live="polite">
+            <span className="coins-counter__icon" aria-hidden="true" />
+            <span>{coins}</span>
+          </div>
+        )}
       </div>
       <HubOverlay />
       <SpeedBoostHud />
-      {ballHits > 0 && (
-        <div className="ball-hit-counter" aria-live="polite">{`Hits: ${ballHits}`}</div>
-      )}
       <div className={`game-focus-hint${gameFocused ? "" : " game-focus-hint--visible"}`}>
         <strong>Click to Play</strong>
         <span>Press ESC to exit</span>

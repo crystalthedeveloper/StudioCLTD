@@ -1,5 +1,5 @@
 import { Html, Text } from "@react-three/drei";
-import { CuboidCollider, IntersectionEnterPayload, IntersectionExitPayload, RigidBody } from "@react-three/rapier";
+import { CuboidCollider, CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload, RigidBody } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -30,7 +30,8 @@ const sectionPosition = new Vector3();
 const offerCountdownMs = 3000;
 const offerDisplayMs = 10000;
 const simpleDisplayMs = 10000;
-const portalTriggerHalfExtent = 1.61;
+const portalTriggerRadius = 1.06;
+const portalActivationCooldownMs = 900;
 const offersPageUrl = "https://www.crystalthedeveloper.ca/offers";
 const white = "#f5f7fb";
 const softWhite = "#d8dde8";
@@ -62,11 +63,11 @@ const simpleDisplaySections: Record<string, { imagePath: string; label: string }
     imagePath: "/images/optimized/tips/tip.jpg",
     label: "Show Tip",
   },
-  value: {
-    imagePath: "/images/optimized/values/value.jpg",
-    label: "Show Value",
-  },
 };
+const valueDisplayOptions = [
+  { id: "trust", label: "Trust", imagePath: "/images/optimized/values/value.jpg", position: [-1.8, 0.18, 9.2] as [number, number, number] },
+  { id: "speed", label: "Speed", imagePath: "/images/optimized/values/value-2.jpg", position: [1.8, 0.18, 9.2] as [number, number, number] },
+];
 const offerOptions = [
   {
     id: "quick-fix",
@@ -110,6 +111,7 @@ const requiredScreenImagePaths = Array.from(
   new Set([
     ...Object.values(serviceScreenImages).flatMap((images) => [images.bad, images.good]),
     ...Object.values(simpleDisplaySections).map((display) => display.imagePath),
+    ...valueDisplayOptions.map((display) => display.imagePath),
     ...offerOptions.map((offer) => offer.imagePath),
   ])
 );
@@ -203,7 +205,7 @@ function useLazyScreenTexture(path: string | null, enabled: boolean, delayMs = 0
     };
   }, [delayMs, enabled, path]);
 
-  return enabled ? texture ?? cachedTexture : null;
+  return enabled ? cachedTexture ?? texture : null;
 }
 
 function getShowcaseVideoElement() {
@@ -276,7 +278,7 @@ function getShowcaseVideoTexture(video: HTMLVideoElement) {
 
 export function HubSections({ restartKey, serviceResolutions }: HubSectionsProps) {
   const displayTimersRef = useRef<Record<string, number>>({});
-  const [activeSimpleDisplays, setActiveSimpleDisplays] = useState<Record<string, boolean>>({});
+  const [activeSimpleDisplays, setActiveSimpleDisplays] = useState<Record<string, string>>({});
   const [visibleSectionCount, setVisibleSectionCount] = useState(2);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
   const [showcaseVideoState, setShowcaseVideoState] = useState<ShowcaseVideoState>({
@@ -324,20 +326,19 @@ export function HubSections({ restartKey, serviceResolutions }: HubSectionsProps
     return () => window.clearTimeout(timeout);
   }, [visibleSectionCount]);
 
-  const showSimpleDisplay = (sectionId: string) => {
+  const showSimpleDisplay = (sectionId: string, imagePath: string) => {
     const existingTimer = displayTimersRef.current[sectionId];
     if (existingTimer) window.clearTimeout(existingTimer);
 
     setActiveSimpleDisplays((current) => ({
       ...current,
-      [sectionId]: true,
+      [sectionId]: imagePath,
     }));
 
     displayTimersRef.current[sectionId] = window.setTimeout(() => {
-      setActiveSimpleDisplays((current) => ({
-        ...current,
-        [sectionId]: false,
-      }));
+      setActiveSimpleDisplays((current) =>
+        Object.fromEntries(Object.entries(current).filter(([id]) => id !== sectionId)),
+      );
       delete displayTimersRef.current[sectionId];
     }, simpleDisplayMs);
   };
@@ -400,11 +401,11 @@ function HubSectionDistrict({
   selectedOffer,
   showcaseVideoState,
 }: {
-  activeSimpleDisplays: Record<string, boolean>;
+  activeSimpleDisplays: Record<string, string>;
   onOfferSelect: (offerId: string | null) => void;
   onShowcasePause: () => void;
   onShowcasePlay: () => void;
-  onSimpleDisplayTrigger: (sectionId: string) => void;
+  onSimpleDisplayTrigger: (sectionId: string, imagePath: string) => void;
   serviceResolutions: Record<string, boolean>;
   section: HubSection;
   selectedOffer: OfferOption | null;
@@ -430,7 +431,13 @@ function HubSectionDistrict({
           active={Boolean(activeSimpleDisplays[section.id])}
           label={simpleDisplaySections[section.id].label}
           name={`SimpleDisplayPortal:${section.id}`}
-          onPlayerEnter={() => onSimpleDisplayTrigger(section.id)}
+          onPlayerEnter={() => onSimpleDisplayTrigger(section.id, simpleDisplaySections[section.id].imagePath)}
+        />
+      )}
+      {section.id === "value" && (
+        <ValueDisplaySelector
+          selectedImagePath={activeSimpleDisplays.value ?? null}
+          onSelect={(imagePath) => onSimpleDisplayTrigger("value", imagePath)}
         />
       )}
       {section.id === "showcase" && (
@@ -451,7 +458,7 @@ function SectionBillboard({
   selectedOffer,
   showcaseVideoState,
 }: {
-  activeSimpleDisplays: Record<string, boolean>;
+  activeSimpleDisplays: Record<string, string>;
   section: HubSection;
   serviceResolutions: Record<string, boolean>;
   selectedOffer: OfferOption | null;
@@ -459,6 +466,7 @@ function SectionBillboard({
 }) {
   const isOffers = section.id === "offers";
   const simpleDisplay = simpleDisplaySections[section.id];
+  const selectedSimpleDisplayPath = activeSimpleDisplays[section.id] ?? null;
   const isServiceSection = serviceSectionIds.includes(section.id);
   const isShowcase = section.id === "showcase";
   const isFramePrototype = section.id === "value";
@@ -511,8 +519,8 @@ function SectionBillboard({
       </Text>
       {isOffers ? (
         <OffersScreenContent selectedOffer={selectedOffer} />
-      ) : simpleDisplay ? (
-        <SimpleDisplayScreen active={Boolean(activeSimpleDisplays[section.id])} imagePath={simpleDisplay.imagePath} />
+      ) : simpleDisplay || section.id === "value" ? (
+        <SimpleDisplayScreen imagePath={selectedSimpleDisplayPath} />
       ) : isServiceSection ? (
         <ServiceScreenContent resolved={Boolean(serviceResolutions[section.id])} section={section} />
       ) : isShowcase ? (
@@ -610,17 +618,23 @@ function OffersScreenContent({ selectedOffer }: { selectedOffer: OfferOption | n
   );
 }
 
-function SimpleDisplayScreen({ active, imagePath }: { active: boolean; imagePath: string }) {
-  const texture = useLazyScreenTexture(imagePath, active);
+function SimpleDisplayScreen({ imagePath }: { imagePath: string | null }) {
+  const materialRef = useRef<MeshBasicMaterial>(null);
+  const texture = useLazyScreenTexture(imagePath, Boolean(imagePath));
+
+  useEffect(() => {
+    const material = materialRef.current;
+    if (!material) return;
+
+    material.map = texture;
+    material.color.set(texture ? screenImageTint : screenIdleColor);
+    material.needsUpdate = true;
+  }, [texture]);
 
   return (
-    <mesh key={active ? imagePath : "simple-display-empty"} position={[0, -0.03, -0.2]} renderOrder={20}>
+    <mesh position={[0, -0.03, -0.2]} renderOrder={20}>
       <planeGeometry args={screenContentSize} />
-      {active && texture ? (
-        <meshBasicMaterial color={screenImageTint} depthTest={false} map={texture} side={DoubleSide} toneMapped />
-      ) : (
-        <meshBasicMaterial color={screenIdleColor} depthTest={false} side={DoubleSide} toneMapped />
-      )}
+      <meshBasicMaterial ref={materialRef} color={screenIdleColor} depthTest={false} side={DoubleSide} toneMapped />
     </mesh>
   );
 }
@@ -880,6 +894,30 @@ function SimpleDisplaySelector({
   );
 }
 
+function ValueDisplaySelector({
+  onSelect,
+  selectedImagePath,
+}: {
+  onSelect: (imagePath: string) => void;
+  selectedImagePath: string | null;
+}) {
+  return (
+    <group name="ValueDisplaySelector">
+      {valueDisplayOptions.map((option) => (
+        <ShowcasePortalPad
+          key={option.id}
+          active={selectedImagePath === option.imagePath}
+          label={option.label}
+          name={`ValueDisplayPortal:${option.id}`}
+          onPlayerEnter={() => onSelect(option.imagePath)}
+          onPlayerExit={() => undefined}
+          position={option.position}
+        />
+      ))}
+    </group>
+  );
+}
+
 function OfferPortalPad({
   active,
   countdownSeconds,
@@ -896,6 +934,8 @@ function OfferPortalPad({
   const ringRef = useRef<Mesh>(null);
   const pulseRef = useRef<Mesh>(null);
   const playerInsideRef = useRef(false);
+  const activatedThisEntryRef = useRef(false);
+  const lastActivatedAtRef = useRef(-Infinity);
   const activeStartedAtRef = useRef(0);
   const wasActiveRef = useRef(active);
 
@@ -919,13 +959,20 @@ function OfferPortalPad({
   const handleEnter = (event: IntersectionEnterPayload) => {
     if (!isPlayerEvent(event) || playerInsideRef.current) return;
     playerInsideRef.current = true;
+    activatedThisEntryRef.current = false;
+
+    const now = performance.now();
+    if (now - lastActivatedAtRef.current < portalActivationCooldownMs) return;
+    lastActivatedAtRef.current = now;
+    activatedThisEntryRef.current = true;
     onPlayerEnter();
   };
 
   const handleExit = (event: IntersectionExitPayload) => {
     if (!isPlayerEvent(event) || !playerInsideRef.current) return;
     playerInsideRef.current = false;
-    onPlayerExit();
+    if (activatedThisEntryRef.current) onPlayerExit();
+    activatedThisEntryRef.current = false;
   };
 
   useFrame(({ clock }) => {
@@ -960,10 +1007,10 @@ function OfferPortalPad({
 
   return (
     <group name={`OfferPortal:${offer.id}`} position={offer.position}>
-      <CuboidCollider
+      <CylinderCollider
         sensor
-        args={[portalTriggerHalfExtent, 0.28, portalTriggerHalfExtent]}
-        position={[0, 0.45, 0]}
+        args={[0.28, portalTriggerRadius]}
+        position={[0, 0.32, 0]}
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
@@ -980,6 +1027,7 @@ function OfferPortalPad({
         fontSize={offer.id === "site-improvement" ? 0.22 : 0.28}
         position={[0, 1.05, 0]}
         maxWidth={2.8}
+        maxVisibleDistance={12}
       >
         {offer.name}
       </BillboardLabel>
@@ -989,6 +1037,7 @@ function OfferPortalPad({
           fontSize={0.2}
           position={[0, 1.48, 0]}
           maxWidth={3.2}
+          maxVisibleDistance={12}
         >
           {`Opening offers page in ${countdownSeconds}...`}
         </BillboardLabel>
@@ -1003,16 +1052,20 @@ function ShowcasePortalPad({
   name,
   onPlayerEnter,
   onPlayerExit,
+  position = [0, 0.18, 9.2],
 }: {
   active: boolean;
   label: string;
   name: string;
   onPlayerEnter: () => void;
   onPlayerExit: () => void;
+  position?: [number, number, number];
 }) {
   const ringRef = useRef<Mesh>(null);
   const pulseRef = useRef<Mesh>(null);
   const playerInsideRef = useRef(false);
+  const activatedThisEntryRef = useRef(false);
+  const lastActivatedAtRef = useRef(-Infinity);
   const activeStartedAtRef = useRef(0);
   const wasActiveRef = useRef(active);
 
@@ -1031,13 +1084,20 @@ function ShowcasePortalPad({
   const activate = () => {
     if (playerInsideRef.current) return;
     playerInsideRef.current = true;
+    activatedThisEntryRef.current = false;
+
+    const now = performance.now();
+    if (now - lastActivatedAtRef.current < portalActivationCooldownMs) return;
+    lastActivatedAtRef.current = now;
+    activatedThisEntryRef.current = true;
     onPlayerEnter();
   };
 
   const deactivate = () => {
     if (!playerInsideRef.current) return;
     playerInsideRef.current = false;
-    onPlayerExit();
+    if (activatedThisEntryRef.current) onPlayerExit();
+    activatedThisEntryRef.current = false;
   };
 
   const handleEnter = (event: IntersectionEnterPayload) => {
@@ -1082,11 +1142,11 @@ function ShowcasePortalPad({
   });
 
   return (
-    <group name={name} position={[0, 0.18, 9.2]}>
-      <CuboidCollider
+    <group name={name} position={position}>
+      <CylinderCollider
         sensor
-        args={[portalTriggerHalfExtent, 0.28, portalTriggerHalfExtent]}
-        position={[0, 0.45, 0]}
+        args={[0.28, portalTriggerRadius]}
+        position={[0, 0.32, 0]}
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
@@ -1098,7 +1158,7 @@ function ShowcasePortalPad({
         <ringGeometry args={[0.68, 1.05, 48]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
-      <BillboardLabel color={white} fontSize={0.28} position={[0, 1.05, 0]} maxWidth={3}>
+      <BillboardLabel color={white} fontSize={0.28} position={[0, 1.05, 0]} maxWidth={3} maxVisibleDistance={12}>
         {label}
       </BillboardLabel>
     </group>

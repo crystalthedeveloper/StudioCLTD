@@ -5,20 +5,20 @@ import { resetSpeedBoost } from "../player/speedBoost";
 import { DialogueMessage } from "../ui/DialogueBubble";
 import { CombatPrototype } from "./systems/CombatPrototype";
 import { HubSections } from "./systems/HubSections";
-import { InteractiveBall } from "./systems/InteractiveBall";
 import { LogoLightField } from "./systems/LogoLightField";
 import { ModularTerrain } from "./systems/ModularTerrain";
 import { SpaceSky } from "./systems/SpaceSky";
-import { SpeedPowerUp } from "./systems/SpeedPowerUp";
 import { WorldLights } from "./systems/WorldLights";
+import { TransportPads } from "./systems/TransportPads";
+import type { TransportDestination } from "./systems/TransportPads";
 
 type StudioWorldProps = {
-  onBallFloorContact: () => void;
-  onBallPlayerHit: () => void;
+  onCoinCollect: () => void;
+  onPenaltyCollect: () => void;
   restartKey: number;
 };
 
-export function StudioWorld({ onBallFloorContact, onBallPlayerHit, restartKey }: StudioWorldProps) {
+export function StudioWorld({ onCoinCollect, onPenaltyCollect, restartKey }: StudioWorldProps) {
   const dialogueIdRef = useRef(0);
   const fixedAnimationRequestRef = useRef(0);
   const [fixedAnimationRequest, setFixedAnimationRequest] = useState(0);
@@ -26,12 +26,14 @@ export function StudioWorld({ onBallFloorContact, onBallPlayerHit, restartKey }:
   const [serviceResolutions, setServiceResolutions] = useState<Record<string, boolean>>({});
   const [playerDialogue, setPlayerDialogue] = useState<DialogueMessage | null>(null);
   const [villainDialogue, setVillainDialogue] = useState<(DialogueMessage & { sectionName: string }) | null>(null);
+  const [transportDestination, setTransportDestination] = useState<TransportDestination | null>(null);
 
   useEffect(() => {
     setMovementLocked(false);
     setServiceResolutions({});
     setPlayerDialogue(null);
     setVillainDialogue(null);
+    setTransportDestination(null);
     resetSpeedBoost();
   }, [restartKey]);
 
@@ -49,13 +51,12 @@ export function StudioWorld({ onBallFloorContact, onBallPlayerHit, restartKey }:
       <SpaceSky />
       <Environment preset="warehouse" background={false} environmentIntensity={0.035} />
       <ModularTerrain radius={7} />
-      <LogoLightField />
-      <InteractiveBall
-        onFloorContact={onBallFloorContact}
-        onPlayerHit={onBallPlayerHit}
+      <LogoLightField
+        onCoinCollect={onCoinCollect}
+        onPenaltyCollect={onPenaltyCollect}
         restartKey={restartKey}
       />
-      <SpeedPowerUp restartKey={restartKey} />
+      <TransportPads onTransport={setTransportDestination} restartKey={restartKey} />
       <HubSections restartKey={restartKey} serviceResolutions={serviceResolutions} />
       <CombatPrototype
         restartKey={restartKey}
@@ -85,6 +86,7 @@ export function StudioWorld({ onBallFloorContact, onBallPlayerHit, restartKey }:
         movementLocked={movementLocked}
         onFixedAnimationComplete={() => setMovementLocked(false)}
         restartKey={restartKey}
+        transportDestination={transportDestination}
       />
     </>
   );

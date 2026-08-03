@@ -239,25 +239,6 @@ canvas {
   transform: translateX(-50%);
 }
 
-.ball-hit-counter {
-  position: fixed;
-  left: 50%;
-  top: max(18px, env(safe-area-inset-top));
-  z-index: 24;
-  min-width: 88px;
-  padding: 8px 13px;
-  border: 1px solid rgba(250, 204, 21, 0.32);
-  border-radius: 8px;
-  background: rgba(5, 7, 12, 0.72);
-  color: #facc15;
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 1;
-  pointer-events: none;
-  text-align: center;
-  transform: translateX(-50%);
-}
-
 .showcase-play-fallback {
   min-width: 170px;
   padding: 12px 18px;
@@ -276,14 +257,19 @@ canvas {
 
 .game-actions {
   position: fixed;
-  top: 18px;
-  left: 18px;
+  top: max(18px, env(safe-area-inset-top));
+  left: max(18px, env(safe-area-inset-left));
   z-index: 45;
   display: flex;
   gap: 8px;
+  align-items: center;
+  max-width: calc(100vw - max(36px, env(safe-area-inset-left) + env(safe-area-inset-right)));
 }
 
-.game-actions button {
+.game-actions button,
+.coins-counter {
+  box-sizing: border-box;
+  height: 30px;
   min-width: 76px;
   padding: 8px 11px;
   border: 1px solid rgba(245, 247, 251, 0.22);
@@ -296,6 +282,27 @@ canvas {
   font-size: 12px;
   font-weight: 700;
   line-height: 1;
+}
+
+.coins-counter {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  min-width: 50px;
+  padding: 6px 9px;
+  border-color: rgba(63, 125, 58, 0.5);
+  color: #3f7d3a;
+  pointer-events: none;
+}
+
+.coins-counter__icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  background: currentColor;
+  mask: url("/images/cltd-logo.svg") center / contain no-repeat;
+  -webkit-mask: url("/images/cltd-logo.svg") center / contain no-repeat;
 }
 
 .game-actions button:hover,

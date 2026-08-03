@@ -3,8 +3,9 @@ import { useEffect, useMemo, useRef } from "react";
 import { MeshStandardMaterial, Object3D, RingGeometry, Vector3 } from "three";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { hubSections } from "../hubSections";
+import { InteractiveMeshOutline } from "../InteractiveOutline";
+import { padVisualStyle } from "../padVisualStyle";
 
-const transportYellow = "#FFE600";
 const transportCooldownMs = 1200;
 const arrivalDistanceFromSection = 16;
 const transportRowZ = 1.5;
@@ -56,9 +57,9 @@ export function TransportPads({ onTransport, restartKey }: TransportPadsProps) {
   const resources = useMemo(() => {
     const geometry = new RingGeometry(0.65, 0.8, 40);
     const material = new MeshStandardMaterial({
-      color: transportYellow,
-      emissive: transportYellow,
-      emissiveIntensity: 0.55,
+      color: padVisualStyle.color,
+      emissive: padVisualStyle.color,
+      emissiveIntensity: padVisualStyle.emissiveIntensity,
       metalness: 0.05,
       roughness: 0.42,
       toneMapped: false,
@@ -150,9 +151,11 @@ function TransportPad({
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
-      <mesh geometry={geometry} material={material} rotation-x={-Math.PI / 2} />
+      <mesh geometry={geometry} material={material} rotation-x={-Math.PI / 2}>
+        <InteractiveMeshOutline />
+      </mesh>
       <BillboardLabel
-        color={transportYellow}
+        color={padVisualStyle.color}
         fontSize={label === "Site Improvement" ? 0.2 : 0.24}
         position={[0, 0.92, 0]}
         maxWidth={3}

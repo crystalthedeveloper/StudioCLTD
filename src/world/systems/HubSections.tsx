@@ -19,6 +19,8 @@ import {
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { gameTextFont } from "../../ui/textFont";
 import { hubSections, HubSection } from "../hubSections";
+import { InteractiveMeshOutline } from "../InteractiveOutline";
+import { padVisualStyle } from "../padVisualStyle";
 
 type HubSectionsProps = {
   restartKey: number;
@@ -35,7 +37,7 @@ const portalActivationCooldownMs = 900;
 const offersPageUrl = "https://www.crystalthedeveloper.ca/offers";
 const white = "#f5f7fb";
 const softWhite = "#d8dde8";
-const screenImageTint = "#c7c7c7";
+const screenImageTint = "#f0f0f0";
 const screenIdleColor = "#0b1018";
 const screenContentSize: [number, number] = [9.05, 4.62];
 const screenContentAspect = screenContentSize[0] / screenContentSize[1];
@@ -490,7 +492,7 @@ function SectionBillboard({
           <meshStandardMaterial
             color="#111827"
             emissive="#ffffff"
-            emissiveIntensity={isOffers ? 0.035 : 0.018}
+            emissiveIntensity={isOffers ? 0.07 : 0.045}
             metalness={0.2}
             roughness={0.48}
           />
@@ -1016,11 +1018,12 @@ function OfferPortalPad({
       />
       <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
         <torusGeometry args={[1, 0.026, 8, 48]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.56} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.68} depthWrite={false} toneMapped={false} />
+        <InteractiveMeshOutline />
       </mesh>
       <mesh ref={pulseRef} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false}>
         <ringGeometry args={[0.68, 1.05, 48]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       <BillboardLabel
         color={white}
@@ -1033,7 +1036,7 @@ function OfferPortalPad({
       </BillboardLabel>
       {countdownSeconds > 0 && (
         <BillboardLabel
-          color="#FFE600"
+          color={padVisualStyle.color}
           fontSize={0.2}
           position={[0, 1.48, 0]}
           maxWidth={3.2}
@@ -1152,11 +1155,12 @@ function ShowcasePortalPad({
       />
       <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
         <torusGeometry args={[1, 0.026, 8, 48]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.58} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.7} depthWrite={false} toneMapped={false} />
+        <InteractiveMeshOutline />
       </mesh>
       <mesh ref={pulseRef} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false}>
         <ringGeometry args={[0.68, 1.05, 48]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       <BillboardLabel color={white} fontSize={0.28} position={[0, 1.05, 0]} maxWidth={3} maxVisibleDistance={12}>
         {label}

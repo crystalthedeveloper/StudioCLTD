@@ -1,17 +1,12 @@
 import { useTexture } from "@react-three/drei";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
-import { LinearFilter, LinearMipmapLinearFilter, RepeatWrapping, SRGBColorSpace, Texture, Vector2 } from "three";
+import { LinearFilter, LinearMipmapLinearFilter, RepeatWrapping, SRGBColorSpace, Texture } from "three";
 
 type ModularTerrainProps = {
   radius: number;
 };
 
-const floorTexturePaths = [
-  "/images/optimized/floor/plaza-microcement-albedo.webp",
-  "/images/optimized/floor/plaza-microcement-normal.webp",
-  "/images/optimized/floor/plaza-microcement-roughness.webp",
-];
-const floorNormalScale = new Vector2(0.04, 0.04);
+const floorTexturePath = "/images/optimized/floor/plaza-sci-fi-panels.webp";
 
 function configureFloorTexture(texture: Texture, repeat: number) {
   texture.wrapS = RepeatWrapping;
@@ -24,12 +19,10 @@ function configureFloorTexture(texture: Texture, repeat: number) {
 
 export function ModularTerrain({ radius }: ModularTerrainProps) {
   const platformSize = radius * 20 + 10;
-  const [albedoMap, normalMap, roughnessMap] = useTexture(floorTexturePaths);
-  const textureRepeat = platformSize / 40;
+  const albedoMap = useTexture(floorTexturePath);
+  const textureRepeat = platformSize / 36;
 
   configureFloorTexture(albedoMap, textureRepeat);
-  configureFloorTexture(normalMap, textureRepeat);
-  configureFloorTexture(roughnessMap, textureRepeat);
   albedoMap.colorSpace = SRGBColorSpace;
 
   return (
@@ -45,13 +38,11 @@ export function ModularTerrain({ radius }: ModularTerrainProps) {
       <mesh rotation-x={-Math.PI / 2}>
         <planeGeometry args={[platformSize, platformSize, 1, 1]} />
         <meshStandardMaterial
+          color="#92969d"
           map={albedoMap}
-          normalMap={normalMap}
-          normalScale={floorNormalScale}
-          roughnessMap={roughnessMap}
-          roughness={1}
-          metalness={0}
-          envMapIntensity={0.18}
+          roughness={0.74}
+          metalness={0.22}
+          envMapIntensity={0.12}
         />
       </mesh>
     </group>

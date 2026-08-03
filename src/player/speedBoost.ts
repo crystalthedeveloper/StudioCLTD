@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-const boostDurationMs = 10000;
+export const speedBoostDurationMs = 10000;
 let activeUntil = 0;
 let endTimeout: number | null = null;
 const subscribers = new Set<() => void>();
@@ -25,7 +25,7 @@ export function getSpeedBoostRemainingMs() {
 }
 
 export function activateSpeedBoost() {
-  activeUntil = Date.now() + boostDurationMs;
+  activeUntil = Date.now() + speedBoostDurationMs;
 
   if (endTimeout !== null) {
     window.clearTimeout(endTimeout);
@@ -35,7 +35,7 @@ export function activateSpeedBoost() {
     activeUntil = 0;
     endTimeout = null;
     emitSpeedBoostChange();
-  }, boostDurationMs);
+  }, speedBoostDurationMs);
 
   emitSpeedBoostChange();
 }
@@ -51,13 +51,12 @@ export function resetSpeedBoost() {
   emitSpeedBoostChange();
 }
 
-export function useSpeedBoostRemainingSeconds() {
-  const [remainingSeconds, setRemainingSeconds] = useState(() => Math.ceil(getSpeedBoostRemainingMs() / 1000));
+export function useSpeedBoostRemainingMs() {
+  const [remainingMs, setRemainingMs] = useState(getSpeedBoostRemainingMs);
 
   useEffect(() => {
-    const update = () => setRemainingSeconds(Math.ceil(getSpeedBoostRemainingMs() / 1000));
-    const interval = window.setInterval(update, 200);
-
+    const update = () => setRemainingMs(getSpeedBoostRemainingMs());
+    const interval = window.setInterval(update, 100);
     const unsubscribe = subscribeSpeedBoostChange(update);
     update();
 
@@ -67,5 +66,5 @@ export function useSpeedBoostRemainingSeconds() {
     };
   }, []);
 
-  return remainingSeconds;
+  return remainingMs;
 }

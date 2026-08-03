@@ -11,6 +11,7 @@ import {
 } from "../characters/characterMaterials";
 import { DialogueBubble, DialogueMessage } from "../ui/DialogueBubble";
 import { playerWorldState } from "../world/playerWorldState";
+import { InteractiveOutline } from "../world/InteractiveOutline";
 
 export type VillainStatus = "idle" | "running" | "dead";
 
@@ -18,6 +19,7 @@ type VillainCharacterProps = {
   basePosition: Vector3;
   dialogue: DialogueMessage | null;
   dialogueVariant?: "default" | "danger";
+  outlineEnabled?: boolean;
   villainStatus: VillainStatus;
 };
 
@@ -30,6 +32,7 @@ const lookDirection = new Vector3();
 const rotationDamping = 5.5;
 const modelFacingOffset = 0;
 const modelYOffset = 0.28;
+const villainMaterialTuningVersion = 2;
 
 type HighlightableMaterial = Material & {
   color?: Color;
@@ -48,7 +51,7 @@ function fadeOutOtherActions(actions: Record<string, AnimationAction | null>, ac
   });
 }
 
-export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "danger", villainStatus }: VillainCharacterProps) {
+export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "danger", outlineEnabled = false, villainStatus }: VillainCharacterProps) {
   const model = useGLTF("/characters/char-optimized.glb", false, true);
   const scene = useMemo(() => SkeletonUtils.clone(model.scene), [model.scene]);
   const rootRef = useRef<Group>(null);
@@ -63,6 +66,7 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
       if (object instanceof Mesh) {
         object.castShadow = false;
         object.receiveShadow = false;
+        object.layers.enable(1);
       }
     });
 
@@ -128,8 +132,8 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
             position={dialogueVariant === "danger" ? [0, 3.75, 0] : [0, 3.25, 0]}
             variant={dialogueVariant}
           />
-          <pointLight color="#fff0dc" intensity={0.44} distance={2.5} decay={2} position={[0, 1.88, 0.16]} castShadow={false} />
           <primitive object={scene} scale={1.16} />
+          {outlineEnabled && <InteractiveOutline object={scene} />}
         </group>
       </group>
     </RigidBody>
@@ -150,31 +154,30 @@ function findVillainSuitMaterial(root: Object3D) {
 }
 
 function enhanceVillainSuitMaterial(material: Material | null | undefined) {
-  if (!material || material.userData.villainVisibilityEnhanced) return;
+  if (!material || material.userData.villainMaterialTuningVersion === villainMaterialTuningVersion) return;
 
   const suitMaterial = material as HighlightableMaterial;
 
-  if (suitMaterial.color) {
-    suitMaterial.color.lerp(new Color("#ffffff"), 0.07);
-  }
+  // Preserve the villain artwork baked into the GLB texture without tinting it.
+  if (suitMaterial.color) suitMaterial.color.set("#ffffff");
 
   if (suitMaterial.emissive) {
-    suitMaterial.emissive.set("#15100c");
-    suitMaterial.emissiveIntensity = Math.max(suitMaterial.emissiveIntensity ?? 0, 0.09);
+    suitMaterial.emissive.set("#050505");
+    suitMaterial.emissiveIntensity = 0.06;
   }
 
   if (typeof suitMaterial.envMapIntensity === "number") {
-    suitMaterial.envMapIntensity = Math.max(suitMaterial.envMapIntensity, 1.25);
+    suitMaterial.envMapIntensity = 0.2;
   }
 
   if (typeof suitMaterial.roughness === "number") {
-    suitMaterial.roughness = Math.min(suitMaterial.roughness, 0.54);
+    suitMaterial.roughness = 0.8;
   }
 
   if (typeof suitMaterial.metalness === "number") {
-    suitMaterial.metalness = Math.max(suitMaterial.metalness, 0.1);
+    suitMaterial.metalness = 0.15;
   }
 
   suitMaterial.needsUpdate = true;
-  suitMaterial.userData.villainVisibilityEnhanced = true;
+  suitMaterial.userData.villainMaterialTuningVersion = villainMaterialTuningVersion;
 }

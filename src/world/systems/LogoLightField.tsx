@@ -3,6 +3,7 @@ import { BallCollider, IntersectionEnterPayload, RigidBody } from "@react-three/
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Color, Group, Mesh, MeshStandardMaterial, Object3D } from "three";
 import { activateSpeedBoost } from "../../player/speedBoost";
+import { InteractiveOutline } from "../InteractiveOutline";
 
 const logoPath = "/logo/logo-optimized.glb";
 const logoScale = 1.8;
@@ -65,7 +66,7 @@ function createSharedMaterial(kind: LogoKind) {
   return new MeshStandardMaterial({
     color,
     emissive: color,
-    emissiveIntensity: kind === "light" ? 1.35 : 0.72,
+    emissiveIntensity: kind === "light" ? 1.5 : kind === "coin" ? 1 : 0.88,
     metalness: 0.08,
     roughness: 0.38,
     toneMapped: false,
@@ -197,12 +198,15 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
 
   const position: [number, number, number] = [logo.position[0], floorLogoY, logo.position[1]];
   const visual = (
-    <primitive
-      object={logo.object}
-      rotation={[0, worldLogoRotation + (logo.rotationOffset ?? 0), 0]}
-      scale={logoScale * (logo.scaleMultiplier ?? 1)}
-      dispose={null}
-    />
+    <>
+      <primitive
+        object={logo.object}
+        rotation={[0, worldLogoRotation + (logo.rotationOffset ?? 0), 0]}
+        scale={logoScale * (logo.scaleMultiplier ?? 1)}
+        dispose={null}
+      />
+      {logo.kind !== "light" && <InteractiveOutline object={logo.object} />}
+    </>
   );
 
   if (logo.kind === "light") {

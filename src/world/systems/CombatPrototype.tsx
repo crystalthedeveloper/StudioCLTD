@@ -9,6 +9,8 @@ import { gameTextFont } from "../../ui/textFont";
 import { VillainCharacter, VillainStatus } from "../../villain/VillainCharacter";
 import { hubSections } from "../hubSections";
 import { playerWorldState } from "../playerWorldState";
+import { InteractiveMeshOutline } from "../InteractiveOutline";
+import { padVisualStyle } from "../padVisualStyle";
 
 const cooldownMs = 1800;
 const triggerPadRadius = 1.33;
@@ -310,6 +312,7 @@ function SectionPortalEncounter({
         <VillainCharacter
           basePosition={encounter.villainPosition}
           dialogue={villainCharacterDialogue}
+          outlineEnabled
           villainStatus={villainStatus}
         />
       )}
@@ -449,7 +452,7 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
       ringRef.current.scale.setScalar(pulse);
       const material = ringRef.current.material;
       if (material instanceof MeshBasicMaterial) {
-        material.color.set("#ffffff");
+        material.color.set(padVisualStyle.color);
         material.opacity = glow;
       }
     }
@@ -459,7 +462,7 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
       pulseRef.current.scale.setScalar(1.05 + activationGlow * 0.2);
       const material = pulseRef.current.material;
       if (material instanceof MeshBasicMaterial) {
-        material.color.set("#ffffff");
+        material.color.set(padVisualStyle.color);
         material.opacity = activationGlow * 0.17;
       }
     }
@@ -476,11 +479,12 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
       />
       <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]}>
         <torusGeometry args={[1.3, 0.03, 8, 64]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.54} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.66} depthWrite={false} toneMapped={false} />
+        <InteractiveMeshOutline />
       </mesh>
       <mesh ref={pulseRef} rotation-x={-Math.PI / 2} position={[0, 0.05, 0]} visible={false}>
         <ringGeometry args={[0.86, 1.32, 64]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       {label && (
         <BillboardLabel

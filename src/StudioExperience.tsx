@@ -6,10 +6,11 @@ import { ACESFilmicToneMapping, SRGBColorSpace } from "three";
 import { isTrackpadCameraInputBlocked } from "./player/cameraInputGuard";
 import { setGameFocused, useGameFocus } from "./player/gameFocus";
 import { HubOverlay } from "./ui/HubOverlay";
-import { SpeedBoostHud } from "./ui/SpeedBoostHud";
+import { GameHud } from "./ui/GameHud";
 import { TrackpadControl } from "./ui/TrackpadControl";
 import { StudioWorld } from "./world/StudioWorld";
 import { preloadScreenTextures, unlockShowcaseVideoPlayback } from "./world/systems/HubSections";
+import { distanceFog } from "./world/distanceFog";
 
 type StudioExperienceProps = {
   onOpenWebsite: () => void;
@@ -145,7 +146,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
             outputColorSpace: SRGBColorSpace,
             powerPreference: "high-performance",
             toneMapping: ACESFilmicToneMapping,
-            toneMappingExposure: 0.96,
+            toneMappingExposure: 1.04,
           }}
           camera={{ position: [11, 7, 15], fov: 58, near: 0.1, far: 10000 }}
           onPointerDown={focusGame}
@@ -158,8 +159,8 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
             gl.shadowMap.enabled = false;
           }}
         >
-          <color attach="background" args={["#03040a"]} />
-          <fog attach="fog" args={["#15182b", 58, 260]} />
+          <color attach="background" args={["#070916"]} />
+          <fog attach="fog" args={[distanceFog.color, distanceFog.near, distanceFog.far]} />
           <Suspense fallback={null}>
             <Physics gravity={[0, -20, 0]}>
               <StudioWorld
@@ -172,22 +173,8 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         </Canvas>
       </div>
       <StartupProgress onProgress={onLoadProgress} onReady={onReady} screenAssetsReady={screenAssetsReady} />
-      <div className="game-actions">
-        <button type="button" onClick={onRestart}>
-          Restart
-        </button>
-        <button type="button" onClick={onOpenWebsite}>
-          My Site
-        </button>
-        {coins > 0 && (
-          <div className="coins-counter" aria-label={`${coins} coins`} aria-live="polite">
-            <span className="coins-counter__icon" aria-hidden="true" />
-            <span>{coins}</span>
-          </div>
-        )}
-      </div>
+      <GameHud onOpenWebsite={onOpenWebsite} onRestart={onRestart} points={coins} />
       <HubOverlay />
-      <SpeedBoostHud />
       <div className={`game-focus-hint${gameFocused ? "" : " game-focus-hint--visible"}`}>
         <strong>Click to Play</strong>
         <span>Press ESC to exit</span>

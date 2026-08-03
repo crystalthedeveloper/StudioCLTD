@@ -12,6 +12,7 @@ import {
 import { DialogueBubble, DialogueMessage } from "../ui/DialogueBubble";
 import { isSpeedBoostActive, subscribeSpeedBoostChange } from "./speedBoost";
 import { CharacterAnimationState } from "./playerTypes";
+import { InteractiveOutline } from "../world/InteractiveOutline";
 
 type PlayerCharacterProps = {
   animationStateRef: MutableRefObject<CharacterAnimationState>;
@@ -26,6 +27,7 @@ const playerAnimationByState: Record<CharacterAnimationState, string> = {
   run: "runH",
 };
 const playerPoweredMaterialName = "HWhiteClown_material";
+const playerMaterialTuningVersion = 2;
 
 type PlayerMaterialSlot = {
   index: number | null;
@@ -82,6 +84,7 @@ export function PlayerCharacter({
       if (object instanceof Mesh) {
         object.castShadow = false;
         object.receiveShadow = false;
+        object.layers.enable(1);
       }
     });
 
@@ -229,8 +232,8 @@ export function PlayerCharacter({
   return (
     <group ref={group}>
       <DialogueBubble message={dialogue} position={[0, 2.65, 0]} />
-      <pointLight color="#fff2dc" intensity={0.5} distance={2.6} decay={2} position={[0, 1.72, 0.18]} castShadow={false} />
       <primitive object={scene} rotation-y={Math.PI} scale={1.05} />
+      <InteractiveOutline object={scene} />
     </group>
   );
 }
@@ -271,31 +274,31 @@ function collectBodyMaterialSlots(root: Object3D) {
 }
 
 function enhancePlayerSuitMaterial(material: Material) {
-  if (material.userData.playerVisibilityEnhanced) return;
+  if (material.userData.playerMaterialTuningVersion === playerMaterialTuningVersion) return;
 
   const suitMaterial = material as HighlightableMaterial;
 
-  if (suitMaterial.color) {
-    suitMaterial.color.lerp(new Color("#ffffff"), 0.08);
-  }
+  // The embedded outfit textures provide the black suit and variant artwork.
+  // Keep their neutral white multiplier so default/Fix/Speed swaps stay visible.
+  if (suitMaterial.color) suitMaterial.color.set("#ffffff");
 
   if (suitMaterial.emissive) {
-    suitMaterial.emissive.set("#15120c");
-    suitMaterial.emissiveIntensity = Math.max(suitMaterial.emissiveIntensity ?? 0, 0.1);
+    suitMaterial.emissive.set("#050505");
+    suitMaterial.emissiveIntensity = 0.06;
   }
 
   if (typeof suitMaterial.envMapIntensity === "number") {
-    suitMaterial.envMapIntensity = Math.max(suitMaterial.envMapIntensity, 1.3);
+    suitMaterial.envMapIntensity = 0.2;
   }
 
   if (typeof suitMaterial.roughness === "number") {
-    suitMaterial.roughness = Math.min(suitMaterial.roughness, 0.52);
+    suitMaterial.roughness = 0.8;
   }
 
   if (typeof suitMaterial.metalness === "number") {
-    suitMaterial.metalness = Math.max(suitMaterial.metalness, 0.1);
+    suitMaterial.metalness = 0.15;
   }
 
   suitMaterial.needsUpdate = true;
-  suitMaterial.userData.playerVisibilityEnhanced = true;
+  suitMaterial.userData.playerMaterialTuningVersion = playerMaterialTuningVersion;
 }

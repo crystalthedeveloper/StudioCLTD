@@ -35,15 +35,14 @@ const serviceInfoText: Record<string, string> = {
     "Broken images can make your website look untrustworthy fast.\n\nWhen key visuals do not load, visitors may leave before they understand your business.\n\nI help fix urgent website issues quickly so your site looks reliable again.",
   performance:
     "A slow website can cost you visitors before they even contact you.\n\nImproving performance helps pages load faster, feel smoother, and support better SEO.\n\nI help optimize websites so users get a faster, cleaner experience.",
-  "site-improvement":
-    "A broken slider can make your website feel unfinished.\n\nVisitors should be able to browse your content without glitches or frustration.\n\nI help improve website layouts, interactions, and user experience so your site feels polished and professional.",
+  "site-improvement": "Contact forms should just work.\n\nFailed submissions and missing emails can cost you customers.\n\nI fix forms so every message gets delivered.",
 };
 
 const villainDialogueText: Record<string, string> = {
   "quick-fix": "😈 Broken Button!",
   "urgent-fix": "😈 Broken Images!",
   performance: "😈 Poor PageSpeed",
-  "site-improvement": "😈 Broken Slider",
+  "site-improvement": "😈 Contact Form Broken",
 };
 
 type SectionEncounterConfig = {

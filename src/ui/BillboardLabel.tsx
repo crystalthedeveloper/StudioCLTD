@@ -10,6 +10,7 @@ const parentQuaternion = new Quaternion();
 const inverseParentQuaternion = new Quaternion();
 const targetQuaternion = new Quaternion();
 const yawEuler = new Euler(0, 0, 0, "YXZ");
+const labelVisibilityBuffer = 2.5;
 
 type BillboardLabelProps = {
   children: ReactNode;
@@ -31,28 +32,31 @@ export function BillboardLabel({
   position = [0, 1.05, 0],
 }: BillboardLabelProps) {
   const groupRef = useRef<Group>(null);
-  const lastUpdateRef = useRef(0);
+  const lastDistanceCheckRef = useRef(-Infinity);
   const visibleRef = useRef(maxVisibleDistance === undefined);
 
   useFrame(({ camera, clock }) => {
-    const updateInterval = visibleRef.current ? 0.1 : 0.35;
-    if (clock.elapsedTime - lastUpdateRef.current < updateInterval) return;
-    lastUpdateRef.current = clock.elapsedTime;
-
     const group = groupRef.current;
     if (!group) return;
 
-    group.getWorldPosition(worldPosition);
     if (maxVisibleDistance !== undefined) {
-      const deltaX = playerWorldState.position.x - worldPosition.x;
-      const deltaY = playerWorldState.position.y - worldPosition.y;
-      const deltaZ = playerWorldState.position.z - worldPosition.z;
-      const visible = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ <= maxVisibleDistance * maxVisibleDistance;
-      visibleRef.current = visible;
-      group.visible = visible;
-      if (!visible) return;
+      const checkInterval = visibleRef.current ? 0.2 : 0.35;
+      if (clock.elapsedTime - lastDistanceCheckRef.current >= checkInterval) {
+        lastDistanceCheckRef.current = clock.elapsedTime;
+        group.getWorldPosition(worldPosition);
+        const deltaX = playerWorldState.position.x - worldPosition.x;
+        const deltaY = playerWorldState.position.y - worldPosition.y;
+        const deltaZ = playerWorldState.position.z - worldPosition.z;
+        const threshold = visibleRef.current ? maxVisibleDistance + labelVisibilityBuffer : maxVisibleDistance;
+        const visible = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ <= threshold * threshold;
+        visibleRef.current = visible;
+        group.visible = visible;
+      }
+
+      if (!visibleRef.current) return;
     }
 
+    group.getWorldPosition(worldPosition);
     const yaw = Math.atan2(camera.position.x - worldPosition.x, camera.position.z - worldPosition.z);
     yawEuler.set(0, yaw, 0);
     targetQuaternion.setFromEuler(yawEuler);

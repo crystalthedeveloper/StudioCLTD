@@ -56,7 +56,7 @@ const serviceScreenImages: Record<string, { bad: string; good: string }> = {
     good: "/images/optimized/performance/performance-good.webp",
   },
   "site-improvement": {
-    bad: "/images/optimized/siteImprovement/site-improvement-bad.jpg",
+    bad: "/images/optimized/siteImprovement/site-improvement-bad.webp",
     good: "/images/optimized/siteImprovement/site-improvement-good.webp",
   },
 };

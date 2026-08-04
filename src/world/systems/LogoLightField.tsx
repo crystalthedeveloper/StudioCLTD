@@ -1,12 +1,17 @@
 import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { BallCollider, IntersectionEnterPayload, IntersectionExitPayload, RigidBody } from "@react-three/rapier";
+import {
+  BallCollider,
+  IntersectionEnterPayload,
+  IntersectionExitPayload,
+  RapierCollider,
+  RigidBody,
+} from "@react-three/rapier";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Color, Group, Mesh, MeshStandardMaterial, Object3D } from "three";
 import { activateSpeedBoost } from "../../player/speedBoost";
 import { InteractiveOutline } from "../InteractiveOutline";
 import { BillboardLabel } from "../../ui/BillboardLabel";
-import { playerWorldState } from "../playerWorldState";
 
 const logoPath = "/logo/logo-optimized.glb";
 const logoScale = 1.8;
@@ -14,11 +19,6 @@ const floorLogoY = 0.04;
 const worldLogoRotation = -0.35;
 const pickupColliderRadius = 1.55;
 const speedRespawnMs = 28000;
-const coinRespawnMinMs = 5000;
-const coinRespawnMaxMs = 10000;
-const coinMinPlayerDistance = 12;
-const coinRespawnRetryMs = 500;
-const activeCoinPoolSize = 12;
 const contactCountdownMs = 3000;
 const contactCooldownMs = 1200;
 const contactUrl = "https://www.crystalthedeveloper.ca/contact";
@@ -142,12 +142,7 @@ export function LogoLightField({ onCoinCollect, onPenaltyCollect, restartKey }: 
 
   return (
     <group name="PlazaLogoSystem">
-      <CoinLogoPool
-        logos={logos.filter((logo) => logo.kind === "coin")}
-        onCollect={onCoinCollect}
-        restartKey={restartKey}
-      />
-      {logos.filter((logo) => logo.kind !== "coin").map((logo) => (
+      {logos.map((logo) => (
         <PlazaLogoInstance
           key={logo.id}
           logo={logo}
@@ -167,160 +162,11 @@ type PlazaLogoInstanceProps = {
   restartKey: number;
 };
 
-type RuntimeLogo = PlazaLogo & { object: Object3D };
-
-type CoinSlot = {
-  active: boolean;
-  positionIndex: number;
-};
-
-function CoinLogoPool({
-  logos,
-  onCollect,
-  restartKey,
-}: {
-  logos: RuntimeLogo[];
-  onCollect: () => void;
-  restartKey: number;
-}) {
-  const poolLogos = useMemo(() => logos.slice(0, activeCoinPoolSize), [logos]);
-  const createInitialSlots = useCallback(
-    (): CoinSlot[] => poolLogos.map((_, positionIndex) => ({ active: true, positionIndex })),
-    [poolLogos],
-  );
-  const [slots, setSlots] = useState<CoinSlot[]>(createInitialSlots);
-  const slotsRef = useRef(slots);
-  const respawnTimersRef = useRef<Array<number | null>>(poolLogos.map(() => null));
-
-  const updateSlots = useCallback((nextSlots: CoinSlot[]) => {
-    slotsRef.current = nextSlots;
-    setSlots(nextSlots);
-  }, []);
-
-  const clearRespawnTimers = useCallback(() => {
-    respawnTimersRef.current.forEach((timer) => {
-      if (timer !== null) window.clearTimeout(timer);
-    });
-    respawnTimersRef.current = poolLogos.map(() => null);
-  }, [poolLogos]);
-
-  useEffect(() => {
-    clearRespawnTimers();
-    updateSlots(createInitialSlots());
-    return clearRespawnTimers;
-  }, [clearRespawnTimers, createInitialSlots, restartKey, updateSlots]);
-
-  const scheduleRespawn = useCallback(
-    (slotIndex: number, delayMs: number) => {
-      respawnTimersRef.current[slotIndex] = window.setTimeout(() => {
-        const occupiedPositions = new Set(
-          slotsRef.current.filter((slot) => slot.active).map((slot) => slot.positionIndex),
-        );
-        const candidates = logos
-          .map((logo, positionIndex) => ({ logo, positionIndex }))
-          .filter(({ logo, positionIndex }) => {
-            if (occupiedPositions.has(positionIndex)) return false;
-            const dx = logo.position[0] - playerWorldState.position.x;
-            const dz = logo.position[1] - playerWorldState.position.z;
-            return dx * dx + dz * dz >= coinMinPlayerDistance * coinMinPlayerDistance;
-          });
-
-        if (candidates.length === 0) {
-          scheduleRespawn(slotIndex, coinRespawnRetryMs);
-          return;
-        }
-
-        const selected = candidates[Math.floor(Math.random() * candidates.length)];
-        const nextSlots = slotsRef.current.map((slot, index) =>
-          index === slotIndex ? { active: true, positionIndex: selected.positionIndex } : slot,
-        );
-        respawnTimersRef.current[slotIndex] = null;
-        updateSlots(nextSlots);
-      }, delayMs);
-    },
-    [logos, updateSlots],
-  );
-
-  const collect = useCallback(
-    (slotIndex: number) => {
-      if (!slotsRef.current[slotIndex]?.active) return;
-
-      const nextSlots = slotsRef.current.map((slot, index) =>
-        index === slotIndex ? { ...slot, active: false } : slot,
-      );
-      updateSlots(nextSlots);
-      onCollect();
-      const delayMs = coinRespawnMinMs + Math.random() * (coinRespawnMaxMs - coinRespawnMinMs);
-      scheduleRespawn(slotIndex, delayMs);
-    },
-    [onCollect, scheduleRespawn, updateSlots],
-  );
-
-  return (
-    <group name="GreenLogoPool">
-      {poolLogos.map((logo, slotIndex) => {
-        const slot = slots[slotIndex];
-        const spawn = logos[slot.positionIndex];
-        return (
-          <CoinLogoInstance
-            key={logo.id}
-            active={slot.active}
-            logo={logo}
-            onCollect={() => collect(slotIndex)}
-            position={spawn.position}
-          />
-        );
-      })}
-    </group>
-  );
-}
-
-function CoinLogoInstance({
-  active,
-  logo,
-  onCollect,
-  position,
-}: {
-  active: boolean;
-  logo: RuntimeLogo;
-  onCollect: () => void;
-  position: readonly [number, number];
-}) {
-  const handleCollect = useCallback(
-    ({ other }: IntersectionEnterPayload) => {
-      if (active && other.rigidBodyObject?.name === "StudioCLTDPlayer") onCollect();
-    },
-    [active, onCollect],
-  );
-
-  if (!active) return null;
-
-  return (
-    <RigidBody
-      type="fixed"
-      colliders={false}
-      position={[position[0], floorLogoY, position[1]]}
-      name={`PlazaLogo:${logo.id}`}
-    >
-      <BallCollider
-        args={[pickupColliderRadius]}
-        position={[0, 0.65, 0]}
-        sensor
-        onIntersectionEnter={handleCollect}
-      />
-      <primitive
-        object={logo.object}
-        rotation={[0, worldLogoRotation + (logo.rotationOffset ?? 0), 0]}
-        scale={logoScale * (logo.scaleMultiplier ?? 1)}
-        dispose={null}
-      />
-      <InteractiveOutline object={logo.object} />
-    </RigidBody>
-  );
-}
-
 function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }: PlazaLogoInstanceProps) {
   const [available, setAvailable] = useState(true);
+  const availableRef = useRef(true);
+  const collectedRef = useRef(false);
+  const colliderRef = useRef<RapierCollider>(null);
   const respawnTimerRef = useRef<number | null>(null);
   const contactIntervalRef = useRef<number | null>(null);
   const contactOpenTimerRef = useRef<number | null>(null);
@@ -380,6 +226,9 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
     contactOpenedRef.current = false;
     contactCooldownUntilRef.current = 0;
     setContactCountdown(0);
+    availableRef.current = true;
+    collectedRef.current = false;
+    logo.object.visible = true;
     setAvailable(true);
 
     return () => {
@@ -389,41 +238,63 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
       }
       clearContactTimers();
     };
-  }, [clearContactTimers, restartKey]);
+  }, [clearContactTimers, logo.object, restartKey]);
+
+  const collectAndRespawn = useCallback(
+    (reward: () => void) => {
+      collectedRef.current = true;
+      availableRef.current = false;
+      colliderRef.current?.setEnabled(false);
+      logo.object.visible = false;
+      setAvailable(false);
+      reward();
+
+      respawnTimerRef.current = window.setTimeout(() => {
+        respawnTimerRef.current = null;
+        collectedRef.current = false;
+        availableRef.current = true;
+        logo.object.visible = true;
+        setAvailable(true);
+      }, speedRespawnMs);
+    },
+    [logo.object],
+  );
 
   const collect = useCallback(
-    ({ other }: IntersectionExitPayload) => {
-      if (!available || other.rigidBodyObject?.name !== "StudioCLTDPlayer") return;
+    ({ other }: IntersectionEnterPayload) => {
+      if (
+        !availableRef.current ||
+        collectedRef.current ||
+        other.rigidBodyObject?.name !== "StudioCLTDPlayer"
+      ) return;
 
       if (logo.kind === "coin") {
-        setAvailable(false);
-        onCoinCollect();
+        collectAndRespawn(onCoinCollect);
         return;
       }
 
       if (logo.kind === "penalty") {
+        collectedRef.current = true;
+        availableRef.current = false;
+        colliderRef.current?.setEnabled(false);
+        logo.object.visible = false;
         setAvailable(false);
         onPenaltyCollect();
         return;
       }
 
       if (logo.kind === "speed") {
-        setAvailable(false);
-        activateSpeedBoost();
-        respawnTimerRef.current = window.setTimeout(() => {
-          respawnTimerRef.current = null;
-          setAvailable(true);
-        }, speedRespawnMs);
+        collectAndRespawn(activateSpeedBoost);
         return;
       }
 
       if (logo.kind === "contact") startContactCountdown();
     },
-    [available, logo.kind, onCoinCollect, onPenaltyCollect, startContactCountdown],
+    [collectAndRespawn, logo.kind, logo.object, onCoinCollect, onPenaltyCollect, startContactCountdown],
   );
 
   const handleExit = useCallback(
-    ({ other }: IntersectionEnterPayload) => {
+    ({ other }: IntersectionExitPayload) => {
       if (logo.kind !== "contact" || other.rigidBodyObject?.name !== "StudioCLTDPlayer") return;
       cancelContactCountdown();
     },
@@ -459,6 +330,7 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
   return (
     <RigidBody type="fixed" colliders={false} position={position} name={`PlazaLogo:${logo.id}`}>
       <BallCollider
+        ref={colliderRef}
         args={[pickupColliderRadius]}
         position={[0, 0.65, 0]}
         sensor

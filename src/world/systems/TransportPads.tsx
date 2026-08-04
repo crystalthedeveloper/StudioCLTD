@@ -87,14 +87,14 @@ export function TransportPads({ onTransport, restartKey }: TransportPadsProps) {
     lastTransportAtRef.current = now;
 
     const sectionPosition = new Vector3(...section.position);
-    const towardCenter = sectionPosition.clone().multiplyScalar(-1).normalize();
+    const towardCenter = new Vector3(-sectionPosition.x, 0, -sectionPosition.z).normalize();
     const arrival = sectionPosition.clone().addScaledVector(towardCenter, arrivalDistanceFromSection);
     const towardSection = sectionPosition.clone().sub(arrival).normalize();
     transportIdRef.current += 1;
 
     onTransport({
       id: transportIdRef.current,
-      position: [arrival.x, 2.2, arrival.z],
+      position: [arrival.x, section.position[1] + 2.2, arrival.z],
       yaw: Math.atan2(-towardSection.x, -towardSection.z),
     });
   };

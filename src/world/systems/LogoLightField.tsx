@@ -12,6 +12,7 @@ import { Color, Group, Mesh, MeshStandardMaterial, Object3D } from "three";
 import { activateSpeedBoost } from "../../player/speedBoost";
 import { InteractiveOutline } from "../InteractiveOutline";
 import { BillboardLabel } from "../../ui/BillboardLabel";
+import { hubSections } from "../hubSections";
 
 const logoPath = "/logo/logo-optimized.glb";
 const logoScale = 1.8;
@@ -22,6 +23,16 @@ const speedRespawnMs = 28000;
 const contactCountdownMs = 3000;
 const contactCooldownMs = 1200;
 const contactUrl = "https://www.crystalthedeveloper.ca/contact";
+const destinationPlatformRadius = 14;
+const platformClearance = 2.4;
+const bridgeStartRadius = 24;
+const bridgeHalfWidth = 2.1;
+const bridgeClearance = 2.5;
+const transportPadClearance = 3.8;
+const collectibleSpacing = 5;
+const placementSearchStep = 1.25;
+const placementSearchDirections = 32;
+const placementWorldLimit = 68;
 
 type LogoKind = "coin" | "speed" | "penalty" | "contact" | "light";
 
@@ -65,6 +76,81 @@ const plazaLogos: PlazaLogo[] = [
   { id: "penalty-center-1", kind: "penalty", position: [-25, -8], rotationOffset: -0.15, scaleMultiplier: 1.04 },
   { id: "contact", kind: "contact", position: [0, 18], rotationOffset: 0.08, scaleMultiplier: 1.06 },
 ];
+
+const transportPadPositions = Array.from({ length: 8 }, (_, index) => [index * 4.5 - 15.75, 1.5] as const);
+
+function distanceToSegment(
+  x: number,
+  z: number,
+  startX: number,
+  startZ: number,
+  endX: number,
+  endZ: number,
+) {
+  const segmentX = endX - startX;
+  const segmentZ = endZ - startZ;
+  const segmentLengthSq = segmentX * segmentX + segmentZ * segmentZ;
+  const projection = segmentLengthSq === 0
+    ? 0
+    : Math.max(0, Math.min(1, ((x - startX) * segmentX + (z - startZ) * segmentZ) / segmentLengthSq));
+  return Math.hypot(x - (startX + segmentX * projection), z - (startZ + segmentZ * projection));
+}
+
+function isOpenCollectiblePosition(position: readonly [number, number], placed: readonly PlazaLogo[]) {
+  const [x, z] = position;
+  if (Math.hypot(x, z) > placementWorldLimit) return false;
+
+  for (const section of hubSections) {
+    const [sectionX, , sectionZ] = section.position;
+    if (Math.hypot(x - sectionX, z - sectionZ) < destinationPlatformRadius + platformClearance) return false;
+
+    const sectionDistance = Math.hypot(sectionX, sectionZ);
+    const directionX = sectionX / sectionDistance;
+    const directionZ = sectionZ / sectionDistance;
+    const bridgeEndRadius = sectionDistance - destinationPlatformRadius + 1.2;
+    const bridgeDistance = distanceToSegment(
+      x,
+      z,
+      directionX * bridgeStartRadius,
+      directionZ * bridgeStartRadius,
+      directionX * bridgeEndRadius,
+      directionZ * bridgeEndRadius,
+    );
+    if (bridgeDistance < bridgeHalfWidth + bridgeClearance) return false;
+  }
+
+  if (transportPadPositions.some(([padX, padZ]) => Math.hypot(x - padX, z - padZ) < transportPadClearance)) {
+    return false;
+  }
+
+  return placed.every((logo) => Math.hypot(x - logo.position[0], z - logo.position[1]) >= collectibleSpacing);
+}
+
+function findNearestOpenPosition(position: readonly [number, number], placed: readonly PlazaLogo[]) {
+  if (isOpenCollectiblePosition(position, placed)) return position;
+
+  for (let radius = placementSearchStep; radius <= 36; radius += placementSearchStep) {
+    for (let index = 0; index < placementSearchDirections; index += 1) {
+      const angle = (index / placementSearchDirections) * Math.PI * 2;
+      const candidate = [
+        position[0] + Math.cos(angle) * radius,
+        position[1] + Math.sin(angle) * radius,
+      ] as const;
+      if (isOpenCollectiblePosition(candidate, placed)) return candidate;
+    }
+  }
+
+  throw new Error(`No accessible collectible position found near ${position[0]}, ${position[1]}`);
+}
+
+function resolveLogoPlacements(logos: readonly PlazaLogo[]) {
+  return logos.reduce<PlazaLogo[]>((placed, logo) => {
+    placed.push({ ...logo, position: findNearestOpenPosition(logo.position, placed) });
+    return placed;
+  }, []);
+}
+
+const accessiblePlazaLogos = resolveLogoPlacements(plazaLogos);
 
 const logoColors: Record<LogoKind, string> = {
   coin: "#3f7d3a",
@@ -131,7 +217,7 @@ export function LogoLightField({ onCoinCollect, onPenaltyCollect, restartKey }: 
 
   const logos = useMemo(
     () =>
-      plazaLogos.map((logo) => ({
+      accessiblePlazaLogos.map((logo) => ({
         ...logo,
         object: templates[logo.kind].clone(true),
       })),

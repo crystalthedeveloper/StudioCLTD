@@ -22,11 +22,10 @@ const dialogueVillainRadiusSq = dialogueVillainRadius * dialogueVillainRadius;
 const encounterSectionIds = ["quick-fix", "urgent-fix", "performance", "site-improvement"];
 const infoPanelDurationMs = 10000;
 const smokeDurationMs = 1700;
-const villainFrontOffset = 6.5;
-const villainSideOffset = 5;
-const fixPadFrontOffset = 11;
-const infoPadFrontOffset = 8.5;
-const infoPadSideOffset = -5;
+const villainFrontOffset = 2.8;
+const villainSideOffset = 0;
+const triggerPadFrontOffset = 5.8;
+const triggerPadSideOffset = 3.6;
 
 const serviceInfoText: Record<string, string> = {
   "quick-fix":
@@ -61,12 +60,18 @@ function createSectionEncounters(): SectionEncounterConfig[] {
       const towardCenter = new Vector3(-sectionPosition.x, 0, -sectionPosition.z).normalize();
       const tangent = new Vector3(-towardCenter.z, 0, towardCenter.x);
       const villainPosition = sectionPosition.clone().add(towardCenter.clone().multiplyScalar(villainFrontOffset)).add(tangent.clone().multiplyScalar(villainSideOffset));
-      const padPosition = sectionPosition.clone().add(towardCenter.clone().multiplyScalar(fixPadFrontOffset));
-      const infoPadPosition = sectionPosition.clone().add(towardCenter.clone().multiplyScalar(infoPadFrontOffset)).add(tangent.clone().multiplyScalar(infoPadSideOffset));
+      const padPosition = sectionPosition
+        .clone()
+        .add(towardCenter.clone().multiplyScalar(triggerPadFrontOffset))
+        .add(tangent.clone().multiplyScalar(triggerPadSideOffset));
+      const infoPadPosition = sectionPosition
+        .clone()
+        .add(towardCenter.clone().multiplyScalar(triggerPadFrontOffset))
+        .add(tangent.clone().multiplyScalar(-triggerPadSideOffset));
 
-      villainPosition.y = 0;
-      padPosition.y = 0.07;
-      infoPadPosition.y = 0.07;
+      villainPosition.y = section.position[1];
+      padPosition.y = section.position[1] + 0.07;
+      infoPadPosition.y = section.position[1] + 0.07;
 
       return {
         id: section.id,

@@ -34,6 +34,7 @@ const offerDisplayMs = 10000;
 const simpleDisplayMs = 10000;
 const portalTriggerRadius = 1.06;
 const portalActivationCooldownMs = 900;
+const selectorRowZ = 5.8;
 const offersPageUrl = "https://www.crystalthedeveloper.ca/offers";
 const white = "#f5f7fb";
 const softWhite = "#d8dde8";
@@ -67,33 +68,33 @@ const simpleDisplaySections: Record<string, { imagePath: string; label: string }
   },
 };
 const valueDisplayOptions = [
-  { id: "trust", label: "Trust", imagePath: "/images/optimized/values/value.jpg", position: [-1.8, 0.18, 9.2] as [number, number, number] },
-  { id: "speed", label: "Speed", imagePath: "/images/optimized/values/value-2.jpg", position: [1.8, 0.18, 9.2] as [number, number, number] },
+  { id: "trust", label: "Trust", imagePath: "/images/optimized/values/value.jpg", position: [-1.8, 0.18, selectorRowZ] as [number, number, number] },
+  { id: "speed", label: "Speed", imagePath: "/images/optimized/values/value-2.jpg", position: [1.8, 0.18, selectorRowZ] as [number, number, number] },
 ];
 const offerOptions = [
   {
     id: "quick-fix",
     imagePath: "/images/optimized/offers/quick-fix.jpg",
     name: "Quick Fix",
-    position: [-5.4, 0.18, 9.2] as [number, number, number],
+    position: [-5.4, 0.18, selectorRowZ] as [number, number, number],
   },
   {
     id: "urgent-fix",
     imagePath: "/images/optimized/offers/urgent-fix.jpg",
     name: "Urgent Fix",
-    position: [-1.8, 0.18, 9.2] as [number, number, number],
+    position: [-1.8, 0.18, selectorRowZ] as [number, number, number],
   },
   {
     id: "performance",
     imagePath: "/images/optimized/offers/performance.jpg",
     name: "Performance",
-    position: [1.8, 0.18, 9.2] as [number, number, number],
+    position: [1.8, 0.18, selectorRowZ] as [number, number, number],
   },
   {
     id: "site-improvement",
     imagePath: "/images/optimized/offers/site-improvement.jpg",
     name: "Site Improvement",
-    position: [5.4, 0.18, 9.2] as [number, number, number],
+    position: [5.4, 0.18, selectorRowZ] as [number, number, number],
   },
 ];
 
@@ -374,20 +375,10 @@ export function HubSections({ restartKey, serviceResolutions }: HubSectionsProps
 function HubPaths() {
   return (
     <group name="HubPaths">
-      {hubSections.map((section) => {
-        const [x, , z] = section.position;
-        const distance = Math.hypot(x, z);
-        const angle = Math.atan2(x, z);
-
-        return (
-          <group key={section.id} rotation-y={angle}>
-            <mesh position={[0, 0.14, distance / 2]} rotation-x={-Math.PI / 2}>
-              <boxGeometry args={[0.04, distance, 0.018]} />
-              <meshBasicMaterial color="#ffffff" transparent opacity={0.3} toneMapped={false} />
-            </mesh>
-          </group>
-        );
-      })}
+      <mesh position={[0, 0.025, 0]} rotation-x={-Math.PI / 2}>
+        <ringGeometry args={[11.8, 12, 32]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.18} toneMapped={false} />
+      </mesh>
     </group>
   );
 }
@@ -1055,7 +1046,7 @@ function ShowcasePortalPad({
   name,
   onPlayerEnter,
   onPlayerExit,
-  position = [0, 0.18, 9.2],
+  position = [0, 0.18, selectorRowZ],
 }: {
   active: boolean;
   label: string;

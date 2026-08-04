@@ -10,8 +10,8 @@ export function WorldLights() {
 
   return (
     <>
-      <ambientLight intensity={0.73} color="#f2f0ea" />
-      <hemisphereLight intensity={0.5} color="#e6e1da" groundColor="#29282c" />
+      <ambientLight intensity={0.84} color="#f2f0ea" />
+      <hemisphereLight intensity={0.57} color="#e6e1da" groundColor="#302f34" />
       <ambientLight ref={characterFillRef} intensity={0.38} color="#fffaf2" />
       <directionalLight color="#ffe2bd" intensity={1.35} position={[-16, 30, 24]} />
       <directionalLight color="#ffd8ad" intensity={0.72} position={[14, 13, 18]} />

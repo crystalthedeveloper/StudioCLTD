@@ -49,7 +49,7 @@ export function StudioWorld({ onCoinCollect, onPenaltyCollect, restartKey }: Stu
     <>
       <WorldLights />
       <SpaceSky />
-      <Environment preset="warehouse" background={false} environmentIntensity={0.135} />
+      <Environment preset="warehouse" background={false} environmentIntensity={0.155} />
       <ModularTerrain radius={7} />
       <LogoLightField
         onCoinCollect={onCoinCollect}

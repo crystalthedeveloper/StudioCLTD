@@ -38,11 +38,11 @@ export function ModularTerrain({ radius }: ModularTerrainProps) {
       <mesh rotation-x={-Math.PI / 2}>
         <planeGeometry args={[platformSize, platformSize, 1, 1]} />
         <meshStandardMaterial
-          color="#92969d"
+          color="#9ca1a9"
           map={albedoMap}
           roughness={0.74}
           metalness={0.22}
-          envMapIntensity={0.12}
+          envMapIntensity={0.14}
         />
       </mesh>
     </group>

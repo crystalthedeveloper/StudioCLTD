@@ -31,6 +31,7 @@ type HubSectionsProps = {
 const offerCountdownMs = 3000;
 const offerDisplayMs = 10000;
 const simpleDisplayMs = 10000;
+const mobileBillboardScale = 0.78;
 const portalTriggerRadius = 1.06;
 const portalActivationCooldownMs = 900;
 const selectorRowZ = 5.8;
@@ -280,11 +281,21 @@ function getShowcaseVideoTexture(video: HTMLVideoElement) {
 export function HubSections({ onSectionTrigger, restartKey, serviceResolutions }: HubSectionsProps) {
   const displayTimersRef = useRef<Record<string, number>>({});
   const [activeSimpleDisplays, setActiveSimpleDisplays] = useState<Record<string, string>>({});
+  const [billboardScale, setBillboardScale] = useState(1);
   const [visibleSectionCount, setVisibleSectionCount] = useState(2);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
   const [showcaseVideoState, setShowcaseVideoState] = useState<ShowcaseVideoState>({
     playing: false,
   });
+
+  useEffect(() => {
+    const mobileQuery = window.matchMedia("(max-width: 768px)");
+    const updateBillboardScale = () => setBillboardScale(mobileQuery.matches ? mobileBillboardScale : 1);
+    updateBillboardScale();
+    mobileQuery.addEventListener("change", updateBillboardScale);
+
+    return () => mobileQuery.removeEventListener("change", updateBillboardScale);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -353,6 +364,7 @@ export function HubSections({ onSectionTrigger, restartKey, serviceResolutions }
       {hubSections.slice(0, visibleSectionCount).map((section) => (
         <HubSectionDistrict
           key={`${section.id}:${restartKey}`}
+          billboardScale={billboardScale}
           section={section}
           serviceResolutions={serviceResolutions}
           activeSimpleDisplays={activeSimpleDisplays}
@@ -411,6 +423,7 @@ function HubPaths() {
 
 function HubSectionDistrict({
   activeSimpleDisplays,
+  billboardScale,
   onOfferSelect,
   onShowcasePause,
   onShowcasePlay,
@@ -421,6 +434,7 @@ function HubSectionDistrict({
   showcaseVideoState,
 }: {
   activeSimpleDisplays: Record<string, string>;
+  billboardScale: number;
   onOfferSelect: (offerId: string | null) => void;
   onShowcasePause: () => void;
   onShowcasePlay: () => void;
@@ -438,6 +452,7 @@ function HubSectionDistrict({
     <group name={`HubSection:${section.id}`} position={section.position} rotation-y={rotation}>
       <SectionBillboard
         activeSimpleDisplays={activeSimpleDisplays}
+        billboardScale={billboardScale}
         section={section}
         serviceResolutions={serviceResolutions}
         selectedOffer={selectedOffer}
@@ -469,12 +484,14 @@ function HubSectionDistrict({
 
 function SectionBillboard({
   activeSimpleDisplays,
+  billboardScale,
   section,
   serviceResolutions,
   selectedOffer,
   showcaseVideoState,
 }: {
   activeSimpleDisplays: Record<string, string>;
+  billboardScale: number;
   section: HubSection;
   serviceResolutions: Record<string, boolean>;
   selectedOffer: OfferOption | null;
@@ -490,6 +507,8 @@ function SectionBillboard({
     <group name={`Billboard:${section.id}`} position={[0, 4.8, 0]}>
       <RigidBody type="fixed" colliders={false}>
         <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
+      </RigidBody>
+      <group name={`BillboardVisual:${section.id}`} scale={billboardScale}>
         <mesh position={[0, 0, -0.08]}>
           <boxGeometry args={[10.4, 5.8, 0.32]} />
           <meshStandardMaterial
@@ -510,7 +529,6 @@ function SectionBillboard({
             roughness={0.74}
           />
         </mesh>
-      </RigidBody>
       <Text
         color="#000000"
         font={gameTextFont}
@@ -558,6 +576,7 @@ function SectionBillboard({
           </Text>
         </>
       )}
+      </group>
     </group>
   );
 }

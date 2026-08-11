@@ -6,26 +6,21 @@ import {
   BufferGeometry,
   LinearFilter,
   LinearMipmapLinearFilter,
-  MeshStandardMaterial,
+  MeshToonMaterial,
   PlaneGeometry,
   RepeatWrapping,
   SRGBColorSpace,
   Texture,
-  Vector2,
 } from "three";
-import { destinationPlatformRadius, hubSections } from "../hubSections";
+import { comicToneGradient } from "../../characters/cartoonMaterials";
+import { destinationPlatformRadius, hubSections, sectionRampApproachLength, sectionRampWidth } from "../hubSections";
+import { InteractiveMeshOutline } from "../InteractiveOutline";
 
 type ModularTerrainProps = {
   radius: number;
 };
 
-const floorTexturePaths = [
-  "/images/optimized/floor/plaza-microcement-albedo.webp",
-  "/images/optimized/floor/plaza-microcement-normal.webp",
-  "/images/optimized/floor/plaza-microcement-roughness.webp",
-];
-const bridgeWidth = 4.2;
-const rampApproachLength = 14;
+const comicConcreteTexturePath = "/images/optimized/floor/world-comic-concrete.webp";
 const rampThickness = 0.36;
 const concreteTextureWorldSize = 48;
 
@@ -38,7 +33,7 @@ function configureFloorTexture(texture: Texture, repeat: number) {
   texture.generateMipmaps = true;
 }
 
-function applyWorldScaleBoxUvs(geometry: BufferGeometry) {
+function applyWorldScaleBoxUvs(geometry: BufferGeometry, offsetX = 0, offsetZ = 0) {
   const positions = geometry.getAttribute("position");
   const normals = geometry.getAttribute("normal");
   const uvs = geometry.getAttribute("uv");
@@ -52,11 +47,11 @@ function applyWorldScaleBoxUvs(geometry: BufferGeometry) {
     const normalZ = normals.getZ(index);
 
     if (Math.abs(normalY) > 0.5) {
-      uvs.setXY(index, x, normalY > 0 ? -z : z);
+      uvs.setXY(index, x + offsetX, normalY > 0 ? -(z + offsetZ) : z + offsetZ);
     } else if (Math.abs(normalX) > 0.5) {
-      uvs.setXY(index, normalX > 0 ? -z : z, y);
+      uvs.setXY(index, normalX > 0 ? -(z + offsetZ) : z + offsetZ, y);
     } else {
-      uvs.setXY(index, normalZ > 0 ? x : -x, y);
+      uvs.setXY(index, normalZ > 0 ? x + offsetX : -(x + offsetX), y);
     }
   }
 
@@ -64,8 +59,8 @@ function applyWorldScaleBoxUvs(geometry: BufferGeometry) {
   return geometry;
 }
 
-function createConcreteBoxGeometry(width: number, height: number, depth: number) {
-  return applyWorldScaleBoxUvs(new BoxGeometry(width, height, depth));
+function createConcreteBoxGeometry(width: number, height: number, depth: number, offsetX = 0, offsetZ = 0) {
+  return applyWorldScaleBoxUvs(new BoxGeometry(width, height, depth), offsetX, offsetZ);
 }
 
 function createConcreteFloorGeometry(size: number) {
@@ -81,26 +76,25 @@ function createConcreteFloorGeometry(size: number) {
 
 export function ModularTerrain({ radius }: ModularTerrainProps) {
   const platformSize = radius * 20 + 10;
-  const [albedoMap, normalMap, roughnessMap] = useTexture(floorTexturePaths);
+  const concreteMap = useTexture(comicConcreteTexturePath);
   const textureRepeat = 1 / concreteTextureWorldSize;
   const floorGeometry = useMemo(() => createConcreteFloorGeometry(platformSize), [platformSize]);
 
-  configureFloorTexture(albedoMap, textureRepeat);
-  configureFloorTexture(normalMap, textureRepeat);
-  configureFloorTexture(roughnessMap, textureRepeat);
-  albedoMap.colorSpace = SRGBColorSpace;
-  const sharedFloorMaterial = useMemo(() => new MeshStandardMaterial({
-    color: "#d8d8d8",
-    map: albedoMap,
-    normalMap,
-    normalScale: new Vector2(0.07, 0.07),
-    roughnessMap,
-    roughness: 0.92,
-    metalness: 0,
-    envMapIntensity: 0.08,
-  }), [albedoMap, normalMap, roughnessMap]);
+  configureFloorTexture(concreteMap, textureRepeat);
+  concreteMap.colorSpace = SRGBColorSpace;
+  const floorMaterial = useMemo(() => new MeshToonMaterial({
+    color: "#e0e0e0",
+    gradientMap: comicToneGradient,
+    map: concreteMap,
+  }), [concreteMap]);
+  const platformMaterial = useMemo(() => new MeshToonMaterial({
+    color: "#c5c5c5",
+    gradientMap: comicToneGradient,
+    map: concreteMap,
+  }), [concreteMap]);
 
-  useEffect(() => () => sharedFloorMaterial.dispose(), [sharedFloorMaterial]);
+  useEffect(() => () => floorMaterial.dispose(), [floorMaterial]);
+  useEffect(() => () => platformMaterial.dispose(), [platformMaterial]);
   useEffect(() => () => floorGeometry.dispose(), [floorGeometry]);
 
   return (
@@ -115,10 +109,10 @@ export function ModularTerrain({ radius }: ModularTerrainProps) {
       </RigidBody>
       <mesh rotation-x={-Math.PI / 2}>
         <primitive object={floorGeometry} attach="geometry" />
-        <primitive object={sharedFloorMaterial} attach="material" />
+        <primitive object={floorMaterial} attach="material" />
       </mesh>
       {hubSections.map((section) => (
-        <DestinationPlatform key={section.id} material={sharedFloorMaterial} section={section} />
+        <DestinationPlatform key={section.id} material={platformMaterial} section={section} />
       ))}
     </group>
   );
@@ -128,12 +122,12 @@ function DestinationPlatform({
   material,
   section,
 }: {
-  material: MeshStandardMaterial;
+  material: MeshToonMaterial;
   section: (typeof hubSections)[number];
 }) {
   const [x, height, z] = section.position;
   const [directionX, directionZ] = section.entrance;
-  const bridgeRun = rampApproachLength;
+  const bridgeRun = sectionRampApproachLength;
   const bridgeAngle = Math.atan2(height, bridgeRun);
   const bridgeLength = Math.hypot(bridgeRun, height);
   const bridgeCenterOffset = destinationPlatformRadius
@@ -144,12 +138,12 @@ function DestinationPlatform({
   const bridgeZ = z + directionZ * bridgeCenterOffset;
   const yaw = Math.atan2(directionX, directionZ);
   const platformGeometry = useMemo(
-    () => createConcreteBoxGeometry(destinationPlatformRadius * 2, height, destinationPlatformRadius * 2),
-    [height],
+    () => createConcreteBoxGeometry(destinationPlatformRadius * 2, height, destinationPlatformRadius * 2, x, z),
+    [height, x, z],
   );
   const rampGeometry = useMemo(
-    () => createConcreteBoxGeometry(bridgeWidth, rampThickness, bridgeLength),
-    [bridgeLength],
+    () => createConcreteBoxGeometry(sectionRampWidth, rampThickness, bridgeLength, bridgeX, bridgeZ),
+    [bridgeLength, bridgeX, bridgeZ],
   );
 
   useEffect(() => () => platformGeometry.dispose(), [platformGeometry]);
@@ -165,11 +159,12 @@ function DestinationPlatform({
         />
         <mesh position={[x, height / 2, z]} material={material}>
           <primitive object={platformGeometry} attach="geometry" />
+          <InteractiveMeshOutline />
         </mesh>
       </RigidBody>
       <RigidBody type="fixed" colliders={false} position={[bridgeX, bridgeCenterY, bridgeZ]} rotation={[0, yaw, 0]}>
         <CuboidCollider
-          args={[bridgeWidth / 2, rampThickness / 2, bridgeLength / 2]}
+          args={[sectionRampWidth / 2, rampThickness / 2, bridgeLength / 2]}
           rotation={[bridgeAngle, 0, 0]}
           friction={0.35}
         />
@@ -178,6 +173,7 @@ function DestinationPlatform({
           rotation-x={bridgeAngle}
         >
           <primitive object={rampGeometry} attach="geometry" />
+          <InteractiveMeshOutline />
         </mesh>
       </RigidBody>
     </group>

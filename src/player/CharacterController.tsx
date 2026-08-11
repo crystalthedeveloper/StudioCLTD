@@ -14,6 +14,9 @@ import { installFootstepAudioUnlock, playConcreteFootstep } from "./footsteps";
 
 const moveDirection = new Vector3();
 const playerForward = new Vector3();
+const lockedVelocity = { x: 0, y: 0, z: 0 };
+const targetVelocity = { x: 0, z: 0 };
+const nextVelocity = { x: 0, y: 0, z: 0 };
 const baseRunSpeed = 13.2;
 const boostedRunSpeed = 18.4;
 const turnSpeed = 1.75;
@@ -100,7 +103,8 @@ export function CharacterController({
     if (movementLocked) {
       forwardBackSpeedRef.current = 0;
       movementDirectionRef.current.set(0, 0, 0);
-      body.setLinvel({ x: 0, y: velocity.y, z: 0 }, true);
+      lockedVelocity.y = velocity.y;
+      body.setLinvel(lockedVelocity, true);
 
       if (translation.y < -10) {
         body.setTranslation({ x: spawn[0], y: spawn[1], z: spawn[2] }, true);
@@ -163,10 +167,8 @@ export function CharacterController({
     } else {
       lastFootstepAtRef.current = clock.elapsedTime;
     }
-    const targetVelocity = {
-      x: isMoving ? moveDirection.x : 0,
-      z: isMoving ? moveDirection.z : 0,
-    };
+    targetVelocity.x = isMoving ? moveDirection.x : 0;
+    targetVelocity.z = isMoving ? moveDirection.z : 0;
 
     if (isMoving) {
       moveDirection.normalize();
@@ -176,11 +178,9 @@ export function CharacterController({
     const accelerationRate = isMoving ? 8.5 : 10;
     const acceleration = 1 - Math.exp(-frameDelta * accelerationRate);
 
-    const nextVelocity = {
-      x: MathUtils.lerp(velocity.x, targetVelocity.x, acceleration),
-      y: velocity.y,
-      z: MathUtils.lerp(velocity.z, targetVelocity.z, acceleration),
-    };
+    nextVelocity.x = MathUtils.lerp(velocity.x, targetVelocity.x, acceleration);
+    nextVelocity.y = velocity.y;
+    nextVelocity.z = MathUtils.lerp(velocity.z, targetVelocity.z, acceleration);
 
     body.setLinvel(nextVelocity, true);
 

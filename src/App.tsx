@@ -58,9 +58,10 @@ function StudioLaunch({ loading = false, onLaunch }: { loading?: boolean; onLaun
 
 function StudioLoadingOverlay({ progress }: { progress: number }) {
   const displayProgress = Math.min(100, Math.max(0, Math.round(progress)));
+  const ready = progress >= 100;
 
   return (
-    <div className={`loading-screen${displayProgress >= 100 ? " loading-screen--ready" : ""}`}>
+    <div className={`loading-screen${ready ? " loading-screen--ready" : ""}`}>
       <div className="loading-screen__content">
         <strong>StudioCLTD Loading...</strong>
         <span>{`${displayProgress}%`}</span>

@@ -3,24 +3,26 @@ import { CuboidCollider, CylinderCollider, IntersectionEnterPayload, Intersectio
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  BoxGeometry,
   DoubleSide,
-  Group,
   LinearFilter,
   MathUtils,
-  Mesh,
   MeshBasicMaterial,
-  Object3D,
+  PlaneGeometry,
   SRGBColorSpace,
   Texture,
   TextureLoader,
   VideoTexture,
 } from "three";
 import { BillboardLabel } from "../../ui/BillboardLabel";
+import { comicToneGradient } from "../../characters/cartoonMaterials";
 import { gameTextFont } from "../../ui/textFont";
 import { hubSections, HubSection } from "../hubSections";
 import { InteractiveMeshOutline } from "../InteractiveOutline";
+import { isPlayerObject } from "../playerCollision";
 import { padVisualStyle } from "../padVisualStyle";
 import { triggerPopupLayout } from "../triggerPopupLayout";
+import { portalPulseGeometry, portalRingGeometry, useTriggerPadVisuals } from "../useTriggerPadVisuals";
 
 type HubSectionsProps = {
   onSectionTrigger: (sectionId: string, triggerId: string) => void;
@@ -35,6 +37,18 @@ const mobileBillboardScale = 0.78;
 const mobileBillboardYOffset = -0.55;
 const portalTriggerRadius = 1.06;
 const portalActivationCooldownMs = 900;
+const offerPadVisualConfig = {
+  pulseBaseScale: 1.03,
+  pulseScaleAmount: 0.18,
+  ringOpacity: (_active: boolean, activationGlow: number) => 0.56 + activationGlow * 0.28,
+  pulseOpacity: (_active: boolean, activationGlow: number) => activationGlow * 0.16,
+};
+const selectorPadVisualConfig = {
+  pulseBaseScale: 1.04,
+  pulseScaleAmount: 0.16,
+  ringOpacity: (active: boolean, activationGlow: number) => 0.58 + (active ? 0.2 : 0) + activationGlow * 0.16,
+  pulseOpacity: (active: boolean, activationGlow: number) => active ? 0.1 + activationGlow * 0.1 : activationGlow * 0.12,
+};
 const selectorRowZ = 5.8;
 const offersPageUrl = "https://www.crystalthedeveloper.ca/offers";
 const white = "#f5f7fb";
@@ -43,6 +57,9 @@ const screenIdleColor = "#0b1018";
 const screenContentScale = 1.1;
 const screenContentSize: [number, number] = [9.05 * screenContentScale, 4.62 * screenContentScale];
 const screenContentAspect = screenContentSize[0] / screenContentSize[1];
+const screenContentGeometry = new PlaneGeometry(...screenContentSize);
+const tvFrameGeometry = new BoxGeometry(10.4, 5.8, 0.32);
+const tvBackingGeometry = new PlaneGeometry(9.25, 4.85);
 const serviceSectionIds = ["quick-fix", "urgent-fix", "performance", "site-improvement"];
 const serviceScreenImages: Record<string, { bad: string; good: string }> = {
   "quick-fix": {
@@ -146,8 +163,19 @@ function loadScreenTexture(path: string) {
   return loadPromise;
 }
 
-export function preloadScreenTextures() {
-  return Promise.allSettled(requiredScreenImagePaths.map(loadScreenTexture)).then(() => undefined);
+export function preloadScreenTextures(onProgress?: (progress: number) => void) {
+  const total = requiredScreenImagePaths.length;
+  let completed = 0;
+  onProgress?.(0);
+
+  return Promise.allSettled(
+    requiredScreenImagePaths.map((path) =>
+      loadScreenTexture(path).finally(() => {
+        completed += 1;
+        onProgress?.((completed / total) * 100);
+      }),
+    ),
+  ).then(() => undefined);
 }
 
 function configureTextureCover(texture: Texture, targetAspect: number) {
@@ -226,7 +254,6 @@ function getShowcaseVideoElement() {
     video.setAttribute("webkit-playsinline", "");
 
     showcaseVideoElement = video;
-    console.info("[Showcase] Video initialized");
   }
 
   return showcaseVideoElement;
@@ -235,17 +262,14 @@ function getShowcaseVideoElement() {
 function pauseShowcaseVideo(video = getShowcaseVideoElement(), reset = false) {
   video.pause();
   if (reset) video.currentTime = 0;
-  console.info("[Showcase] Video paused");
 }
 
 function playShowcaseVideo(video = getShowcaseVideoElement(), restart = true) {
   if (restart) video.currentTime = 0;
 
   return video.play().then(() => {
-    console.info("[Showcase] Video playing");
     return true;
-  }).catch((error: unknown) => {
-    console.error("[Showcase] Video playback failed", error);
+  }).catch(() => {
     return false;
   });
 }
@@ -256,10 +280,8 @@ export function unlockShowcaseVideoPlayback() {
   const video = getShowcaseVideoElement();
   showcaseUnlockPromise = video.play().then(() => {
     pauseShowcaseVideo(video, true);
-    console.info("[Showcase] Mobile playback unlocked");
-  }).catch((error: unknown) => {
+  }).catch(() => {
     showcaseUnlockPromise = null;
-    console.error("[Showcase] Video playback failed", error);
   });
 
   return showcaseUnlockPromise;
@@ -409,7 +431,7 @@ function HubPaths() {
       {streetCoordinates.map((coordinate) => (
         <mesh key={`street-x:${coordinate}`} position={[coordinate, 0.0175, 0]}>
           <boxGeometry args={[6, 0.035, 124]} />
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.12} toneMapped={false} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.18} toneMapped={false} />
         </mesh>
       ))}
       {streetCoordinates.flatMap((coordinate) =>
@@ -419,7 +441,7 @@ function HubPaths() {
             position={[segment.center, 0.0175, coordinate]}
           >
             <boxGeometry args={[segment.length, 0.035, 6]} />
-            <meshBasicMaterial color="#ffffff" transparent opacity={0.12} toneMapped={false} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.18} toneMapped={false} />
           </mesh>
         )),
       )}
@@ -520,24 +542,21 @@ function SectionBillboard({
         <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
       </RigidBody>
       <group name={`BillboardVisual:${section.id}`} position={[0, billboardYOffset, 0]} scale={billboardScale}>
-        <mesh position={[0, 0, -0.08]}>
-          <boxGeometry args={[10.4, 5.8, 0.32]} />
-          <meshStandardMaterial
+        <mesh geometry={tvFrameGeometry} position={[0, 0, -0.08]} dispose={null}>
+          <meshToonMaterial
             color="#101621"
             emissive="#000000"
             emissiveIntensity={0}
-            metalness={0.04}
-            roughness={0.82}
+            gradientMap={comicToneGradient}
           />
+          <InteractiveMeshOutline />
         </mesh>
-        <mesh position={[0, 0.1, -0.26]}>
-          <planeGeometry args={[9.25, 4.85]} />
-          <meshStandardMaterial
+        <mesh geometry={tvBackingGeometry} position={[0, 0.1, -0.26]} dispose={null}>
+          <meshToonMaterial
             color="#111827"
             emissive="#ffffff"
             emissiveIntensity={isOffers ? 0.07 : 0.045}
-            metalness={0.02}
-            roughness={0.74}
+            gradientMap={comicToneGradient}
           />
         </mesh>
       <Text
@@ -596,8 +615,7 @@ function OffersScreenContent({ selectedOffer }: { selectedOffer: OfferOption | n
   const texture = useLazyScreenTexture(selectedOffer?.imagePath ?? null, Boolean(selectedOffer));
 
   return (
-    <mesh key={selectedOffer?.id ?? "offers-empty-screen"} position={[0, -0.03, -0.2]} renderOrder={20}>
-      <planeGeometry args={screenContentSize} />
+    <mesh key={selectedOffer?.id ?? "offers-empty-screen"} geometry={screenContentGeometry} position={[0, -0.03, -0.2]} renderOrder={20} dispose={null}>
       {texture ? (
         <meshBasicMaterial
           key={`offer-image-${selectedOffer?.id}`}
@@ -628,8 +646,7 @@ function SimpleDisplayScreen({ imagePath }: { imagePath: string | null }) {
   }, [texture]);
 
   return (
-    <mesh position={[0, -0.03, -0.2]} renderOrder={20}>
-      <planeGeometry args={screenContentSize} />
+    <mesh geometry={screenContentGeometry} position={[0, -0.03, -0.2]} renderOrder={20} dispose={null}>
       <meshBasicMaterial ref={materialRef} color={screenIdleColor} depthTest={false} side={DoubleSide} toneMapped />
     </mesh>
   );
@@ -655,8 +672,7 @@ function ServiceImageScreen({
   const texture = useLazyScreenTexture(texturePath, true, 240);
 
   return (
-    <mesh position={[0, -0.03, -0.2]} renderOrder={20}>
-      <planeGeometry args={screenContentSize} />
+    <mesh geometry={screenContentGeometry} position={[0, -0.03, -0.2]} renderOrder={20} dispose={null}>
       {texture ? (
         <meshBasicMaterial color={screenImageTint} depthTest={false} map={texture} side={DoubleSide} toneMapped />
       ) : (
@@ -739,8 +755,7 @@ function ShowcaseScreenContent({ isPlaying }: { isPlaying: boolean }) {
 
   return (
     <>
-      <mesh position={[0, -0.03, -0.2]} renderOrder={20}>
-        <planeGeometry args={screenContentSize} />
+      <mesh geometry={screenContentGeometry} position={[0, -0.03, -0.2]} renderOrder={20} dispose={null}>
         {videoTexture ? (
           <meshBasicMaterial
             ref={materialRef}
@@ -927,29 +942,12 @@ function OfferPortalPad({
   onPlayerEnter: () => void;
   onPlayerExit: () => void;
 }) {
-  const ringRef = useRef<Mesh>(null);
-  const pulseRef = useRef<Mesh>(null);
+  const { pulseRef, ringRef } = useTriggerPadVisuals(active, offerPadVisualConfig);
   const playerInsideRef = useRef(false);
   const activatedThisEntryRef = useRef(false);
   const lastActivatedAtRef = useRef(-Infinity);
-  const activeStartedAtRef = useRef(0);
-  const wasActiveRef = useRef(active);
-
-  const isPlayerIntersection = (object?: Object3D) => {
-    let current: Object3D | null | undefined = object;
-    while (current) {
-      if (current.name === "StudioCLTDPlayer") return true;
-      current = current.parent;
-    }
-    return false;
-  };
-
   const isPlayerEvent = (event: IntersectionEnterPayload | IntersectionExitPayload) => {
-    const hitPlayer =
-      isPlayerIntersection(event.other.rigidBodyObject) ||
-      isPlayerIntersection(event.other.colliderObject);
-
-    return hitPlayer;
+    return isPlayerObject(event.other.rigidBodyObject) || isPlayerObject(event.other.colliderObject);
   };
 
   const handleEnter = (event: IntersectionEnterPayload) => {
@@ -971,36 +969,6 @@ function OfferPortalPad({
     activatedThisEntryRef.current = false;
   };
 
-  useFrame(({ clock }) => {
-    if (!active && !wasActiveRef.current) return;
-
-    if (active && !wasActiveRef.current) {
-      activeStartedAtRef.current = clock.elapsedTime;
-    }
-
-    const activationGlow = active ? Math.max(0, 1 - (clock.elapsedTime - activeStartedAtRef.current) / 1) : 0;
-    const pulse = 1 + activationGlow * 0.05;
-    const opacity = 0.56 + activationGlow * 0.28;
-    wasActiveRef.current = active;
-
-    if (ringRef.current) {
-      ringRef.current.scale.setScalar(pulse);
-      const material = ringRef.current.material;
-      if (material instanceof MeshBasicMaterial) {
-        material.opacity = opacity;
-      }
-    }
-
-    if (pulseRef.current) {
-      pulseRef.current.visible = active || activationGlow > 0;
-      pulseRef.current.scale.setScalar(1.03 + activationGlow * 0.18);
-      const material = pulseRef.current.material;
-      if (material instanceof MeshBasicMaterial) {
-        material.opacity = activationGlow * 0.16;
-      }
-    }
-  });
-
   return (
     <group name={`OfferPortal:${offer.id}`} position={offer.position}>
       <CylinderCollider
@@ -1010,13 +978,10 @@ function OfferPortalPad({
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
-      <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
-        <torusGeometry args={[1, 0.026, 8, 48]} />
+      <mesh ref={ringRef} geometry={portalRingGeometry} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.68} depthWrite={false} toneMapped={false} />
-        <InteractiveMeshOutline />
       </mesh>
-      <mesh ref={pulseRef} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false}>
-        <ringGeometry args={[0.68, 1.05, 48]} />
+      <mesh ref={pulseRef} geometry={portalPulseGeometry} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       <BillboardLabel
@@ -1056,25 +1021,12 @@ function ShowcasePortalPad({
   onPlayerExit: () => void;
   position?: [number, number, number];
 }) {
-  const ringRef = useRef<Mesh>(null);
-  const pulseRef = useRef<Mesh>(null);
+  const { pulseRef, ringRef } = useTriggerPadVisuals(active, selectorPadVisualConfig);
   const playerInsideRef = useRef(false);
   const activatedThisEntryRef = useRef(false);
   const lastActivatedAtRef = useRef(-Infinity);
-  const activeStartedAtRef = useRef(0);
-  const wasActiveRef = useRef(active);
-
-  const isPlayerIntersection = (object?: Object3D) => {
-    let current: Object3D | null | undefined = object;
-    while (current) {
-      if (current.name === "StudioCLTDPlayer") return true;
-      current = current.parent;
-    }
-    return false;
-  };
-
   const isPlayerEvent = (event: IntersectionEnterPayload | IntersectionExitPayload) =>
-    isPlayerIntersection(event.other.rigidBodyObject) || isPlayerIntersection(event.other.colliderObject);
+    isPlayerObject(event.other.rigidBodyObject) || isPlayerObject(event.other.colliderObject);
 
   const activate = () => {
     if (playerInsideRef.current) return;
@@ -1105,37 +1057,6 @@ function ShowcasePortalPad({
     deactivate();
   };
 
-  useFrame(({ clock }) => {
-    if (!active && !wasActiveRef.current) return;
-
-    if (active && !wasActiveRef.current) {
-      activeStartedAtRef.current = clock.elapsedTime;
-    }
-
-    const activationGlow = active ? Math.max(0, 1 - (clock.elapsedTime - activeStartedAtRef.current) / 1) : 0;
-    const steadyGlow = active ? 0.2 : 0;
-    const pulse = 1 + activationGlow * 0.05;
-    const opacity = 0.58 + steadyGlow + activationGlow * 0.16;
-    wasActiveRef.current = active;
-
-    if (ringRef.current) {
-      ringRef.current.scale.setScalar(pulse);
-      const material = ringRef.current.material;
-      if (material instanceof MeshBasicMaterial) {
-        material.opacity = opacity;
-      }
-    }
-
-    if (pulseRef.current) {
-      pulseRef.current.visible = active || activationGlow > 0;
-      pulseRef.current.scale.setScalar(1.04 + activationGlow * 0.16);
-      const material = pulseRef.current.material;
-      if (material instanceof MeshBasicMaterial) {
-        material.opacity = active ? 0.1 + activationGlow * 0.1 : activationGlow * 0.12;
-      }
-    }
-  });
-
   return (
     <group name={name} position={position}>
       <CylinderCollider
@@ -1145,13 +1066,10 @@ function ShowcasePortalPad({
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
-      <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]}>
-        <torusGeometry args={[1, 0.026, 8, 48]} />
+      <mesh ref={ringRef} geometry={portalRingGeometry} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.7} depthWrite={false} toneMapped={false} />
-        <InteractiveMeshOutline />
       </mesh>
-      <mesh ref={pulseRef} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false}>
-        <ringGeometry args={[0.68, 1.05, 48]} />
+      <mesh ref={pulseRef} geometry={portalPulseGeometry} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       <BillboardLabel

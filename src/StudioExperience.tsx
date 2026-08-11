@@ -2,7 +2,7 @@ import { Canvas } from "@react-three/fiber";
 import { useProgress } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { ACESFilmicToneMapping, SRGBColorSpace } from "three";
+import { ACESFilmicToneMapping, MathUtils, SRGBColorSpace } from "three";
 import { isTrackpadCameraInputBlocked } from "./player/cameraInputGuard";
 import { setGameFocused, useGameFocus } from "./player/gameFocus";
 import { HubOverlay } from "./ui/HubOverlay";
@@ -27,6 +27,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   const previousCompletedSectionCountRef = useRef(0);
   const [coins, setCoins] = useState(0);
   const [completedSectionCount, setCompletedSectionCount] = useState(0);
+  const [screenAssetProgress, setScreenAssetProgress] = useState(0);
   const [screenAssetsReady, setScreenAssetsReady] = useState(false);
 
   useEffect(() => {
@@ -44,7 +45,9 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
 
   useEffect(() => {
     let cancelled = false;
-    preloadScreenTextures()
+    preloadScreenTextures((nextProgress) => {
+      if (!cancelled) setScreenAssetProgress((current) => Math.max(current, nextProgress));
+    })
       .catch(() => undefined)
       .then(() => {
         if (!cancelled) setScreenAssetsReady(true);
@@ -188,7 +191,12 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
           </Suspense>
         </Canvas>
       </div>
-      <StartupProgress onProgress={onLoadProgress} onReady={onReady} screenAssetsReady={screenAssetsReady} />
+      <StartupProgress
+        onProgress={onLoadProgress}
+        onReady={onReady}
+        screenAssetProgress={screenAssetProgress}
+        screenAssetsReady={screenAssetsReady}
+      />
       <GameHud
         completedSectionCount={completedSectionCount}
         onOpenWebsite={onOpenWebsite}
@@ -208,31 +216,67 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
 function StartupProgress({
   onProgress,
   onReady,
+  screenAssetProgress,
   screenAssetsReady,
 }: {
   onProgress: (progress: number) => void;
   onReady: () => void;
+  screenAssetProgress: number;
   screenAssetsReady: boolean;
 }) {
   const { active, progress } = useProgress();
+  const displayedProgressRef = useRef(0);
+  const targetProgressRef = useRef(0);
+  const onProgressRef = useRef(onProgress);
+  const onReadyRef = useRef(onReady);
+  const observedWorldLoadingRef = useRef(false);
   const readyRef = useRef(false);
+
+  onProgressRef.current = onProgress;
+  onReadyRef.current = onReady;
+  if (active) observedWorldLoadingRef.current = true;
+
   const complete = !active && progress >= 100;
-  const startupProgress = Math.min(99, Math.round((Math.min(progress, 100) + (screenAssetsReady ? 100 : 0)) / 2));
+  const worldProgress = observedWorldLoadingRef.current || screenAssetsReady
+    ? MathUtils.clamp(progress, 0, 100)
+    : 0;
+  const actualProgress = screenAssetsReady && complete
+    ? 100
+    : Math.min(99, worldProgress * 0.8 + MathUtils.clamp(screenAssetProgress, 0, 100) * 0.2);
+  targetProgressRef.current = Math.max(targetProgressRef.current, actualProgress);
 
   useEffect(() => {
-    onProgress(screenAssetsReady && complete ? 100 : startupProgress);
-  }, [complete, onProgress, screenAssetsReady, startupProgress]);
+    let animationFrame = 0;
+    let fadeTimeout = 0;
 
-  useEffect(() => {
-    if (readyRef.current || !screenAssetsReady || !complete) return;
+    onProgressRef.current(0);
 
-    const timeout = window.setTimeout(() => {
-      readyRef.current = true;
-      onProgress(100);
-      onReady();
-    }, 520);
-    return () => window.clearTimeout(timeout);
-  }, [complete, onProgress, onReady, screenAssetsReady]);
+    const updateDisplayedProgress = () => {
+      const current = displayedProgressRef.current;
+      const target = targetProgressRef.current;
+      let next = MathUtils.lerp(current, target, 0.15);
+
+      if (target >= 100 && 100 - next < 0.08) next = 100;
+      next = Math.max(current, Math.min(100, next));
+      displayedProgressRef.current = next;
+      onProgressRef.current(next);
+
+      if (next >= 100 && !readyRef.current) {
+        readyRef.current = true;
+        fadeTimeout = window.setTimeout(() => onReadyRef.current(), 520);
+        return;
+      }
+
+      animationFrame = window.requestAnimationFrame(updateDisplayedProgress);
+    };
+
+    animationFrame = window.requestAnimationFrame(updateDisplayedProgress);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.clearTimeout(fadeTimeout);
+    };
+  }, []);
 
   return null;
 }

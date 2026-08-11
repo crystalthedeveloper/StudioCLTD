@@ -9,13 +9,15 @@ import {
   Group,
   LinearFilter,
   Matrix4,
-  MeshStandardMaterial,
+  MeshToonMaterial,
   Quaternion,
   SphereGeometry,
   SRGBColorSpace,
   Texture,
   Vector3,
 } from "three";
+import { comicToneGradient } from "../../characters/cartoonMaterials";
+import { InteractiveMeshOutline } from "../InteractiveOutline";
 
 const earthTexturePath = "/images/optimized/earth-nightmap-1k.jpg";
 const venusTexturePath = "/images/optimized/venus-surface-1k.jpg";
@@ -23,12 +25,10 @@ const venusTexturePath = "/images/optimized/venus-surface-1k.jpg";
 // A single modest sphere is shared by every puff. The extra radial segments
 // soften silhouettes without multiplying geometry memory per cloud.
 const cloudGeometry = new SphereGeometry(1, 16, 12);
-const cloudMaterial = new MeshStandardMaterial({
+const cloudMaterial = new MeshToonMaterial({
   color: "#ffffff",
-  roughness: 1,
-  metalness: 0,
-  flatShading: false,
   fog: false,
+  gradientMap: comicToneGradient,
   vertexColors: true,
 });
 
@@ -126,7 +126,9 @@ function CartoonCloud({ position, rotation = 0, scale, speed, variant }: CloudPr
 
   return (
     <group ref={cloudRef} position={position} rotation-y={rotation} scale={scale}>
-      <mesh geometry={cloudGeometries[variant % cloudGeometries.length]} material={cloudMaterial} />
+      <mesh geometry={cloudGeometries[variant % cloudGeometries.length]} material={cloudMaterial}>
+        <InteractiveMeshOutline />
+      </mesh>
     </group>
   );
 }
@@ -180,16 +182,15 @@ export function SpaceSky() {
 
       <mesh position={[68, 42, -210]} rotation={[0.08, -0.48, 0]}>
         <sphereGeometry args={[22, 32, 24]} />
-        <meshStandardMaterial
+        <meshToonMaterial
           map={venusTexture}
           color={new Color("#ffd08a")}
           emissive="#8d4725"
           emissiveIntensity={0.1}
-          metalness={0}
-          roughness={0.72}
-          envMapIntensity={0.65}
+          gradientMap={comicToneGradient}
           fog={false}
         />
+        <InteractiveMeshOutline />
       </mesh>
       <mesh position={[68, 42, -210]} scale={[1.08, 1.08, 1.08]}>
         <sphereGeometry args={[22, 24, 16]} />
@@ -198,16 +199,15 @@ export function SpaceSky() {
 
       <mesh position={[-135, 48, 165]} rotation={[0.08, 0.64, -0.06]}>
         <sphereGeometry args={[17, 32, 24]} />
-        <meshStandardMaterial
+        <meshToonMaterial
           map={earthTexture}
           emissiveMap={earthTexture}
           emissive="#86bfff"
           emissiveIntensity={0.2}
-          metalness={0}
-          roughness={0.66}
-          envMapIntensity={0.6}
+          gradientMap={comicToneGradient}
           fog={false}
         />
+        <InteractiveMeshOutline />
       </mesh>
       <mesh position={[-135, 48, 165]} scale={[1.09, 1.09, 1.09]}>
         <sphereGeometry args={[17, 24, 16]} />

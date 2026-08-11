@@ -2,18 +2,26 @@ import { Text } from "@react-three/drei";
 import { CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Group, Mesh, MeshBasicMaterial, Object3D, SphereGeometry, Vector3 } from "three";
-import { isGameAudioEnabled, subscribeGameAudio } from "../../audio/gameAudio";
+import { Group, MeshBasicMaterial, SphereGeometry, Vector3 } from "three";
+import {
+  hasVillainVoice,
+  playVillainDefeatSound,
+  playVillainVoice,
+  preloadVillainAudio,
+  stopAllVillainAudio,
+  stopVillainVoice,
+} from "../../audio/villainAudio";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { DialogueMessage } from "../../ui/DialogueBubble";
 import { triggerFixHaptic } from "../../ui/haptics";
 import { gameTextFont } from "../../ui/textFont";
 import { VillainCharacter, VillainStatus } from "../../villain/VillainCharacter";
 import { destinationPlatformRadius, hubSections } from "../hubSections";
+import { isPlayerObject } from "../playerCollision";
 import { playerWorldState } from "../playerWorldState";
-import { InteractiveMeshOutline } from "../InteractiveOutline";
 import { padVisualStyle } from "../padVisualStyle";
 import { triggerPopupLayout } from "../triggerPopupLayout";
+import { fixPulseGeometry, fixRingGeometry, useTriggerPadVisuals } from "../useTriggerPadVisuals";
 
 const cooldownMs = 1800;
 const triggerPadRadius = 1.33;
@@ -47,11 +55,13 @@ const villainDialogueText: Record<string, string> = {
   "site-improvement": "😈 Form Broken",
 };
 
-const villainVoicePath: Record<string, string> = {
-  performance: "/audio/Performance.mp3",
-  "quick-fix": "/audio/Quick-Fix.mp3",
-  "urgent-fix": "/audio/Urgent-Fix.mp3",
-  "site-improvement": "/audio/Site-Improvement.mp3",
+const smokeGeometry = new SphereGeometry(1, 8, 8);
+const fixPadVisualConfig = {
+  pulseBaseScale: 1.05,
+  pulseScaleAmount: 0.2,
+  ringColor: padVisualStyle.color,
+  ringOpacity: (_active: boolean, activationGlow: number) => 0.54 + activationGlow * 0.32,
+  pulseOpacity: (_active: boolean, activationGlow: number) => activationGlow * 0.17,
 };
 
 type SectionEncounterConfig = {
@@ -118,6 +128,13 @@ export function CombatPrototype({
 }: CombatPrototypeProps) {
   const [activeInfoId, setActiveInfoId] = useState<string | null>(null);
   const [visibleEncounterCount, setVisibleEncounterCount] = useState(1);
+
+  useEffect(() => {
+    preloadVillainAudio();
+    return stopAllVillainAudio;
+  }, []);
+
+  useEffect(() => stopAllVillainAudio(), [restartKey]);
 
   useEffect(() => {
     if (!activeInfoId) return undefined;
@@ -191,91 +208,21 @@ function SectionPortalEncounter({
   const [smokeActive, setSmokeActive] = useState(false);
   const [villainVisible, setVillainVisible] = useState(true);
   const [villainBubbleVisible, setVillainBubbleVisible] = useState(false);
-  const voicePath = villainVoicePath[encounter.id];
+  const voiceEnabled = hasVillainVoice(encounter.id);
   const lastActivatedRef = useRef(0);
   const lastInfoActivatedRef = useRef(0);
   const wasNearDialogueRef = useRef(false);
   const wasNearVillainRef = useRef(false);
   const wasOnVoicePlatformRef = useRef(false);
-  const villainBubbleVisibleRef = useRef(false);
   const villainBubbleUpdateTimerRef = useRef(0);
   const villainDialogueTimerRef = useRef(0);
   const sectionResolvedTimerRef = useRef(0);
   const defeatedRef = useRef(false);
-  const villainVoiceRef = useRef<HTMLAudioElement | null>(null);
-  const defeatSoundRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    const defeatSound = new Audio("/audio/defeat.mp3");
-    defeatSound.preload = "auto";
-    defeatSound.volume = 0.5;
-    defeatSound.muted = !isGameAudioEnabled();
-    defeatSound.load();
-    defeatSoundRef.current = defeatSound;
-
-    const voice = voicePath ? new Audio(voicePath) : null;
-    if (voice) {
-      voice.preload = "auto";
-      voice.volume = 0.48;
-      voice.muted = !isGameAudioEnabled();
-      voice.load();
-      villainVoiceRef.current = voice;
-    }
-
-    const unsubscribe = subscribeGameAudio(() => {
-      const muted = !isGameAudioEnabled();
-      defeatSound.muted = muted;
-      if (voice) voice.muted = muted;
-    });
-
-    return () => {
-      unsubscribe();
-      defeatSound.pause();
-      defeatSound.currentTime = 0;
-      defeatSoundRef.current = null;
-      if (voice) {
-        voice.pause();
-        voice.currentTime = 0;
-      }
-      villainVoiceRef.current = null;
-    };
-  }, [encounter.id, voicePath]);
-
-  const playVillainVoice = () => {
-    const voice = villainVoiceRef.current;
-    if (!voice) return;
-
-    voice.pause();
-    voice.currentTime = 0;
-    voice.muted = !isGameAudioEnabled();
-    void voice.play().catch(() => {
-      // Browsers can reject media playback until the player's first interaction.
-    });
-  };
-
-  const stopVillainVoice = () => {
-    const voice = villainVoiceRef.current;
-    if (!voice) return;
-
-    voice.pause();
-    voice.currentTime = 0;
-  };
-
-  const playDefeatSound = () => {
-    const defeatSound = defeatSoundRef.current;
-    if (!defeatSound) return;
-
-    defeatSound.currentTime = 0;
-    defeatSound.muted = !isGameAudioEnabled();
-    void defeatSound.play().catch(() => {
-      // Browsers can reject media playback until the player's first interaction.
-    });
-  };
+  useEffect(() => () => stopVillainVoice(encounter.id), [encounter.id]);
 
   const setVillainBubbleVisibilitySoon = (visible: boolean) => {
     window.clearTimeout(villainBubbleUpdateTimerRef.current);
     villainBubbleUpdateTimerRef.current = window.setTimeout(() => {
-      villainBubbleVisibleRef.current = visible;
       setVillainBubbleVisible(visible);
     }, 0);
   };
@@ -298,8 +245,8 @@ function SectionPortalEncounter({
     lastActivatedRef.current = now;
     window.clearTimeout(villainBubbleUpdateTimerRef.current);
     window.clearTimeout(villainDialogueTimerRef.current);
-    stopVillainVoice();
-    playDefeatSound();
+    stopVillainVoice(encounter.id);
+    playVillainDefeatSound();
     setPortalActive(true);
     setSmokeActive(true);
     setVillainBubbleVisible(false);
@@ -367,7 +314,7 @@ function SectionPortalEncounter({
       villainDistanceSq <= dialogueVillainRadiusSq;
     const nearVillain = !defeatedRef.current && villainDistanceSq <= dialogueVillainRadiusSq;
     const onVoicePlatform =
-      Boolean(voicePath) &&
+      voiceEnabled &&
       Math.abs(playerWorldState.position.x - encounter.platformPosition.x) <= destinationPlatformRadius &&
       Math.abs(playerWorldState.position.z - encounter.platformPosition.z) <= destinationPlatformRadius;
 
@@ -376,8 +323,8 @@ function SectionPortalEncounter({
     }
 
     if (onVoicePlatform !== wasOnVoicePlatformRef.current) {
-      if (onVoicePlatform && !defeatedRef.current) playVillainVoice();
-      else stopVillainVoice();
+      if (onVoicePlatform && !defeatedRef.current) playVillainVoice(encounter.id);
+      else stopVillainVoice(encounter.id);
     }
 
     if (!defeatedRef.current && encounter.id !== "quick-fix" && nearDialogueArea && !wasNearDialogueRef.current) {
@@ -417,7 +364,6 @@ function SectionPortalEncounter({
         <VillainCharacter
           basePosition={encounter.villainPosition}
           dialogue={villainCharacterDialogue}
-          outlineEnabled
           villainStatus={villainStatus}
         />
       )}
@@ -429,7 +375,6 @@ function SmokeDeathEffect({ position }: { position: Vector3 }) {
   const groupRef = useRef<Group>(null);
   const startedAtRef = useRef(0);
   const lastSmokeFrameRef = useRef(-1);
-  const smokeGeometry = useMemo(() => new SphereGeometry(1, 8, 8), []);
   const smokeMaterials = useMemo(
     () =>
       Array.from(
@@ -455,6 +400,8 @@ function SmokeDeathEffect({ position }: { position: Vector3 }) {
       speed: 0.65 + (index % 3) * 0.12,
     }))
   );
+
+  useEffect(() => () => smokeMaterials.forEach((material) => material.dispose()), [smokeMaterials]);
 
   useFrame(({ clock }) => {
     const frameSlot = Math.floor(clock.elapsedTime * 20);
@@ -510,20 +457,12 @@ type TriggerPadProps = {
 };
 
 export function TriggerPad({ active, label, onActivate, position }: TriggerPadProps) {
-  const ringRef = useRef<Mesh>(null);
-  const pulseRef = useRef<Mesh>(null);
-  const activeStartedAtRef = useRef(0);
-  const wasActiveRef = useRef(active);
+  const { pulseRef, ringRef } = useTriggerPadVisuals(active, fixPadVisualConfig);
   const playerInsideRef = useRef(false);
   const lastTriggeredAtRef = useRef(-Infinity);
 
   const isPlayerEvent = (event: IntersectionEnterPayload | IntersectionExitPayload) => {
-    let object: Object3D | null | undefined = event.other.rigidBodyObject ?? event.other.colliderObject;
-    while (object) {
-      if (object.name === "StudioCLTDPlayer") return true;
-      object = object.parent;
-    }
-    return false;
+    return isPlayerObject(event.other.rigidBodyObject) || isPlayerObject(event.other.colliderObject);
   };
 
   const handleEnter = (event: IntersectionEnterPayload) => {
@@ -541,38 +480,6 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
     playerInsideRef.current = false;
   };
 
-  useFrame(({ clock }) => {
-    if (!active && !wasActiveRef.current) return;
-
-    if (active && !wasActiveRef.current) {
-      activeStartedAtRef.current = clock.elapsedTime;
-    }
-
-    const activationGlow = active ? Math.max(0, 1 - (clock.elapsedTime - activeStartedAtRef.current) / 1) : 0;
-    const pulse = 1 + activationGlow * 0.05;
-    const glow = 0.54 + activationGlow * 0.32;
-    wasActiveRef.current = active;
-
-    if (ringRef.current) {
-      ringRef.current.scale.setScalar(pulse);
-      const material = ringRef.current.material;
-      if (material instanceof MeshBasicMaterial) {
-        material.color.set(padVisualStyle.color);
-        material.opacity = glow;
-      }
-    }
-
-    if (pulseRef.current) {
-      pulseRef.current.visible = active || activationGlow > 0;
-      pulseRef.current.scale.setScalar(1.05 + activationGlow * 0.2);
-      const material = pulseRef.current.material;
-      if (material instanceof MeshBasicMaterial) {
-        material.color.set(padVisualStyle.color);
-        material.opacity = activationGlow * 0.17;
-      }
-    }
-  });
-
   return (
     <group position={position}>
       <CylinderCollider
@@ -582,13 +489,10 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
-      <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]}>
-        <torusGeometry args={[1.3, 0.03, 8, 64]} />
+      <mesh ref={ringRef} geometry={fixRingGeometry} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.66} depthWrite={false} toneMapped={false} />
-        <InteractiveMeshOutline />
       </mesh>
-      <mesh ref={pulseRef} rotation-x={-Math.PI / 2} position={[0, 0.05, 0]} visible={false}>
-        <ringGeometry args={[0.86, 1.32, 64]} />
+      <mesh ref={pulseRef} geometry={fixPulseGeometry} rotation-x={-Math.PI / 2} position={[0, 0.05, 0]} visible={false} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       {label && (

@@ -8,11 +8,13 @@ import {
   RigidBody,
 } from "@react-three/rapier";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Color, Group, Mesh, MeshStandardMaterial, Object3D } from "three";
+import { Color, Group, Mesh, MeshToonMaterial, Object3D } from "three";
 import { activateSpeedBoost } from "../../player/speedBoost";
 import { playCollectibleSound } from "../../audio/collectibleSounds";
+import { comicToneGradient } from "../../characters/cartoonMaterials";
 import { BillboardLabel } from "../../ui/BillboardLabel";
-import { hubSections } from "../hubSections";
+import { InteractiveOutline } from "../InteractiveOutline";
+import { destinationPlatformRadius, hubSections, sectionRampApproachLength, sectionRampWidth } from "../hubSections";
 import { transportPadPositions } from "./TransportPads";
 
 const logoPath = "/logo/logo-optimized.glb";
@@ -24,11 +26,8 @@ const speedRespawnMs = 28000;
 const contactCountdownMs = 3000;
 const contactCooldownMs = 1200;
 const contactUrl = "https://www.crystalthedeveloper.ca/contact";
-const destinationPlatformRadius = 14;
 const platformClearance = 2.4;
-const bridgeHalfWidth = 2.1;
 const bridgeClearance = 2.5;
-const rampApproachLength = 14;
 const transportPadClearance = 3.8;
 const collectibleSpacing = 5;
 const placementSearchStep = 1.25;
@@ -110,7 +109,7 @@ function isOpenCollectiblePosition(position: readonly [number, number], placed: 
     ) return false;
 
     const [directionX, directionZ] = section.entrance;
-    const rampOuterOffset = destinationPlatformRadius + rampApproachLength;
+    const rampOuterOffset = destinationPlatformRadius + sectionRampApproachLength;
     const bridgeDistance = distanceToSegment(
       x,
       z,
@@ -119,7 +118,7 @@ function isOpenCollectiblePosition(position: readonly [number, number], placed: 
       sectionX + directionX * rampOuterOffset,
       sectionZ + directionZ * rampOuterOffset,
     );
-    if (bridgeDistance < bridgeHalfWidth + bridgeClearance) return false;
+    if (bridgeDistance < sectionRampWidth / 2 + bridgeClearance) return false;
   }
 
   if (transportPadPositions.some(([padX, padZ]) => Math.hypot(x - padX, z - padZ) < transportPadClearance)) {
@@ -166,17 +165,16 @@ const logoColors: Record<LogoKind, string> = {
 
 function createSharedMaterial(kind: LogoKind) {
   const color = new Color(logoColors[kind]);
-  return new MeshStandardMaterial({
+  return new MeshToonMaterial({
     color,
     emissive: color,
     emissiveIntensity: kind === "light" ? 0.12 : kind === "coin" ? 0.55 : kind === "contact" ? 0.65 : kind === "dark" ? 0.08 : kind === "speed" ? 0.7 : 0.55,
-    metalness: 0,
-    roughness: 0.72,
+    gradientMap: comicToneGradient,
     toneMapped: false,
   });
 }
 
-function createLogoTemplate(source: Group, material: MeshStandardMaterial) {
+function createLogoTemplate(source: Group, material: MeshToonMaterial) {
   const logo = source.clone(true);
 
   logo.traverse((object: Object3D) => {
@@ -411,13 +409,18 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
       />
     </>
   );
-  const visual = logo.kind === "contact" || logo.kind === "dark" ? (
-    <ContactLogoVisual
-      object={logo.object}
-      rotation={worldLogoRotation + (logo.rotationOffset ?? 0)}
-      scale={logoScale * (logo.scaleMultiplier ?? 1)}
-    />
-  ) : standardVisual;
+  const visual = (
+    <>
+      {logo.kind === "contact" || logo.kind === "dark" ? (
+        <ContactLogoVisual
+          object={logo.object}
+          rotation={worldLogoRotation + (logo.rotationOffset ?? 0)}
+          scale={logoScale * (logo.scaleMultiplier ?? 1)}
+        />
+      ) : standardVisual}
+      <InteractiveOutline object={logo.object} />
+    </>
+  );
 
   if (logo.kind === "light" || logo.kind === "dark") {
     return <group position={position}>{visual}</group>;

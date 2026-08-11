@@ -1,9 +1,9 @@
 import { CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload, RigidBody } from "@react-three/rapier";
 import { useEffect, useMemo, useRef } from "react";
-import { MeshStandardMaterial, Object3D, RingGeometry, Vector3 } from "three";
+import { MeshStandardMaterial, RingGeometry, Vector3 } from "three";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { hubSections } from "../hubSections";
-import { InteractiveMeshOutline } from "../InteractiveOutline";
+import { isPlayerObject } from "../playerCollision";
 import { padVisualStyle } from "../padVisualStyle";
 import { triggerPopupLayout } from "../triggerPopupLayout";
 
@@ -45,15 +45,6 @@ type TransportPadsProps = {
   onTransport: (destination: TransportDestination) => void;
   restartKey: number;
 };
-
-function isPlayerObject(object?: Object3D) {
-  let current: Object3D | null | undefined = object;
-  while (current) {
-    if (current.name === "StudioCLTDPlayer") return true;
-    current = current.parent;
-  }
-  return false;
-}
 
 export function TransportPads({ onTransport, restartKey }: TransportPadsProps) {
   const lastTransportAtRef = useRef(-Infinity);
@@ -155,9 +146,7 @@ function TransportPad({
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
-      <mesh geometry={geometry} material={material} rotation-x={-Math.PI / 2}>
-        <InteractiveMeshOutline />
-      </mesh>
+      <mesh geometry={geometry} material={material} rotation-x={-Math.PI / 2} />
       <BillboardLabel
         color={padVisualStyle.color}
         fontSize={label === "Site Improvement" ? 0.2 : 0.24}

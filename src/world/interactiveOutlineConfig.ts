@@ -1,6 +1,6 @@
-export const ENABLE_OUTLINES = false;
+export const ENABLE_OUTLINES = true;
 
 export const interactiveOutlineConfig = {
   color: "#1a1a1a",
-  thicknessPx: 1,
+  thicknessPx: 2,
 } as const;

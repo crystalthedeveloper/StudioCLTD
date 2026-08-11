@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { isGameFocused, subscribeGameFocus } from "./gameFocus";
 
 export type MovementControls = {
@@ -119,5 +119,5 @@ export function useKeyboardControls() {
     };
   }, []);
 
-  return useMemo(() => controls, [controls]);
+  return controls;
 }

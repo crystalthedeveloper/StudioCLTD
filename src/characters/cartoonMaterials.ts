@@ -9,7 +9,7 @@ import {
   RGBAFormat,
 } from "three";
 
-const toonGradient = new DataTexture(
+export const comicToneGradient = new DataTexture(
   new Uint8Array([
     92, 92, 92, 255,
     178, 178, 178, 255,
@@ -19,10 +19,10 @@ const toonGradient = new DataTexture(
   1,
   RGBAFormat,
 );
-toonGradient.minFilter = NearestFilter;
-toonGradient.magFilter = NearestFilter;
-toonGradient.generateMipmaps = false;
-toonGradient.needsUpdate = true;
+comicToneGradient.minFilter = NearestFilter;
+comicToneGradient.magFilter = NearestFilter;
+comicToneGradient.generateMipmaps = false;
+comicToneGradient.needsUpdate = true;
 
 const toonMaterialCache = new WeakMap<Material, Material>();
 
@@ -41,7 +41,7 @@ export function createCartoonMaterial(source: Material) {
     emissive: source.emissive,
     emissiveIntensity: source.emissiveIntensity,
     emissiveMap: source.emissiveMap,
-    gradientMap: toonGradient,
+    gradientMap: comicToneGradient,
     lightMap: source.lightMap,
     lightMapIntensity: source.lightMapIntensity,
     map: source.map,

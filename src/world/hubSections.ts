@@ -10,6 +10,8 @@ export type HubSection = {
 
 const blockSpacing = 48;
 export const destinationPlatformRadius = 14;
+export const sectionRampApproachLength = 14;
+export const sectionRampWidth = 4.2;
 
 export const hubSections: HubSection[] = [
   { id: "tips", name: "Tips", icon: "T", position: [-blockSpacing, 1.5, -blockSpacing], entrance: [0, 1], color: "#63d8ff", accent: "#1aa7ff" },

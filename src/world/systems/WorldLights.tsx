@@ -10,20 +10,11 @@ export function WorldLights() {
 
   return (
     <>
-      <ambientLight intensity={0.84} color="#f2f0ea" />
-      <hemisphereLight intensity={0.57} color="#e6e1da" groundColor="#302f34" />
-      <ambientLight ref={characterFillRef} intensity={0.38} color="#fffaf2" />
-      <directionalLight color="#ffe2bd" intensity={1.35} position={[-16, 30, 24]} />
-      <directionalLight color="#ffd8ad" intensity={0.72} position={[14, 13, 18]} />
-      <rectAreaLight color="#ffdfbf" intensity={1.35} width={42} height={26} position={[0, 14, 18]} rotation={[-0.72, 0, 0]} />
-      <spotLight
-        color="#fff1d5"
-        intensity={11}
-        position={[6, 18, 12]}
-        angle={0.5}
-        penumbra={0.92}
-        distance={70}
-      />
+      <ambientLight intensity={1.05} color="#fff8e8" />
+      <hemisphereLight intensity={1.25} color="#d9f1ff" groundColor="#70766a" />
+      <ambientLight ref={characterFillRef} intensity={0.42} color="#fffdf5" />
+      <directionalLight color="#fff1c9" intensity={1.35} position={[-24, 36, 20]} />
+      <directionalLight color="#c8e9ff" intensity={0.38} position={[20, 18, -16]} />
     </>
   );
 }

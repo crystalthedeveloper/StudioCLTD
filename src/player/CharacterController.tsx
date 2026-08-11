@@ -1,4 +1,4 @@
-import { CapsuleCollider, RigidBody, RapierRigidBody } from "@react-three/rapier";
+import { CapsuleCollider, RigidBody, RapierRigidBody, useRapier } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import { MathUtils, Vector3 } from "three";
@@ -10,6 +10,7 @@ import { useKeyboardControls } from "./useKeyboardControls";
 import { DialogueMessage } from "../ui/DialogueBubble";
 import { playerWorldState } from "../world/playerWorldState";
 import type { TransportDestination } from "../world/systems/TransportPads";
+import { installFootstepAudioUnlock, playConcreteFootstep } from "./footsteps";
 
 const moveDirection = new Vector3();
 const playerForward = new Vector3();
@@ -19,6 +20,7 @@ const turnSpeed = 1.75;
 const forwardBackSmoothing = 11;
 const forwardBackStopSmoothing = 12;
 const maxFrameDelta = 1 / 30;
+const groundedRayDistance = 1.16;
 
 type CharacterControllerProps = {
   dialogue: DialogueMessage | null;
@@ -38,6 +40,7 @@ export function CharacterController({
   transportDestination,
 }: CharacterControllerProps) {
   const bodyRef = useRef<RapierRigidBody | null>(null);
+  const { rapier, world } = useRapier();
   const yawRef = useRef(0);
   const cameraYawRef = useRef(0);
   const controls = useKeyboardControls();
@@ -45,7 +48,12 @@ export function CharacterController({
   const movementDirectionRef = useRef(new Vector3());
   const animationStateRef = useRef<CharacterAnimationState>("idle");
   const forwardBackSpeedRef = useRef(0);
+  const lastFootstepAtRef = useRef(-Infinity);
+  const footstepVariationRef = useRef(0);
+  const groundRay = useMemo(() => new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 }), [rapier]);
   const spawn = useMemo<[number, number, number]>(() => [0, 2.8, 8], []);
+
+  useEffect(() => installFootstepAudioUnlock(), []);
 
   useEffect(() => {
     const body = bodyRef.current;
@@ -55,6 +63,7 @@ export function CharacterController({
     forwardBackSpeedRef.current = 0;
     movementDirectionRef.current.set(0, 0, 0);
     animationStateRef.current = "idle";
+    lastFootstepAtRef.current = -Infinity;
     playerWorldState.position.set(spawn[0], spawn[1], spawn[2]);
 
     if (!body) return;
@@ -79,7 +88,7 @@ export function CharacterController({
     body.setAngvel({ x: 0, y: 0, z: 0 }, true);
   }, [transportDestination]);
 
-  useFrame((_, delta) => {
+  useFrame(({ clock }, delta) => {
     const body = bodyRef.current;
     if (!body) return;
     const frameDelta = Math.min(delta, maxFrameDelta);
@@ -131,6 +140,29 @@ export function CharacterController({
     moveDirection.addScaledVector(playerForward, forwardBackSpeedRef.current);
 
     const isMoving = Math.abs(forwardBackSpeedRef.current) > 0.08;
+    const horizontalSpeed = Math.hypot(velocity.x, velocity.z);
+    groundRay.origin.x = translation.x;
+    groundRay.origin.y = translation.y;
+    groundRay.origin.z = translation.z;
+    const grounded = world.castRay(
+      groundRay,
+      groundedRayDistance,
+      true,
+      rapier.QueryFilterFlags.EXCLUDE_SENSORS,
+      undefined,
+      undefined,
+      body,
+    ) !== null;
+    if (isMoving && horizontalSpeed > 0.8 && grounded) {
+      const cadence = isSpeedBoostActive() ? 0.3 : 0.42;
+      if (clock.elapsedTime - lastFootstepAtRef.current >= cadence) {
+        lastFootstepAtRef.current = clock.elapsedTime;
+        footstepVariationRef.current = (footstepVariationRef.current + 0.37) % 1;
+        playConcreteFootstep(footstepVariationRef.current);
+      }
+    } else {
+      lastFootstepAtRef.current = clock.elapsedTime;
+    }
     const targetVelocity = {
       x: isMoving ? moveDirection.x : 0,
       z: isMoving ? moveDirection.z : 0,

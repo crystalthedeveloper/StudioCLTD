@@ -9,6 +9,7 @@ import {
   villainBodyMaterialName,
   villainMaterialProfile,
 } from "../characters/characterMaterials";
+import { applyCartoonMaterials } from "../characters/cartoonMaterials";
 import { DialogueBubble, DialogueMessage } from "../ui/DialogueBubble";
 import { playerWorldState } from "../world/playerWorldState";
 import { InteractiveOutline } from "../world/InteractiveOutline";
@@ -32,7 +33,7 @@ const lookDirection = new Vector3();
 const rotationDamping = 5.5;
 const modelFacingOffset = 0;
 const modelYOffset = 0.28;
-const villainMaterialTuningVersion = 2;
+const villainMaterialTuningVersion = 3;
 
 type HighlightableMaterial = Material & {
   color?: Color;
@@ -61,6 +62,7 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
 
   useEffect(() => {
     applyCharacterMaterials(scene, model.materials, villainMaterialProfile);
+    applyCartoonMaterials(scene);
 
     scene.traverse((object) => {
       if (object instanceof Mesh) {
@@ -70,7 +72,7 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
       }
     });
 
-    enhanceVillainSuitMaterial(model.materials?.[villainBodyMaterialName] ?? findVillainSuitMaterial(scene));
+    enhanceVillainSuitMaterial(findVillainSuitMaterial(scene));
   }, [scene]);
 
   useEffect(() => {
@@ -163,19 +165,19 @@ function enhanceVillainSuitMaterial(material: Material | null | undefined) {
 
   if (suitMaterial.emissive) {
     suitMaterial.emissive.set("#050505");
-    suitMaterial.emissiveIntensity = 0.06;
+    suitMaterial.emissiveIntensity = 0.025;
   }
 
   if (typeof suitMaterial.envMapIntensity === "number") {
-    suitMaterial.envMapIntensity = 0.2;
+    suitMaterial.envMapIntensity = 0.08;
   }
 
   if (typeof suitMaterial.roughness === "number") {
-    suitMaterial.roughness = 0.8;
+    suitMaterial.roughness = 0.9;
   }
 
   if (typeof suitMaterial.metalness === "number") {
-    suitMaterial.metalness = 0.15;
+    suitMaterial.metalness = 0;
   }
 
   suitMaterial.needsUpdate = true;

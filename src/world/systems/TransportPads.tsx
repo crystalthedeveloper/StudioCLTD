@@ -5,31 +5,35 @@ import { BillboardLabel } from "../../ui/BillboardLabel";
 import { hubSections } from "../hubSections";
 import { InteractiveMeshOutline } from "../InteractiveOutline";
 import { padVisualStyle } from "../padVisualStyle";
+import { triggerPopupLayout } from "../triggerPopupLayout";
 
 const transportCooldownMs = 1200;
 const arrivalDistanceFromSection = 16;
-const transportRowZ = 1.5;
-const transportPadSpacing = 4.5;
 const transportSectionIds = [
   "tips",
-  "showcase",
-  "performance",
-  "site-improvement",
+  "offers",
   "value",
   "quick-fix",
+  "performance",
+  "site-improvement",
   "urgent-fix",
-  "offers",
+  "showcase",
 ] as const;
 const transportSections = transportSectionIds.map((sectionId) => {
   const section = hubSections.find(({ id }) => id === sectionId);
   if (!section) throw new Error(`Missing transport section: ${sectionId}`);
   return section;
 });
-const transportRowWidth = (transportSections.length - 1) * transportPadSpacing;
-const padPositions = transportSections.map((_, index) => [
-  index * transportPadSpacing - transportRowWidth / 2,
-  transportRowZ,
-] as const);
+export const transportPadPositions = [
+  [-3, -8],
+  [0, -4],
+  [3, -8],
+  [-3, 0],
+  [3, 0],
+  [0, 4],
+  [-3, 8],
+  [3, 8],
+] as const;
 
 export type TransportDestination = {
   id: number;
@@ -87,8 +91,8 @@ export function TransportPads({ onTransport, restartKey }: TransportPadsProps) {
     lastTransportAtRef.current = now;
 
     const sectionPosition = new Vector3(...section.position);
-    const towardCenter = new Vector3(-sectionPosition.x, 0, -sectionPosition.z).normalize();
-    const arrival = sectionPosition.clone().addScaledVector(towardCenter, arrivalDistanceFromSection);
+    const towardEntrance = new Vector3(section.entrance[0], 0, section.entrance[1]);
+    const arrival = sectionPosition.clone().addScaledVector(towardEntrance, arrivalDistanceFromSection);
     const towardSection = sectionPosition.clone().sub(arrival).normalize();
     transportIdRef.current += 1;
 
@@ -108,7 +112,7 @@ export function TransportPads({ onTransport, restartKey }: TransportPadsProps) {
           label={section.name}
           material={resources.material}
           onEnter={(event) => transport(section, event)}
-          position={padPositions[index]}
+          position={transportPadPositions[index]}
         />
       ))}
     </group>
@@ -157,9 +161,8 @@ function TransportPad({
       <BillboardLabel
         color={padVisualStyle.color}
         fontSize={label === "Site Improvement" ? 0.2 : 0.24}
-        position={[0, 0.92, 0]}
+        position={[0, triggerPopupLayout.labelHeight, 0]}
         maxWidth={3}
-        maxVisibleDistance={14}
       >
         {label}
       </BillboardLabel>

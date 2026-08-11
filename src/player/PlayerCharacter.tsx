@@ -9,10 +9,10 @@ import {
   playerMaskMaterialName,
   playerMaterialProfile,
 } from "../characters/characterMaterials";
+import { applyCartoonMaterials, createCartoonMaterial } from "../characters/cartoonMaterials";
 import { DialogueBubble, DialogueMessage } from "../ui/DialogueBubble";
 import { isSpeedBoostActive, subscribeSpeedBoostChange } from "./speedBoost";
 import { CharacterAnimationState } from "./playerTypes";
-import { InteractiveOutline } from "../world/InteractiveOutline";
 
 type PlayerCharacterProps = {
   animationStateRef: MutableRefObject<CharacterAnimationState>;
@@ -27,7 +27,7 @@ const playerAnimationByState: Record<CharacterAnimationState, string> = {
   run: "runH",
 };
 const playerPoweredMaterialName = "HWhiteClown_material";
-const playerMaterialTuningVersion = 2;
+const playerMaterialTuningVersion = 3;
 
 type PlayerMaterialSlot = {
   index: number | null;
@@ -79,6 +79,7 @@ export function PlayerCharacter({
 
   useEffect(() => {
     applyCharacterMaterials(scene, model.materials, playerMaterialProfile);
+    applyCartoonMaterials(scene);
 
     scene.traverse((object) => {
       if (object instanceof Mesh) {
@@ -88,7 +89,8 @@ export function PlayerCharacter({
       }
     });
 
-    poweredBodyMaterialRef.current = model.materials?.[playerPoweredMaterialName] ?? findMaterialByName(scene, playerPoweredMaterialName);
+    const poweredBodyMaterial = model.materials?.[playerPoweredMaterialName] ?? findMaterialByName(scene, playerPoweredMaterialName);
+    poweredBodyMaterialRef.current = poweredBodyMaterial ? createCartoonMaterial(poweredBodyMaterial) : null;
     materialSlotsRef.current = collectBodyMaterialSlots(scene);
     materialSlotsRef.current.forEach((slot) => enhancePlayerSuitMaterial(slot.material));
     if (poweredBodyMaterialRef.current) enhancePlayerSuitMaterial(poweredBodyMaterialRef.current);
@@ -233,7 +235,6 @@ export function PlayerCharacter({
     <group ref={group}>
       <DialogueBubble message={dialogue} position={[0, 2.65, 0]} />
       <primitive object={scene} rotation-y={Math.PI} scale={1.05} />
-      <InteractiveOutline object={scene} />
     </group>
   );
 }
@@ -284,19 +285,19 @@ function enhancePlayerSuitMaterial(material: Material) {
 
   if (suitMaterial.emissive) {
     suitMaterial.emissive.set("#050505");
-    suitMaterial.emissiveIntensity = 0.06;
+    suitMaterial.emissiveIntensity = 0.025;
   }
 
   if (typeof suitMaterial.envMapIntensity === "number") {
-    suitMaterial.envMapIntensity = 0.2;
+    suitMaterial.envMapIntensity = 0.08;
   }
 
   if (typeof suitMaterial.roughness === "number") {
-    suitMaterial.roughness = 0.8;
+    suitMaterial.roughness = 0.9;
   }
 
   if (typeof suitMaterial.metalness === "number") {
-    suitMaterial.metalness = 0.15;
+    suitMaterial.metalness = 0;
   }
 
   suitMaterial.needsUpdate = true;

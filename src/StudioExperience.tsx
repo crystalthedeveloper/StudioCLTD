@@ -8,6 +8,7 @@ import { setGameFocused, useGameFocus } from "./player/gameFocus";
 import { HubOverlay } from "./ui/HubOverlay";
 import { GameHud } from "./ui/GameHud";
 import { TrackpadControl } from "./ui/TrackpadControl";
+import { triggerTrophyHaptic } from "./ui/haptics";
 import { StudioWorld } from "./world/StudioWorld";
 import { preloadScreenTextures, unlockShowcaseVideoPlayback } from "./world/systems/HubSections";
 import { distanceFog } from "./world/distanceFog";
@@ -23,12 +24,23 @@ type StudioExperienceProps = {
 export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRestart, restartKey }: StudioExperienceProps) {
   const gameFocused = useGameFocus();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const previousCompletedSectionCountRef = useRef(0);
   const [coins, setCoins] = useState(0);
+  const [completedSectionCount, setCompletedSectionCount] = useState(0);
   const [screenAssetsReady, setScreenAssetsReady] = useState(false);
 
   useEffect(() => {
     setCoins(0);
+    setCompletedSectionCount(0);
+    previousCompletedSectionCountRef.current = 0;
   }, [restartKey]);
+
+  useEffect(() => {
+    if (completedSectionCount === 8 && previousCompletedSectionCountRef.current < 8) {
+      triggerTrophyHaptic();
+    }
+    previousCompletedSectionCountRef.current = completedSectionCount;
+  }, [completedSectionCount]);
 
   useEffect(() => {
     let cancelled = false;
@@ -146,7 +158,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
             outputColorSpace: SRGBColorSpace,
             powerPreference: "high-performance",
             toneMapping: ACESFilmicToneMapping,
-            toneMappingExposure: 1.04,
+            toneMappingExposure: 1.12,
           }}
           camera={{ position: [11, 7, 15], fov: 58, near: 0.1, far: 10000 }}
           onPointerDown={focusGame}
@@ -159,13 +171,17 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
             gl.shadowMap.enabled = false;
           }}
         >
-          <color attach="background" args={["#070916"]} />
+          <color attach="background" args={["#62bff5"]} />
           <fog attach="fog" args={[distanceFog.color, distanceFog.near, distanceFog.far]} />
           <Suspense fallback={null}>
             <Physics gravity={[0, -20, 0]}>
               <StudioWorld
                 onCoinCollect={() => setCoins((current) => current + 1)}
-                onPenaltyCollect={() => setCoins(0)}
+                onPenaltyCollect={() => {
+                  setCoins(0);
+                  setCompletedSectionCount(0);
+                }}
+                onSectionComplete={() => setCompletedSectionCount((current) => Math.min(8, current + 1))}
                 restartKey={restartKey}
               />
             </Physics>
@@ -173,7 +189,12 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         </Canvas>
       </div>
       <StartupProgress onProgress={onLoadProgress} onReady={onReady} screenAssetsReady={screenAssetsReady} />
-      <GameHud onOpenWebsite={onOpenWebsite} onRestart={onRestart} points={coins} />
+      <GameHud
+        completedSectionCount={completedSectionCount}
+        onOpenWebsite={onOpenWebsite}
+        onRestart={onRestart}
+        points={coins}
+      />
       <HubOverlay />
       <div className={`game-focus-hint${gameFocused ? "" : " game-focus-hint--visible"}`}>
         <strong>Click to Play</strong>

@@ -10,9 +10,10 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Color, Group, Mesh, MeshStandardMaterial, Object3D } from "three";
 import { activateSpeedBoost } from "../../player/speedBoost";
-import { InteractiveOutline } from "../InteractiveOutline";
+import { playCollectibleSound } from "../../audio/collectibleSounds";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { hubSections } from "../hubSections";
+import { transportPadPositions } from "./TransportPads";
 
 const logoPath = "/logo/logo-optimized.glb";
 const logoScale = 1.8;
@@ -25,16 +26,16 @@ const contactCooldownMs = 1200;
 const contactUrl = "https://www.crystalthedeveloper.ca/contact";
 const destinationPlatformRadius = 14;
 const platformClearance = 2.4;
-const bridgeStartRadius = 24;
 const bridgeHalfWidth = 2.1;
 const bridgeClearance = 2.5;
+const rampApproachLength = 14;
 const transportPadClearance = 3.8;
 const collectibleSpacing = 5;
 const placementSearchStep = 1.25;
 const placementSearchDirections = 32;
 const placementWorldLimit = 68;
 
-type LogoKind = "coin" | "speed" | "penalty" | "contact" | "light";
+type LogoKind = "coin" | "speed" | "penalty" | "contact" | "light" | "dark";
 
 type PlazaLogo = {
   id: string;
@@ -64,6 +65,9 @@ const plazaLogos: PlazaLogo[] = [
   { id: "light-3", kind: "light", position: [-42, -32] },
   { id: "light-4", kind: "light", position: [-8, 48] },
   { id: "light-5", kind: "light", position: [-58, 6] },
+  { id: "dark-1", kind: "dark", position: [-34, 30], rotationOffset: -0.1 },
+  { id: "dark-2", kind: "dark", position: [36, -28], rotationOffset: 0.12 },
+  { id: "dark-3", kind: "dark", position: [10, 52], rotationOffset: -0.05 },
   { id: "coin-center-1", kind: "coin", position: [-12, 5], rotationOffset: -0.14, scaleMultiplier: 0.94 },
   { id: "coin-center-2", kind: "coin", position: [14, 9], rotationOffset: 0.1, scaleMultiplier: 1.08 },
   { id: "coin-center-3", kind: "coin", position: [-8, -13], rotationOffset: -0.08, scaleMultiplier: 1.02 },
@@ -76,8 +80,6 @@ const plazaLogos: PlazaLogo[] = [
   { id: "penalty-center-1", kind: "penalty", position: [-25, -8], rotationOffset: -0.15, scaleMultiplier: 1.04 },
   { id: "contact", kind: "contact", position: [0, 18], rotationOffset: 0.08, scaleMultiplier: 1.06 },
 ];
-
-const transportPadPositions = Array.from({ length: 8 }, (_, index) => [index * 4.5 - 15.75, 1.5] as const);
 
 function distanceToSegment(
   x: number,
@@ -102,19 +104,20 @@ function isOpenCollectiblePosition(position: readonly [number, number], placed: 
 
   for (const section of hubSections) {
     const [sectionX, , sectionZ] = section.position;
-    if (Math.hypot(x - sectionX, z - sectionZ) < destinationPlatformRadius + platformClearance) return false;
+    if (
+      Math.abs(x - sectionX) < destinationPlatformRadius + platformClearance &&
+      Math.abs(z - sectionZ) < destinationPlatformRadius + platformClearance
+    ) return false;
 
-    const sectionDistance = Math.hypot(sectionX, sectionZ);
-    const directionX = sectionX / sectionDistance;
-    const directionZ = sectionZ / sectionDistance;
-    const bridgeEndRadius = sectionDistance - destinationPlatformRadius + 1.2;
+    const [directionX, directionZ] = section.entrance;
+    const rampOuterOffset = destinationPlatformRadius + rampApproachLength;
     const bridgeDistance = distanceToSegment(
       x,
       z,
-      directionX * bridgeStartRadius,
-      directionZ * bridgeStartRadius,
-      directionX * bridgeEndRadius,
-      directionZ * bridgeEndRadius,
+      sectionX + directionX * destinationPlatformRadius,
+      sectionZ + directionZ * destinationPlatformRadius,
+      sectionX + directionX * rampOuterOffset,
+      sectionZ + directionZ * rampOuterOffset,
     );
     if (bridgeDistance < bridgeHalfWidth + bridgeClearance) return false;
   }
@@ -158,6 +161,7 @@ const logoColors: Record<LogoKind, string> = {
   penalty: "#991b1b",
   contact: "#2583e8",
   light: "#ffffff",
+  dark: "#000",
 };
 
 function createSharedMaterial(kind: LogoKind) {
@@ -165,9 +169,9 @@ function createSharedMaterial(kind: LogoKind) {
   return new MeshStandardMaterial({
     color,
     emissive: color,
-    emissiveIntensity: kind === "light" ? 1.5 : kind === "coin" ? 1 : kind === "contact" ? 0.94 : 0.88,
-    metalness: 0.08,
-    roughness: 0.38,
+    emissiveIntensity: kind === "light" ? 0.12 : kind === "coin" ? 0.55 : kind === "contact" ? 0.65 : kind === "dark" ? 0.08 : kind === "speed" ? 0.7 : 0.55,
+    metalness: 0,
+    roughness: 0.72,
     toneMapped: false,
   });
 }
@@ -201,6 +205,7 @@ export function LogoLightField({ onCoinCollect, onPenaltyCollect, restartKey }: 
       penalty: createSharedMaterial("penalty"),
       contact: createSharedMaterial("contact"),
       light: createSharedMaterial("light"),
+      dark: createSharedMaterial("dark"),
     }),
     [],
   );
@@ -211,6 +216,7 @@ export function LogoLightField({ onCoinCollect, onPenaltyCollect, restartKey }: 
       penalty: createLogoTemplate(scene, materials.penalty),
       contact: createLogoTemplate(scene, materials.contact),
       light: createLogoTemplate(scene, materials.light),
+      dark: createLogoTemplate(scene, materials.dark),
     }),
     [materials, scene],
   );
@@ -283,6 +289,7 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
     contactActiveRef.current = true;
     contactOpenedRef.current = false;
     contactCooldownUntilRef.current = now + contactCooldownMs;
+    playCollectibleSound("contact");
     setContactCountdown(3);
     const startedAt = performance.now();
 
@@ -355,22 +362,26 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
       ) return;
 
       if (logo.kind === "coin") {
-        collectAndRespawn(onCoinCollect);
+        collectAndRespawn(() => {
+          playCollectibleSound("coin");
+          onCoinCollect();
+        });
         return;
       }
 
       if (logo.kind === "penalty") {
-        collectedRef.current = true;
-        availableRef.current = false;
-        colliderRef.current?.setEnabled(false);
-        logo.object.visible = false;
-        setAvailable(false);
-        onPenaltyCollect();
+        collectAndRespawn(() => {
+          playCollectibleSound("penalty");
+          onPenaltyCollect();
+        });
         return;
       }
 
       if (logo.kind === "speed") {
-        collectAndRespawn(activateSpeedBoost);
+        collectAndRespawn(() => {
+          playCollectibleSound("speed");
+          activateSpeedBoost();
+        });
         return;
       }
 
@@ -398,10 +409,9 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
         scale={logoScale * (logo.scaleMultiplier ?? 1)}
         dispose={null}
       />
-      {logo.kind !== "light" && <InteractiveOutline object={logo.object} />}
     </>
   );
-  const visual = logo.kind === "contact" ? (
+  const visual = logo.kind === "contact" || logo.kind === "dark" ? (
     <ContactLogoVisual
       object={logo.object}
       rotation={worldLogoRotation + (logo.rotationOffset ?? 0)}
@@ -409,7 +419,7 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
     />
   ) : standardVisual;
 
-  if (logo.kind === "light") {
+  if (logo.kind === "light" || logo.kind === "dark") {
     return <group position={position}>{visual}</group>;
   }
 
@@ -447,7 +457,6 @@ function ContactLogoVisual({ object, rotation, scale }: { object: Object3D; rota
   return (
     <group ref={groupRef} rotation-y={rotation}>
       <primitive object={object} scale={scale} dispose={null} />
-      <InteractiveOutline object={object} />
     </group>
   );
 }

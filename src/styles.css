@@ -294,6 +294,12 @@ canvas {
   stroke-width: 1.8;
 }
 
+.game-hud__sound-icon {
+  display: block;
+  font-size: clamp(19px, 2.5vmin, 25px);
+  line-height: 1;
+}
+
 .game-hud__panel {
   display: flex;
   width: 100%;
@@ -312,6 +318,22 @@ canvas {
 .game-hud__points strong {
   font-size: clamp(20px, 2.8vmin, 28px);
   line-height: 1;
+}
+
+.game-hud__section-progress {
+  align-items: center;
+  justify-content: center;
+  height: clamp(44px, 6vmin, 58px);
+  border-color: rgba(255, 230, 0, 0.58);
+  color: #ffe600;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+
+.game-hud__section-progress strong {
+  font-size: clamp(14px, 2vmin, 19px);
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .game-hud__speed {
@@ -415,8 +437,8 @@ canvas {
 
 .trackpad {
   position: relative;
-  width: clamp(132px, 18vw, 156px);
-  height: clamp(132px, 18vw, 156px);
+  width: clamp(103px, 14vw, 122px);
+  height: clamp(103px, 14vw, 122px);
   border: 1px solid rgba(245, 247, 251, 0.22);
   border-radius: 50%;
   background: rgba(10, 13, 20, 0.34);
@@ -436,15 +458,15 @@ canvas {
 
 .trackpad::before {
   left: 50%;
-  top: 20px;
-  bottom: 20px;
+  top: 16px;
+  bottom: 16px;
   width: 1px;
 }
 
 .trackpad::after {
   top: 50%;
-  left: 20px;
-  right: 20px;
+  left: 16px;
+  right: 16px;
   height: 1px;
 }
 
@@ -452,8 +474,8 @@ canvas {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 38px;
-  height: 38px;
+  width: 30px;
+  height: 30px;
   border: 1px solid rgba(255, 255, 255, 0.42);
   border-radius: 50%;
   background: rgba(245, 247, 251, 0.2);
@@ -474,12 +496,12 @@ canvas {
   }
 
   .trackpad {
-    width: clamp(158px, 42vw, 176px);
-    height: clamp(158px, 42vw, 176px);
+    width: clamp(123px, 33vw, 137px);
+    height: clamp(123px, 33vw, 137px);
   }
 
   .trackpad__thumb {
-    width: 64px;
-    height: 64px;
+    width: 50px;
+    height: 50px;
   }
 }

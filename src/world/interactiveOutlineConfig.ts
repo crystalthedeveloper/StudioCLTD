@@ -1,4 +1,4 @@
-export const ENABLE_OUTLINES = true;
+export const ENABLE_OUTLINES = false;
 
 export const interactiveOutlineConfig = {
   color: "#1a1a1a",

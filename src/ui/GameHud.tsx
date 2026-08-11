@@ -1,12 +1,15 @@
 import { useSpeedBoostRemainingMs, speedBoostDurationMs } from "../player/speedBoost";
+import { setGameAudioEnabled, useGameAudioEnabled } from "../audio/gameAudio";
 
 type GameHudProps = {
+  completedSectionCount: number;
   onOpenWebsite: () => void;
   onRestart: () => void;
   points: number;
 };
 
-export function GameHud({ onOpenWebsite, onRestart, points }: GameHudProps) {
+export function GameHud({ completedSectionCount, onOpenWebsite, onRestart, points }: GameHudProps) {
+  const audioEnabled = useGameAudioEnabled();
   const remainingMs = useSpeedBoostRemainingMs();
   const active = remainingMs > 0;
   const progress = active ? Math.min(100, (remainingMs / speedBoostDurationMs) * 100) : 0;
@@ -14,6 +17,15 @@ export function GameHud({ onOpenWebsite, onRestart, points }: GameHudProps) {
   return (
     <aside className="game-hud" aria-label="Game controls and status">
       <div className="game-hud__actions">
+        <button
+          type="button"
+          onClick={() => setGameAudioEnabled(!audioEnabled)}
+          aria-label={audioEnabled ? "Mute game audio" : "Enable game audio"}
+          aria-pressed={!audioEnabled}
+          title={audioEnabled ? "Sound On" : "Sound Off"}
+        >
+          <span className="game-hud__sound-icon" aria-hidden="true">{audioEnabled ? "🔊" : "🔇"}</span>
+        </button>
         <button type="button" onClick={onRestart} aria-label="Restart world" title="Restart">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7" />
@@ -29,6 +41,14 @@ export function GameHud({ onOpenWebsite, onRestart, points }: GameHudProps) {
 
       <section className="game-hud__panel game-hud__points" aria-label={`${points} points`} aria-live="polite">
         <strong>{points}</strong>
+      </section>
+
+      <section
+        className="game-hud__panel game-hud__section-progress"
+        aria-label={`${completedSectionCount} of 8 sections complete`}
+        aria-live="polite"
+      >
+        <strong>{completedSectionCount === 8 ? "🏆" : `${completedSectionCount} / 8`}</strong>
       </section>
 
       <section

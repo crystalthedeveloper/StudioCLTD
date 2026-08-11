@@ -13,7 +13,6 @@ import {
   SRGBColorSpace,
   Texture,
   TextureLoader,
-  Vector3,
   VideoTexture,
 } from "three";
 import { BillboardLabel } from "../../ui/BillboardLabel";
@@ -21,14 +20,14 @@ import { gameTextFont } from "../../ui/textFont";
 import { hubSections, HubSection } from "../hubSections";
 import { InteractiveMeshOutline } from "../InteractiveOutline";
 import { padVisualStyle } from "../padVisualStyle";
+import { triggerPopupLayout } from "../triggerPopupLayout";
 
 type HubSectionsProps = {
-  restartKey: number;
+  onSectionTrigger: (sectionId: string, triggerId: string) => void;
+  restartKey: number | string;
   serviceResolutions: Record<string, boolean>;
 };
 
-const center = new Vector3(0, 0, 0);
-const sectionPosition = new Vector3();
 const offerCountdownMs = 3000;
 const offerDisplayMs = 10000;
 const simpleDisplayMs = 10000;
@@ -37,10 +36,10 @@ const portalActivationCooldownMs = 900;
 const selectorRowZ = 5.8;
 const offersPageUrl = "https://www.crystalthedeveloper.ca/offers";
 const white = "#f5f7fb";
-const softWhite = "#d8dde8";
 const screenImageTint = "#f0f0f0";
 const screenIdleColor = "#0b1018";
-const screenContentSize: [number, number] = [9.05, 4.62];
+const screenContentScale = 1.1;
+const screenContentSize: [number, number] = [9.05 * screenContentScale, 4.62 * screenContentScale];
 const screenContentAspect = screenContentSize[0] / screenContentSize[1];
 const serviceSectionIds = ["quick-fix", "urgent-fix", "performance", "site-improvement"];
 const serviceScreenImages: Record<string, { bad: string; good: string }> = {
@@ -61,12 +60,11 @@ const serviceScreenImages: Record<string, { bad: string; good: string }> = {
     good: "/images/optimized/siteImprovement/site-improvement-good.webp",
   },
 };
-const simpleDisplaySections: Record<string, { imagePath: string; label: string }> = {
-  tips: {
-    imagePath: "/images/optimized/tips/tip.jpg",
-    label: "Show Tip",
-  },
-};
+const tipDisplayOptions = [
+  { id: "navigation", label: "Navigation", imagePath: "/images/optimized/tips/Navigation-tip.jpg", position: [-3.6, 0.18, 5.5] as [number, number, number] },
+  { id: "content", label: "Content", imagePath: "/images/optimized/tips/Content-tip.jpg", position: [0, 0.18, 6.3] as [number, number, number] },
+  { id: "images", label: "Images", imagePath: "/images/optimized/tips/Images-tip.jpg", position: [3.6, 0.18, 5.5] as [number, number, number] },
+];
 const valueDisplayOptions = [
   { id: "trust", label: "Trust", imagePath: "/images/optimized/values/value.jpg", position: [-1.8, 0.18, selectorRowZ] as [number, number, number] },
   { id: "speed", label: "Speed", imagePath: "/images/optimized/values/value-2.jpg", position: [1.8, 0.18, selectorRowZ] as [number, number, number] },
@@ -113,7 +111,7 @@ let showcaseUnlockPromise: Promise<void> | null = null;
 const requiredScreenImagePaths = Array.from(
   new Set([
     ...Object.values(serviceScreenImages).flatMap((images) => [images.bad, images.good]),
-    ...Object.values(simpleDisplaySections).map((display) => display.imagePath),
+    ...tipDisplayOptions.map((display) => display.imagePath),
     ...valueDisplayOptions.map((display) => display.imagePath),
     ...offerOptions.map((offer) => offer.imagePath),
   ])
@@ -279,7 +277,7 @@ function getShowcaseVideoTexture(video: HTMLVideoElement) {
   return showcaseVideoTexture;
 }
 
-export function HubSections({ restartKey, serviceResolutions }: HubSectionsProps) {
+export function HubSections({ onSectionTrigger, restartKey, serviceResolutions }: HubSectionsProps) {
   const displayTimersRef = useRef<Record<string, number>>({});
   const [activeSimpleDisplays, setActiveSimpleDisplays] = useState<Record<string, string>>({});
   const [visibleSectionCount, setVisibleSectionCount] = useState(2);
@@ -330,6 +328,7 @@ export function HubSections({ restartKey, serviceResolutions }: HubSectionsProps
   }, [visibleSectionCount]);
 
   const showSimpleDisplay = (sectionId: string, imagePath: string) => {
+    onSectionTrigger(sectionId, imagePath);
     const existingTimer = displayTimersRef.current[sectionId];
     if (existingTimer) window.clearTimeout(existingTimer);
 
@@ -337,6 +336,8 @@ export function HubSections({ restartKey, serviceResolutions }: HubSectionsProps
       ...current,
       [sectionId]: imagePath,
     }));
+
+    if (sectionId === "tips") return;
 
     displayTimersRef.current[sectionId] = window.setTimeout(() => {
       setActiveSimpleDisplays((current) =>
@@ -357,7 +358,10 @@ export function HubSections({ restartKey, serviceResolutions }: HubSectionsProps
           activeSimpleDisplays={activeSimpleDisplays}
           selectedOffer={offerOptions.find((offer) => offer.id === selectedOfferId) ?? null}
           showcaseVideoState={showcaseVideoState}
-          onOfferSelect={setSelectedOfferId}
+          onOfferSelect={(offerId) => {
+            setSelectedOfferId(offerId);
+            if (offerId) onSectionTrigger("offers", offerId);
+          }}
           onSimpleDisplayTrigger={showSimpleDisplay}
           onShowcasePause={() => {
             if (showcaseVideoElement) pauseShowcaseVideo(showcaseVideoElement);
@@ -365,6 +369,7 @@ export function HubSections({ restartKey, serviceResolutions }: HubSectionsProps
           }}
           onShowcasePlay={() => {
             setShowcaseVideoState({ playing: true });
+            onSectionTrigger("showcase", "play");
           }}
         />
       ))}
@@ -373,12 +378,33 @@ export function HubSections({ restartKey, serviceResolutions }: HubSectionsProps
 }
 
 function HubPaths() {
+  const streetCoordinates = [-48, 0, 48];
+  const horizontalSegments = [
+    { center: -56.5, length: 11 },
+    { center: -24, length: 42 },
+    { center: 24, length: 42 },
+    { center: 56.5, length: 11 },
+  ];
+
   return (
     <group name="HubPaths">
-      <mesh position={[0, 0.025, 0]} rotation-x={-Math.PI / 2}>
-        <ringGeometry args={[11.8, 12, 32]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.18} toneMapped={false} />
-      </mesh>
+      {streetCoordinates.map((coordinate) => (
+        <mesh key={`street-x:${coordinate}`} position={[coordinate, 0.0175, 0]}>
+          <boxGeometry args={[6, 0.035, 124]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.12} toneMapped={false} />
+        </mesh>
+      ))}
+      {streetCoordinates.flatMap((coordinate) =>
+        horizontalSegments.map((segment) => (
+          <mesh
+            key={`street-z:${coordinate}:${segment.center}`}
+            position={[segment.center, 0.0175, coordinate]}
+          >
+            <boxGeometry args={[segment.length, 0.035, 6]} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.12} toneMapped={false} />
+          </mesh>
+        )),
+      )}
     </group>
   );
 }
@@ -405,9 +431,8 @@ function HubSectionDistrict({
   showcaseVideoState: ShowcaseVideoState;
 }) {
   const rotation = useMemo(() => {
-    sectionPosition.set(...section.position);
-    return Math.atan2(sectionPosition.x - center.x, sectionPosition.z - center.z) + Math.PI;
-  }, [section.position]);
+    return Math.atan2(section.entrance[0], section.entrance[1]);
+  }, [section.entrance]);
 
   return (
     <group name={`HubSection:${section.id}`} position={section.position} rotation-y={rotation}>
@@ -419,12 +444,10 @@ function HubSectionDistrict({
         showcaseVideoState={showcaseVideoState}
       />
       {section.id === "offers" && <OffersSelector selectedOfferId={selectedOffer?.id ?? null} onOfferSelect={onOfferSelect} />}
-      {simpleDisplaySections[section.id] && (
-        <SimpleDisplaySelector
-          active={Boolean(activeSimpleDisplays[section.id])}
-          label={simpleDisplaySections[section.id].label}
-          name={`SimpleDisplayPortal:${section.id}`}
-          onPlayerEnter={() => onSimpleDisplayTrigger(section.id, simpleDisplaySections[section.id].imagePath)}
+      {section.id === "tips" && (
+        <TipsDisplaySelector
+          selectedImagePath={activeSimpleDisplays.tips ?? null}
+          onSelect={(imagePath) => onSimpleDisplayTrigger("tips", imagePath)}
         />
       )}
       {section.id === "value" && (
@@ -458,11 +481,10 @@ function SectionBillboard({
   showcaseVideoState: ShowcaseVideoState;
 }) {
   const isOffers = section.id === "offers";
-  const simpleDisplay = simpleDisplaySections[section.id];
+  const simpleDisplay = section.id === "tips";
   const selectedSimpleDisplayPath = activeSimpleDisplays[section.id] ?? null;
   const isServiceSection = serviceSectionIds.includes(section.id);
   const isShowcase = section.id === "showcase";
-  const isFramePrototype = section.id === "value";
 
   return (
     <group name={`Billboard:${section.id}`} position={[0, 4.8, 0]}>
@@ -471,11 +493,11 @@ function SectionBillboard({
         <mesh position={[0, 0, -0.08]}>
           <boxGeometry args={[10.4, 5.8, 0.32]} />
           <meshStandardMaterial
-            color={isFramePrototype ? "#28313b" : "#101621"}
-            emissive={isFramePrototype ? "#111820" : "#000000"}
-            emissiveIntensity={isFramePrototype ? 0.32 : 0}
-            metalness={isFramePrototype ? 0.82 : 0.72}
-            roughness={isFramePrototype ? 0.24 : 0.34}
+            color="#101621"
+            emissive="#000000"
+            emissiveIntensity={0}
+            metalness={0.04}
+            roughness={0.82}
           />
         </mesh>
         <mesh position={[0, 0.1, -0.26]}>
@@ -484,23 +506,13 @@ function SectionBillboard({
             color="#111827"
             emissive="#ffffff"
             emissiveIntensity={isOffers ? 0.07 : 0.045}
-            metalness={0.2}
-            roughness={0.48}
+            metalness={0.02}
+            roughness={0.74}
           />
         </mesh>
-        <mesh position={[0, 2.85, -0.14]}>
-          <boxGeometry args={[10.8, 0.15, 0.18]} />
-          <meshBasicMaterial
-            color={softWhite}
-            transparent
-            opacity={0.64}
-            toneMapped={false}
-          />
-        </mesh>
-        {isFramePrototype && <BrightTvFrame />}
       </RigidBody>
       <Text
-        color={white}
+        color="#000000"
         font={gameTextFont}
         fontSize={0.86}
         anchorX="center"
@@ -545,45 +557,6 @@ function SectionBillboard({
             {selectedOffer?.name ?? "Select an offer"}
           </Text>
         </>
-      )}
-    </group>
-  );
-}
-
-function BrightTvFrame() {
-  const railColor = "#ffd66b";
-  const cornerX = 5.31;
-  const cornerY = 2.84;
-  const horizontalLength = 0.72;
-  const verticalLength = 0.72;
-
-  return (
-    <group name="BrightTvFramePrototype" position={[0, 0, -0.3]}>
-      {([-1, 1] as const).flatMap((xDirection) =>
-        ([-1, 1] as const).map((yDirection) => (
-          <group key={`${xDirection}-${yDirection}`}>
-            <mesh
-              position={[
-                xDirection * (cornerX - horizontalLength / 2),
-                yDirection * cornerY,
-                0,
-              ]}
-            >
-              <boxGeometry args={[horizontalLength, 0.1, 0.12]} />
-              <meshBasicMaterial color={railColor} toneMapped={false} />
-            </mesh>
-            <mesh
-              position={[
-                xDirection * cornerX,
-                yDirection * (cornerY - verticalLength / 2),
-                0,
-              ]}
-            >
-              <boxGeometry args={[0.1, verticalLength, 0.12]} />
-              <meshBasicMaterial color={railColor} toneMapped={false} />
-            </mesh>
-          </group>
-        )),
       )}
     </group>
   );
@@ -863,26 +836,26 @@ function ShowcaseSelector({
   );
 }
 
-function SimpleDisplaySelector({
-  active,
-  label,
-  name,
-  onPlayerEnter,
+function TipsDisplaySelector({
+  onSelect,
+  selectedImagePath,
 }: {
-  active: boolean;
-  label: string;
-  name: string;
-  onPlayerEnter: () => void;
+  onSelect: (imagePath: string) => void;
+  selectedImagePath: string | null;
 }) {
   return (
-    <group name={`${name}:selector`}>
-      <ShowcasePortalPad
-        active={active}
-        label={label}
-        name={name}
-        onPlayerEnter={onPlayerEnter}
-        onPlayerExit={() => undefined}
-      />
+    <group name="TipsDisplaySelector">
+      {tipDisplayOptions.map((option) => (
+        <ShowcasePortalPad
+          key={option.id}
+          active={selectedImagePath === option.imagePath}
+          label={option.label}
+          name={`TipsDisplayPortal:${option.id}`}
+          onPlayerEnter={() => onSelect(option.imagePath)}
+          onPlayerExit={() => undefined}
+          position={option.position}
+        />
+      ))}
     </group>
   );
 }
@@ -1017,11 +990,10 @@ function OfferPortalPad({
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       <BillboardLabel
-        color={white}
+        color={padVisualStyle.color}
         fontSize={offer.id === "site-improvement" ? 0.22 : 0.28}
-        position={[0, 1.05, 0]}
+        position={[0, triggerPopupLayout.labelHeight, 0]}
         maxWidth={2.8}
-        maxVisibleDistance={12}
       >
         {offer.name}
       </BillboardLabel>
@@ -1029,9 +1001,8 @@ function OfferPortalPad({
         <BillboardLabel
           color={padVisualStyle.color}
           fontSize={0.2}
-          position={[0, 1.48, 0]}
+          position={[0, triggerPopupLayout.secondaryLabelHeight, 0]}
           maxWidth={3.2}
-          maxVisibleDistance={12}
         >
           {`Opening offers page in ${countdownSeconds}...`}
         </BillboardLabel>
@@ -1153,7 +1124,12 @@ function ShowcasePortalPad({
         <ringGeometry args={[0.68, 1.05, 48]} />
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
-      <BillboardLabel color={white} fontSize={0.28} position={[0, 1.05, 0]} maxWidth={3} maxVisibleDistance={12}>
+      <BillboardLabel
+        color={padVisualStyle.color}
+        fontSize={0.28}
+        position={[0, triggerPopupLayout.labelHeight, 0]}
+        maxWidth={3}
+      >
         {label}
       </BillboardLabel>
     </group>

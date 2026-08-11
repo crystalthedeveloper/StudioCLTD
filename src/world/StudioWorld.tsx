@@ -15,20 +15,38 @@ import type { TransportDestination } from "./systems/TransportPads";
 type StudioWorldProps = {
   onCoinCollect: () => void;
   onPenaltyCollect: () => void;
+  onSectionComplete: () => void;
   restartKey: number;
 };
 
-export function StudioWorld({ onCoinCollect, onPenaltyCollect, restartKey }: StudioWorldProps) {
+const requiredSectionTriggers: Record<string, number> = {
+  tips: 3,
+  offers: 4,
+  value: 2,
+  "quick-fix": 2,
+  "urgent-fix": 2,
+  performance: 2,
+  "site-improvement": 2,
+  showcase: 1,
+};
+
+export function StudioWorld({ onCoinCollect, onPenaltyCollect, onSectionComplete, restartKey }: StudioWorldProps) {
   const dialogueIdRef = useRef(0);
   const fixedAnimationRequestRef = useRef(0);
+  const activatedSectionTriggersRef = useRef<Record<string, Set<string>>>({});
+  const completedSectionsRef = useRef(new Set<string>());
   const [fixedAnimationRequest, setFixedAnimationRequest] = useState(0);
   const [movementLocked, setMovementLocked] = useState(false);
+  const [penaltyResetCount, setPenaltyResetCount] = useState(0);
   const [serviceResolutions, setServiceResolutions] = useState<Record<string, boolean>>({});
   const [playerDialogue, setPlayerDialogue] = useState<DialogueMessage | null>(null);
   const [villainDialogue, setVillainDialogue] = useState<(DialogueMessage & { sectionName: string }) | null>(null);
   const [transportDestination, setTransportDestination] = useState<TransportDestination | null>(null);
 
   useEffect(() => {
+    activatedSectionTriggersRef.current = {};
+    completedSectionsRef.current.clear();
+    setPenaltyResetCount(0);
     setMovementLocked(false);
     setServiceResolutions({});
     setPlayerDialogue(null);
@@ -36,6 +54,31 @@ export function StudioWorld({ onCoinCollect, onPenaltyCollect, restartKey }: Stu
     setTransportDestination(null);
     resetSpeedBoost();
   }, [restartKey]);
+
+  const recordSectionTrigger = (sectionId: string, triggerId: string) => {
+    if (completedSectionsRef.current.has(sectionId)) return;
+
+    const activatedTriggers = activatedSectionTriggersRef.current[sectionId] ?? new Set<string>();
+    activatedTriggers.add(triggerId);
+    activatedSectionTriggersRef.current[sectionId] = activatedTriggers;
+
+    const requiredTriggerCount = requiredSectionTriggers[sectionId];
+    if (requiredTriggerCount === undefined || activatedTriggers.size < requiredTriggerCount) return;
+
+    completedSectionsRef.current.add(sectionId);
+    onSectionComplete();
+  };
+
+  const resetProgressForPenalty = () => {
+    activatedSectionTriggersRef.current = {};
+    completedSectionsRef.current.clear();
+    setServiceResolutions({});
+    setPenaltyResetCount((current) => current + 1);
+    resetSpeedBoost();
+    onPenaltyCollect();
+  };
+
+  const sectionResetKey = `${restartKey}:${penaltyResetCount}`;
 
   const createDialogue = (text: string): DialogueMessage => {
     dialogueIdRef.current += 1;
@@ -49,17 +92,22 @@ export function StudioWorld({ onCoinCollect, onPenaltyCollect, restartKey }: Stu
     <>
       <WorldLights />
       <SpaceSky />
-      <Environment preset="warehouse" background={false} environmentIntensity={0.155} />
+      <Environment preset="warehouse" background={false} environmentIntensity={0.12} />
       <ModularTerrain radius={7} />
       <LogoLightField
         onCoinCollect={onCoinCollect}
-        onPenaltyCollect={onPenaltyCollect}
+        onPenaltyCollect={resetProgressForPenalty}
         restartKey={restartKey}
       />
       <TransportPads onTransport={setTransportDestination} restartKey={restartKey} />
-      <HubSections restartKey={restartKey} serviceResolutions={serviceResolutions} />
+      <HubSections
+        onSectionTrigger={recordSectionTrigger}
+        restartKey={sectionResetKey}
+        serviceResolutions={serviceResolutions}
+      />
       <CombatPrototype
-        restartKey={restartKey}
+        restartKey={sectionResetKey}
+        onSectionTrigger={recordSectionTrigger}
         onPlayerDialogue={(text) => setPlayerDialogue(createDialogue(text))}
         onPlayerFixedAnimation={() => {
           setMovementLocked(true);
@@ -73,6 +121,7 @@ export function StudioWorld({ onCoinCollect, onPenaltyCollect, restartKey }: Stu
           });
         }}
         onSectionResolved={(sectionId) => {
+          recordSectionTrigger(sectionId, "resolved");
           setServiceResolutions((current) => ({
             ...current,
             [sectionId]: true,

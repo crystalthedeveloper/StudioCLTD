@@ -3,14 +3,17 @@ import { CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload } f
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Group, Mesh, MeshBasicMaterial, Object3D, SphereGeometry, Vector3 } from "three";
+import { isGameAudioEnabled, subscribeGameAudio } from "../../audio/gameAudio";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { DialogueMessage } from "../../ui/DialogueBubble";
+import { triggerFixHaptic } from "../../ui/haptics";
 import { gameTextFont } from "../../ui/textFont";
 import { VillainCharacter, VillainStatus } from "../../villain/VillainCharacter";
-import { hubSections } from "../hubSections";
+import { destinationPlatformRadius, hubSections } from "../hubSections";
 import { playerWorldState } from "../playerWorldState";
 import { InteractiveMeshOutline } from "../InteractiveOutline";
 import { padVisualStyle } from "../padVisualStyle";
+import { triggerPopupLayout } from "../triggerPopupLayout";
 
 const cooldownMs = 1800;
 const triggerPadRadius = 1.33;
@@ -23,7 +26,7 @@ const encounterSectionIds = ["quick-fix", "urgent-fix", "performance", "site-imp
 const infoPanelDurationMs = 10000;
 const smokeDurationMs = 1700;
 const villainFrontOffset = 2.8;
-const villainSideOffset = 0;
+const villainSideOffset = 5.1;
 const triggerPadFrontOffset = 5.8;
 const triggerPadSideOffset = 3.6;
 
@@ -31,7 +34,7 @@ const serviceInfoText: Record<string, string> = {
   "quick-fix":
     "A button that doesn't work can cost you real customers.\n\nEvery click should lead somewhere-not to frustration.\n\nI help businesses fix website issues so every button, form, and interaction works as expected.",
   "urgent-fix":
-    "Broken images can make your website look untrustworthy fast.\n\nWhen key visuals do not load, visitors may leave before they understand your business.\n\nI help fix urgent website issues quickly so your site looks reliable again.",
+    "A website that's down can cost you customers fast.\n\nWhen your website isn't available, visitors leave and opportunities are lost.\n\nI fix urgent website issues quickly to get your site back online.",
   performance:
     "A slow website can cost you visitors before they even contact you.\n\nImproving performance helps pages load faster, feel smoother, and support better SEO.\n\nI help optimize websites so users get a faster, cleaner experience.",
   "site-improvement": "Contact forms should just work.\n\nFailed submissions and missing emails can cost you customers.\n\nI fix forms so every message gets delivered.",
@@ -39,9 +42,16 @@ const serviceInfoText: Record<string, string> = {
 
 const villainDialogueText: Record<string, string> = {
   "quick-fix": "😈 Broken Button!",
-  "urgent-fix": "😈 Broken Images!",
+  "urgent-fix": "👿 Not secure!",
   performance: "😈 Poor PageSpeed",
-  "site-improvement": "😈 Contact Form Broken",
+  "site-improvement": "😈 Form Broken",
+};
+
+const villainVoicePath: Record<string, string> = {
+  performance: "/audio/Performance.mp3",
+  "quick-fix": "/audio/Quick-Fix.mp3",
+  "urgent-fix": "/audio/Urgent-Fix.mp3",
+  "site-improvement": "/audio/Site-Improvement.mp3",
 };
 
 type SectionEncounterConfig = {
@@ -49,6 +59,7 @@ type SectionEncounterConfig = {
   infoPadPosition: Vector3;
   name: string;
   padPosition: Vector3;
+  platformPosition: Vector3;
   villainPosition: Vector3;
 };
 
@@ -57,16 +68,16 @@ function createSectionEncounters(): SectionEncounterConfig[] {
     .filter((section) => encounterSectionIds.includes(section.id))
     .map((section) => {
       const sectionPosition = new Vector3(...section.position);
-      const towardCenter = new Vector3(-sectionPosition.x, 0, -sectionPosition.z).normalize();
-      const tangent = new Vector3(-towardCenter.z, 0, towardCenter.x);
-      const villainPosition = sectionPosition.clone().add(towardCenter.clone().multiplyScalar(villainFrontOffset)).add(tangent.clone().multiplyScalar(villainSideOffset));
+      const towardEntrance = new Vector3(section.entrance[0], 0, section.entrance[1]);
+      const tangent = new Vector3(-towardEntrance.z, 0, towardEntrance.x);
+      const villainPosition = sectionPosition.clone().add(towardEntrance.clone().multiplyScalar(villainFrontOffset)).add(tangent.clone().multiplyScalar(villainSideOffset));
       const padPosition = sectionPosition
         .clone()
-        .add(towardCenter.clone().multiplyScalar(triggerPadFrontOffset))
+        .add(towardEntrance.clone().multiplyScalar(triggerPadFrontOffset))
         .add(tangent.clone().multiplyScalar(triggerPadSideOffset));
       const infoPadPosition = sectionPosition
         .clone()
-        .add(towardCenter.clone().multiplyScalar(triggerPadFrontOffset))
+        .add(towardEntrance.clone().multiplyScalar(triggerPadFrontOffset))
         .add(tangent.clone().multiplyScalar(-triggerPadSideOffset));
 
       villainPosition.y = section.position[1];
@@ -78,6 +89,7 @@ function createSectionEncounters(): SectionEncounterConfig[] {
         infoPadPosition,
         name: section.name,
         padPosition,
+        platformPosition: sectionPosition,
         villainPosition,
       };
     });
@@ -89,8 +101,9 @@ type CombatPrototypeProps = {
   onPlayerFixedAnimation: () => void;
   onPlayerDialogue: (text: string) => void;
   onSectionResolved: (sectionId: string) => void;
+  onSectionTrigger: (sectionId: string, triggerId: string) => void;
   onVillainDialogue: (sectionName: string, text: string) => void;
-  restartKey: number;
+  restartKey: number | string;
   villainDialogue: (DialogueMessage & { sectionName: string }) | null;
 };
 
@@ -98,6 +111,7 @@ export function CombatPrototype({
   onPlayerFixedAnimation,
   onPlayerDialogue,
   onSectionResolved,
+  onSectionTrigger,
   onVillainDialogue,
   restartKey,
   villainDialogue,
@@ -137,7 +151,10 @@ export function CombatPrototype({
           key={`${encounter.id}:${restartKey}`}
           activeInfoId={activeInfoId}
           encounter={encounter}
-          onInfoOpen={() => setActiveInfoId(encounter.id)}
+          onInfoOpen={() => {
+            setActiveInfoId(encounter.id);
+            onSectionTrigger(encounter.id, "info");
+          }}
           onPlayerFixedAnimation={onPlayerFixedAnimation}
           onPlayerDialogue={onPlayerDialogue}
           onSectionResolved={onSectionResolved}
@@ -174,15 +191,86 @@ function SectionPortalEncounter({
   const [smokeActive, setSmokeActive] = useState(false);
   const [villainVisible, setVillainVisible] = useState(true);
   const [villainBubbleVisible, setVillainBubbleVisible] = useState(false);
+  const voicePath = villainVoicePath[encounter.id];
   const lastActivatedRef = useRef(0);
   const lastInfoActivatedRef = useRef(0);
   const wasNearDialogueRef = useRef(false);
   const wasNearVillainRef = useRef(false);
+  const wasOnVoicePlatformRef = useRef(false);
   const villainBubbleVisibleRef = useRef(false);
   const villainBubbleUpdateTimerRef = useRef(0);
   const villainDialogueTimerRef = useRef(0);
   const sectionResolvedTimerRef = useRef(0);
   const defeatedRef = useRef(false);
+  const villainVoiceRef = useRef<HTMLAudioElement | null>(null);
+  const defeatSoundRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const defeatSound = new Audio("/audio/defeat.mp3");
+    defeatSound.preload = "auto";
+    defeatSound.volume = 0.5;
+    defeatSound.muted = !isGameAudioEnabled();
+    defeatSound.load();
+    defeatSoundRef.current = defeatSound;
+
+    const voice = voicePath ? new Audio(voicePath) : null;
+    if (voice) {
+      voice.preload = "auto";
+      voice.volume = 0.48;
+      voice.muted = !isGameAudioEnabled();
+      voice.load();
+      villainVoiceRef.current = voice;
+    }
+
+    const unsubscribe = subscribeGameAudio(() => {
+      const muted = !isGameAudioEnabled();
+      defeatSound.muted = muted;
+      if (voice) voice.muted = muted;
+    });
+
+    return () => {
+      unsubscribe();
+      defeatSound.pause();
+      defeatSound.currentTime = 0;
+      defeatSoundRef.current = null;
+      if (voice) {
+        voice.pause();
+        voice.currentTime = 0;
+      }
+      villainVoiceRef.current = null;
+    };
+  }, [encounter.id, voicePath]);
+
+  const playVillainVoice = () => {
+    const voice = villainVoiceRef.current;
+    if (!voice) return;
+
+    voice.pause();
+    voice.currentTime = 0;
+    voice.muted = !isGameAudioEnabled();
+    void voice.play().catch(() => {
+      // Browsers can reject media playback until the player's first interaction.
+    });
+  };
+
+  const stopVillainVoice = () => {
+    const voice = villainVoiceRef.current;
+    if (!voice) return;
+
+    voice.pause();
+    voice.currentTime = 0;
+  };
+
+  const playDefeatSound = () => {
+    const defeatSound = defeatSoundRef.current;
+    if (!defeatSound) return;
+
+    defeatSound.currentTime = 0;
+    defeatSound.muted = !isGameAudioEnabled();
+    void defeatSound.play().catch(() => {
+      // Browsers can reject media playback until the player's first interaction.
+    });
+  };
 
   const setVillainBubbleVisibilitySoon = (visible: boolean) => {
     window.clearTimeout(villainBubbleUpdateTimerRef.current);
@@ -206,9 +294,12 @@ function SectionPortalEncounter({
     if (now - lastActivatedRef.current < cooldownMs) return;
 
     defeatedRef.current = true;
+    triggerFixHaptic();
     lastActivatedRef.current = now;
     window.clearTimeout(villainBubbleUpdateTimerRef.current);
     window.clearTimeout(villainDialogueTimerRef.current);
+    stopVillainVoice();
+    playDefeatSound();
     setPortalActive(true);
     setSmokeActive(true);
     setVillainBubbleVisible(false);
@@ -275,9 +366,18 @@ function SectionPortalEncounter({
       infoPadDistanceSq <= dialoguePadRadiusSq ||
       villainDistanceSq <= dialogueVillainRadiusSq;
     const nearVillain = !defeatedRef.current && villainDistanceSq <= dialogueVillainRadiusSq;
+    const onVoicePlatform =
+      Boolean(voicePath) &&
+      Math.abs(playerWorldState.position.x - encounter.platformPosition.x) <= destinationPlatformRadius &&
+      Math.abs(playerWorldState.position.z - encounter.platformPosition.z) <= destinationPlatformRadius;
 
     if (nearVillain !== wasNearVillainRef.current) {
       setVillainBubbleVisibilitySoon(nearVillain);
+    }
+
+    if (onVoicePlatform !== wasOnVoicePlatformRef.current) {
+      if (onVoicePlatform && !defeatedRef.current) playVillainVoice();
+      else stopVillainVoice();
     }
 
     if (!defeatedRef.current && encounter.id !== "quick-fix" && nearDialogueArea && !wasNearDialogueRef.current) {
@@ -289,6 +389,7 @@ function SectionPortalEncounter({
 
     wasNearDialogueRef.current = nearDialogueArea;
     wasNearVillainRef.current = nearVillain;
+    wasOnVoicePlatformRef.current = onVoicePlatform;
   });
 
   const villainCharacterDialogue =
@@ -492,11 +593,10 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
       </mesh>
       {label && (
         <BillboardLabel
-          color="#ffffff"
+          color={padVisualStyle.color}
           fontSize={label === "More Info" ? 0.24 : 0.28}
-          position={[0, 1.02, 0]}
+          position={[0, triggerPopupLayout.labelHeight, 0]}
           maxWidth={2.5}
-          maxVisibleDistance={12}
         >
           {label}
         </BillboardLabel>
@@ -514,44 +614,59 @@ function ServiceInfoPanel({
   text: string;
   title: string;
 }) {
+  const panelRef = useRef<Group>(null);
+  const panelWidth = 6;
+  const panelHeight = 3.65;
+
+  useFrame(({ camera }) => {
+    if (!panelRef.current) return;
+    panelRef.current.rotation.y = Math.atan2(
+      camera.position.x - position.x,
+      camera.position.z - position.z,
+    );
+  });
+
   return (
-    <group position={[position.x, 3.1, position.z]} rotation-y={Math.atan2(position.x, position.z) + Math.PI}>
+    <group
+      ref={panelRef}
+      position={[position.x, position.y + triggerPopupLayout.panelCenterOffset, position.z]}
+    >
       <mesh position={[0, 0, -0.07]}>
-        <planeGeometry args={[7.05, 4.25]} />
+        <planeGeometry args={[panelWidth, panelHeight]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.94} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh position={[0, -0.08, -0.06]}>
-        <planeGeometry args={[6.35, 3.25]} />
+        <planeGeometry args={[5.55, 2.95]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.72} depthWrite={false} toneMapped={false} />
       </mesh>
-      <mesh position={[0, 1.55, -0.05]}>
-        <planeGeometry args={[6.8, 0.95]} />
+      <mesh position={[0, 1.27, -0.05]}>
+        <planeGeometry args={[5.75, 0.72]} />
         <meshBasicMaterial color="#05070b" transparent opacity={0.54} depthWrite={false} toneMapped={false} />
       </mesh>
-      <mesh position={[0, -1.45, -0.05]}>
-        <planeGeometry args={[6.8, 0.95]} />
+      <mesh position={[0, -1.28, -0.05]}>
+        <planeGeometry args={[5.75, 0.72]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.42} depthWrite={false} toneMapped={false} />
       </mesh>
-      <mesh position={[0, 2.16, -0.04]}>
-        <boxGeometry args={[7.08, 0.035, 0.035]} />
+      <mesh position={[0, panelHeight / 2 + 0.035, -0.04]}>
+        <boxGeometry args={[panelWidth + 0.03, 0.035, 0.035]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.28} toneMapped={false} />
       </mesh>
-      <mesh position={[0, -2.16, -0.04]}>
-        <boxGeometry args={[7.08, 0.035, 0.035]} />
+      <mesh position={[0, -panelHeight / 2 - 0.035, -0.04]}>
+        <boxGeometry args={[panelWidth + 0.03, 0.035, 0.035]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.16} toneMapped={false} />
       </mesh>
-      <mesh position={[-3.54, 0, -0.04]}>
-        <boxGeometry args={[0.035, 4.25, 0.035]} />
+      <mesh position={[-panelWidth / 2 - 0.02, 0, -0.04]}>
+        <boxGeometry args={[0.035, panelHeight, 0.035]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.18} toneMapped={false} />
       </mesh>
-      <mesh position={[3.54, 0, -0.04]}>
-        <boxGeometry args={[0.035, 4.25, 0.035]} />
+      <mesh position={[panelWidth / 2 + 0.02, 0, -0.04]}>
+        <boxGeometry args={[0.035, panelHeight, 0.035]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0.18} toneMapped={false} />
       </mesh>
-      <Text color="#ffffff" font={gameTextFont} fontSize={0.3} anchorX="center" anchorY="middle" position={[0, 1.45, 0]} maxWidth={5.75}>
+      <Text color="#ffffff" font={gameTextFont} fontSize={0.3} anchorX="center" anchorY="middle" position={[0, 1.18, 0]} maxWidth={5.1}>
         {title}
       </Text>
-      <Text color="#ffffff" font={gameTextFont} fontSize={0.17} anchorX="center" anchorY="middle" position={[0, -0.25, 0]} maxWidth={5.55} lineHeight={1.35}>
+      <Text color="#ffffff" font={gameTextFont} fontSize={0.17} anchorX="center" anchorY="middle" position={[0, -0.3, 0]} maxWidth={4.95} lineHeight={1.35}>
         {text}
       </Text>
     </group>

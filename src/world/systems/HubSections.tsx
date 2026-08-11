@@ -32,6 +32,7 @@ const offerCountdownMs = 3000;
 const offerDisplayMs = 10000;
 const simpleDisplayMs = 10000;
 const mobileBillboardScale = 0.78;
+const mobileBillboardYOffset = -0.55;
 const portalTriggerRadius = 1.06;
 const portalActivationCooldownMs = 900;
 const selectorRowZ = 5.8;
@@ -282,6 +283,7 @@ export function HubSections({ onSectionTrigger, restartKey, serviceResolutions }
   const displayTimersRef = useRef<Record<string, number>>({});
   const [activeSimpleDisplays, setActiveSimpleDisplays] = useState<Record<string, string>>({});
   const [billboardScale, setBillboardScale] = useState(1);
+  const [billboardYOffset, setBillboardYOffset] = useState(0);
   const [visibleSectionCount, setVisibleSectionCount] = useState(2);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
   const [showcaseVideoState, setShowcaseVideoState] = useState<ShowcaseVideoState>({
@@ -290,11 +292,14 @@ export function HubSections({ onSectionTrigger, restartKey, serviceResolutions }
 
   useEffect(() => {
     const mobileQuery = window.matchMedia("(max-width: 768px)");
-    const updateBillboardScale = () => setBillboardScale(mobileQuery.matches ? mobileBillboardScale : 1);
-    updateBillboardScale();
-    mobileQuery.addEventListener("change", updateBillboardScale);
+    const updateMobileBillboards = () => {
+      setBillboardScale(mobileQuery.matches ? mobileBillboardScale : 1);
+      setBillboardYOffset(mobileQuery.matches ? mobileBillboardYOffset : 0);
+    };
+    updateMobileBillboards();
+    mobileQuery.addEventListener("change", updateMobileBillboards);
 
-    return () => mobileQuery.removeEventListener("change", updateBillboardScale);
+    return () => mobileQuery.removeEventListener("change", updateMobileBillboards);
   }, []);
 
   useEffect(() => {
@@ -365,6 +370,7 @@ export function HubSections({ onSectionTrigger, restartKey, serviceResolutions }
         <HubSectionDistrict
           key={`${section.id}:${restartKey}`}
           billboardScale={billboardScale}
+          billboardYOffset={billboardYOffset}
           section={section}
           serviceResolutions={serviceResolutions}
           activeSimpleDisplays={activeSimpleDisplays}
@@ -424,6 +430,7 @@ function HubPaths() {
 function HubSectionDistrict({
   activeSimpleDisplays,
   billboardScale,
+  billboardYOffset,
   onOfferSelect,
   onShowcasePause,
   onShowcasePlay,
@@ -435,6 +442,7 @@ function HubSectionDistrict({
 }: {
   activeSimpleDisplays: Record<string, string>;
   billboardScale: number;
+  billboardYOffset: number;
   onOfferSelect: (offerId: string | null) => void;
   onShowcasePause: () => void;
   onShowcasePlay: () => void;
@@ -453,6 +461,7 @@ function HubSectionDistrict({
       <SectionBillboard
         activeSimpleDisplays={activeSimpleDisplays}
         billboardScale={billboardScale}
+        billboardYOffset={billboardYOffset}
         section={section}
         serviceResolutions={serviceResolutions}
         selectedOffer={selectedOffer}
@@ -485,6 +494,7 @@ function HubSectionDistrict({
 function SectionBillboard({
   activeSimpleDisplays,
   billboardScale,
+  billboardYOffset,
   section,
   serviceResolutions,
   selectedOffer,
@@ -492,6 +502,7 @@ function SectionBillboard({
 }: {
   activeSimpleDisplays: Record<string, string>;
   billboardScale: number;
+  billboardYOffset: number;
   section: HubSection;
   serviceResolutions: Record<string, boolean>;
   selectedOffer: OfferOption | null;
@@ -505,10 +516,10 @@ function SectionBillboard({
 
   return (
     <group name={`Billboard:${section.id}`} position={[0, 4.8, 0]}>
-      <RigidBody type="fixed" colliders={false}>
+      <RigidBody type="fixed" colliders={false} position={[0, billboardYOffset, 0]}>
         <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
       </RigidBody>
-      <group name={`BillboardVisual:${section.id}`} scale={billboardScale}>
+      <group name={`BillboardVisual:${section.id}`} position={[0, billboardYOffset, 0]} scale={billboardScale}>
         <mesh position={[0, 0, -0.08]}>
           <boxGeometry args={[10.4, 5.8, 0.32]} />
           <meshStandardMaterial

@@ -77,11 +77,11 @@ export function GameHud({ completedSectionCount, onOpenWebsite, onRestart, point
           {points}
         </div>
         <div
-          className="game-hud__mobile-progress-value"
+          className={`game-hud__mobile-progress-value${completedSectionCount === 8 ? " game-hud__mobile-progress-value--complete" : ""}`}
           aria-label={`${completedSectionCount} of 8 sections complete`}
           aria-live="polite"
         >
-          {completedSectionCount}
+          {completedSectionCount === 8 ? "🏆" : completedSectionCount}
         </div>
         <div className="game-hud__mobile-speed-icon" aria-hidden="true">⚡</div>
         <svg className="game-hud__mobile-arcs" viewBox="0 0 240 180" aria-hidden="true">

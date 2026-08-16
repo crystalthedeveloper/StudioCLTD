@@ -596,6 +596,12 @@ canvas {
     color: #ffffff;
   }
 
+  .game-hud__mobile-progress-value--complete {
+    color: #ffe76a;
+    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.5)) drop-shadow(0 0 6px rgba(255, 230, 0, 0.38));
+    text-shadow: none;
+  }
+
   .game-hud__mobile-speed-icon {
     right: 66px;
     color: #ffe600;

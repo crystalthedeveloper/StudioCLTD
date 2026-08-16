@@ -58,6 +58,8 @@ export function BillboardLabel({
         fontSize={fontSize}
         lineHeight={lineHeight}
         maxWidth={maxWidth}
+        outlineColor="#05070b"
+        outlineWidth={0.012}
       >
         {children}
       </Text>

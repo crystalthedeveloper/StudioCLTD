@@ -15,10 +15,8 @@ import {
   VideoTexture,
 } from "three";
 import { BillboardLabel } from "../../ui/BillboardLabel";
-import { comicToneGradient } from "../../characters/cartoonMaterials";
 import { gameTextFont } from "../../ui/textFont";
 import { hubSections, HubSection } from "../hubSections";
-import { InteractiveMeshOutline } from "../InteractiveOutline";
 import { isPlayerObject } from "../playerCollision";
 import { padVisualStyle } from "../padVisualStyle";
 import { triggerPopupLayout } from "../triggerPopupLayout";
@@ -387,7 +385,6 @@ export function HubSections({ onSectionTrigger, restartKey, serviceResolutions }
 
   return (
     <group name="HubSections">
-      <HubPaths />
       {hubSections.slice(0, visibleSectionCount).map((section) => (
         <HubSectionDistrict
           key={`${section.id}:${restartKey}`}
@@ -413,38 +410,6 @@ export function HubSections({ onSectionTrigger, restartKey, serviceResolutions }
           }}
         />
       ))}
-    </group>
-  );
-}
-
-function HubPaths() {
-  const streetCoordinates = [-48, 0, 48];
-  const horizontalSegments = [
-    { center: -56.5, length: 11 },
-    { center: -24, length: 42 },
-    { center: 24, length: 42 },
-    { center: 56.5, length: 11 },
-  ];
-
-  return (
-    <group name="HubPaths">
-      {streetCoordinates.map((coordinate) => (
-        <mesh key={`street-x:${coordinate}`} position={[coordinate, 0.0175, 0]}>
-          <boxGeometry args={[6, 0.035, 124]} />
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.18} toneMapped={false} />
-        </mesh>
-      ))}
-      {streetCoordinates.flatMap((coordinate) =>
-        horizontalSegments.map((segment) => (
-          <mesh
-            key={`street-z:${coordinate}:${segment.center}`}
-            position={[segment.center, 0.0175, coordinate]}
-          >
-            <boxGeometry args={[segment.length, 0.035, 6]} />
-            <meshBasicMaterial color="#ffffff" transparent opacity={0.18} toneMapped={false} />
-          </mesh>
-        )),
-      )}
     </group>
   );
 }
@@ -543,30 +508,33 @@ function SectionBillboard({
       </RigidBody>
       <group name={`BillboardVisual:${section.id}`} position={[0, billboardYOffset, 0]} scale={billboardScale}>
         <mesh geometry={tvFrameGeometry} position={[0, 0, -0.08]} dispose={null}>
-          <meshToonMaterial
+          <meshStandardMaterial
             color="#101621"
             emissive="#000000"
             emissiveIntensity={0}
-            gradientMap={comicToneGradient}
+            metalness={0.12}
+            roughness={0.68}
           />
-          <InteractiveMeshOutline />
         </mesh>
         <mesh geometry={tvBackingGeometry} position={[0, 0.1, -0.26]} dispose={null}>
-          <meshToonMaterial
+          <meshStandardMaterial
             color="#111827"
             emissive="#ffffff"
             emissiveIntensity={isOffers ? 0.07 : 0.045}
-            gradientMap={comicToneGradient}
+            metalness={0.08}
+            roughness={0.72}
           />
         </mesh>
       <Text
-        color="#000000"
+        color="#ffffff"
         font={gameTextFont}
         fontSize={0.86}
         anchorX="center"
         anchorY="middle"
         position={[0, 3.55, -0.34]}
         maxWidth={9}
+        outlineColor="#05070b"
+        outlineWidth={0.018}
       >
         {section.name}
       </Text>
@@ -580,13 +548,15 @@ function SectionBillboard({
         <ShowcaseScreenContent isPlaying={showcaseVideoState.playing} />
       ) : (
         <Text
-          color="#9fb5cc"
+          color="#ffffff"
           font={gameTextFont}
           fontSize={0.26}
           anchorX="center"
           anchorY="middle"
           position={[0, -2.25, -0.34]}
           maxWidth={8.5}
+          outlineColor="#05070b"
+          outlineWidth={0.01}
         >
           Future screenshot / video surface
         </Text>
@@ -985,7 +955,7 @@ function OfferPortalPad({
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       <BillboardLabel
-        color={padVisualStyle.color}
+        color={padVisualStyle.labelColor}
         fontSize={offer.id === "site-improvement" ? 0.22 : 0.28}
         position={[0, triggerPopupLayout.labelHeight, 0]}
         maxWidth={2.8}
@@ -994,7 +964,7 @@ function OfferPortalPad({
       </BillboardLabel>
       {countdownSeconds > 0 && (
         <BillboardLabel
-          color={padVisualStyle.color}
+          color={padVisualStyle.labelColor}
           fontSize={0.2}
           position={[0, triggerPopupLayout.secondaryLabelHeight, 0]}
           maxWidth={3.2}
@@ -1073,7 +1043,7 @@ function ShowcasePortalPad({
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       <BillboardLabel
-        color={padVisualStyle.color}
+        color={padVisualStyle.labelColor}
         fontSize={0.28}
         position={[0, triggerPopupLayout.labelHeight, 0]}
         maxWidth={3}

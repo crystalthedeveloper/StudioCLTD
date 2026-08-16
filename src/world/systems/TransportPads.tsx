@@ -148,7 +148,7 @@ function TransportPad({
       />
       <mesh geometry={geometry} material={material} rotation-x={-Math.PI / 2} />
       <BillboardLabel
-        color={padVisualStyle.color}
+        color={padVisualStyle.labelColor}
         fontSize={label === "Site Improvement" ? 0.2 : 0.24}
         position={[0, triggerPopupLayout.labelHeight, 0]}
         maxWidth={3}

@@ -9,10 +9,9 @@ import {
   villainBodyMaterialName,
   villainMaterialProfile,
 } from "../characters/characterMaterials";
-import { applyCartoonMaterials } from "../characters/cartoonMaterials";
+import { applyNaturalMaterials } from "../characters/naturalMaterials";
 import { DialogueBubble, DialogueMessage } from "../ui/DialogueBubble";
 import { playerWorldState } from "../world/playerWorldState";
-import { InteractiveOutline } from "../world/InteractiveOutline";
 
 export type VillainStatus = "idle" | "running" | "dead";
 
@@ -20,7 +19,6 @@ type VillainCharacterProps = {
   basePosition: Vector3;
   dialogue: DialogueMessage | null;
   dialogueVariant?: "default" | "danger";
-  outlineEnabled?: boolean;
   villainStatus: VillainStatus;
 };
 
@@ -52,7 +50,7 @@ function fadeOutOtherActions(actions: Record<string, AnimationAction | null>, ac
   });
 }
 
-export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "danger", outlineEnabled = false, villainStatus }: VillainCharacterProps) {
+export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "danger", villainStatus }: VillainCharacterProps) {
   const model = useGLTF("/characters/char-optimized.glb", false, true);
   const scene = useMemo(() => SkeletonUtils.clone(model.scene), [model.scene]);
   const rootRef = useRef<Group>(null);
@@ -62,11 +60,11 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
 
   useEffect(() => {
     applyCharacterMaterials(scene, model.materials, villainMaterialProfile);
-    applyCartoonMaterials(scene);
+    applyNaturalMaterials(scene);
 
     scene.traverse((object) => {
       if (object instanceof Mesh) {
-        object.castShadow = false;
+        object.castShadow = true;
         object.receiveShadow = false;
         object.layers.enable(1);
       }
@@ -135,7 +133,6 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
             variant={dialogueVariant}
           />
           <primitive object={scene} scale={1.16} />
-          {outlineEnabled && <InteractiveOutline object={scene} />}
         </group>
       </group>
     </RigidBody>

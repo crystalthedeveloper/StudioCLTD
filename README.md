@@ -1,6 +1,6 @@
 # StudioCLTD
 
-StudioCLTD is a lightweight third-person React Three Fiber game world for exploring StudioCLTD's services, website tips, offers, and showcase content. The current world uses a compact 3 × 3 city-block layout with a central plaza, eight interactive sections, and a clean comic-book art direction.
+StudioCLTD is a lightweight third-person React Three Fiber game world for exploring StudioCLTD's services, website tips, offers, and showcase content. The current world uses a compact 3 × 3 city-block layout with a central plaza, eight interactive sections, and an optimized fantasy-realism art direction.
 
 ## Highlights
 
@@ -22,8 +22,8 @@ StudioCLTD is a lightweight third-person React Three Fiber game world for explor
 - Green point, yellow speed-boost, red reset-penalty, and blue contact collectibles.
 - Permanent decorative black and white CLD logos.
 - Sound toggle persisted through `localStorage`.
-- Bright blue sky, lightweight cartoon clouds, and textured spherical Earth and Venus.
-- Shared comic-painted concrete styling across the ground, walkways, ramps, and platforms.
+- Crisp 4K cosmic sky with textured spherical Earth and Venus and no extra procedural star or cloud layers.
+- One shared weathered dark-concrete material across the ground, walkways, ramps, and platforms.
 - Smooth loading progress that remains monotonic from 0% to 100%.
 
 ## World Layout

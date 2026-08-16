@@ -1,7 +1,7 @@
 import { useAnimations, useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
-import { AnimationAction, Color, Group, LoopOnce, LoopRepeat, Material, Mesh, Object3D } from "three";
+import { AnimationAction, Group, LoopOnce, LoopRepeat, Material, Mesh, Object3D } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import {
   applyCharacterMaterials,
@@ -9,7 +9,6 @@ import {
   playerMaskMaterialName,
   playerMaterialProfile,
 } from "../characters/characterMaterials";
-import { applyCartoonMaterials, createCartoonMaterial } from "../characters/cartoonMaterials";
 import { DialogueBubble, DialogueMessage } from "../ui/DialogueBubble";
 import { isSpeedBoostActive, subscribeSpeedBoostChange } from "./speedBoost";
 import { CharacterAnimationState } from "./playerTypes";
@@ -27,21 +26,12 @@ const playerAnimationByState: Record<CharacterAnimationState, string> = {
   run: "runH",
 };
 const playerPoweredMaterialName = "HWhiteClown_material";
-const playerMaterialTuningVersion = 3;
+const playerLightingLayer = 2;
 
 type PlayerMaterialSlot = {
   index: number | null;
   material: Material;
   mesh: Mesh;
-};
-
-type HighlightableMaterial = Material & {
-  color?: Color;
-  emissive?: Color;
-  emissiveIntensity?: number;
-  envMapIntensity?: number;
-  metalness?: number;
-  roughness?: number;
 };
 
 function fadeOutOtherActions(actions: Record<string, AnimationAction | null>, activeAction: AnimationAction) {
@@ -79,21 +69,18 @@ export function PlayerCharacter({
 
   useEffect(() => {
     applyCharacterMaterials(scene, model.materials, playerMaterialProfile);
-    applyCartoonMaterials(scene);
 
     scene.traverse((object) => {
       if (object instanceof Mesh) {
-        object.castShadow = false;
+        object.castShadow = true;
         object.receiveShadow = false;
-        object.layers.enable(1);
+        object.layers.enable(playerLightingLayer);
       }
     });
 
     const poweredBodyMaterial = model.materials?.[playerPoweredMaterialName] ?? findMaterialByName(scene, playerPoweredMaterialName);
-    poweredBodyMaterialRef.current = poweredBodyMaterial ? createCartoonMaterial(poweredBodyMaterial) : null;
+    poweredBodyMaterialRef.current = poweredBodyMaterial ?? null;
     materialSlotsRef.current = collectBodyMaterialSlots(scene);
-    materialSlotsRef.current.forEach((slot) => enhancePlayerSuitMaterial(slot.material));
-    if (poweredBodyMaterialRef.current) enhancePlayerSuitMaterial(poweredBodyMaterialRef.current);
     activeMaterialModeRef.current = "default";
   }, [scene]);
 
@@ -272,34 +259,4 @@ function collectBodyMaterialSlots(root: Object3D) {
   });
 
   return slots;
-}
-
-function enhancePlayerSuitMaterial(material: Material) {
-  if (material.userData.playerMaterialTuningVersion === playerMaterialTuningVersion) return;
-
-  const suitMaterial = material as HighlightableMaterial;
-
-  // The embedded outfit textures provide the black suit and variant artwork.
-  // Keep their neutral white multiplier so default/Fix/Speed swaps stay visible.
-  if (suitMaterial.color) suitMaterial.color.set("#ffffff");
-
-  if (suitMaterial.emissive) {
-    suitMaterial.emissive.set("#050505");
-    suitMaterial.emissiveIntensity = 0.025;
-  }
-
-  if (typeof suitMaterial.envMapIntensity === "number") {
-    suitMaterial.envMapIntensity = 0.08;
-  }
-
-  if (typeof suitMaterial.roughness === "number") {
-    suitMaterial.roughness = 0.9;
-  }
-
-  if (typeof suitMaterial.metalness === "number") {
-    suitMaterial.metalness = 0;
-  }
-
-  suitMaterial.needsUpdate = true;
-  suitMaterial.userData.playerMaterialTuningVersion = playerMaterialTuningVersion;
 }

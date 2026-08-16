@@ -6,23 +6,30 @@ import {
   BufferGeometry,
   LinearFilter,
   LinearMipmapLinearFilter,
-  MeshToonMaterial,
+  MeshStandardMaterial,
+  NoColorSpace,
   PlaneGeometry,
   RepeatWrapping,
   SRGBColorSpace,
   Texture,
+  Vector2,
 } from "three";
-import { comicToneGradient } from "../../characters/cartoonMaterials";
 import { destinationPlatformRadius, hubSections, sectionRampApproachLength, sectionRampWidth } from "../hubSections";
-import { InteractiveMeshOutline } from "../InteractiveOutline";
 
 type ModularTerrainProps = {
   radius: number;
 };
 
-const comicConcreteTexturePath = "/images/optimized/floor/world-comic-concrete.webp";
+const concreteTexturePath = "/images/optimized/floor/world-weathered-concrete-seamless.webp";
+const concreteBumpTexturePath = "/images/optimized/floor/world-weathered-concrete-bump.webp";
+const concreteRoughnessTexturePath = "/images/optimized/floor/world-weathered-concrete-roughness.webp";
+const concreteNormalTexturePath = "/images/optimized/floor/world-weathered-concrete-normal.webp";
+const concreteNormalScale = new Vector2(0.82, 0.82);
 const rampThickness = 0.36;
-const concreteTextureWorldSize = 48;
+// Box surfaces retain this shared world-space scale. The main ground plane uses
+// a tighter UV multiplier so its broad surface reads at the same visual density.
+const concreteTextureWorldSize = 14;
+const groundTextureScale = 1.12;
 
 function configureFloorTexture(texture: Texture, repeat: number) {
   texture.wrapS = RepeatWrapping;
@@ -68,7 +75,11 @@ function createConcreteFloorGeometry(size: number) {
   const positions = geometry.getAttribute("position");
   const uvs = geometry.getAttribute("uv");
   for (let index = 0; index < positions.count; index += 1) {
-    uvs.setXY(index, positions.getX(index), positions.getY(index));
+    uvs.setXY(
+      index,
+      positions.getX(index) * groundTextureScale,
+      positions.getY(index) * groundTextureScale,
+    );
   }
   uvs.needsUpdate = true;
   return geometry;
@@ -76,29 +87,46 @@ function createConcreteFloorGeometry(size: number) {
 
 export function ModularTerrain({ radius }: ModularTerrainProps) {
   const platformSize = radius * 20 + 10;
-  const concreteMap = useTexture(comicConcreteTexturePath);
+  const [concreteMap, concreteBumpMap, concreteRoughnessMap, concreteNormalMap] = useTexture([
+    concreteTexturePath,
+    concreteBumpTexturePath,
+    concreteRoughnessTexturePath,
+    concreteNormalTexturePath,
+  ]);
   const textureRepeat = 1 / concreteTextureWorldSize;
   const floorGeometry = useMemo(() => createConcreteFloorGeometry(platformSize), [platformSize]);
 
-  configureFloorTexture(concreteMap, textureRepeat);
+  [concreteMap, concreteBumpMap, concreteRoughnessMap, concreteNormalMap].forEach((texture) => {
+    configureFloorTexture(texture, textureRepeat);
+  });
   concreteMap.colorSpace = SRGBColorSpace;
-  const floorMaterial = useMemo(() => new MeshToonMaterial({
-    color: "#e0e0e0",
-    gradientMap: comicToneGradient,
+  concreteBumpMap.colorSpace = NoColorSpace;
+  concreteRoughnessMap.colorSpace = NoColorSpace;
+  concreteNormalMap.colorSpace = NoColorSpace;
+  const terrainMaterial = useMemo(() => new MeshStandardMaterial({
+    bumpMap: concreteBumpMap,
+    bumpScale: 0.06,
+    color: "#46515d",
+    envMapIntensity: 0.22,
     map: concreteMap,
-  }), [concreteMap]);
-  const platformMaterial = useMemo(() => new MeshToonMaterial({
-    color: "#c5c5c5",
-    gradientMap: comicToneGradient,
-    map: concreteMap,
-  }), [concreteMap]);
+    metalness: 0.01,
+    normalMap: concreteNormalMap,
+    normalScale: concreteNormalScale,
+    roughness: 1,
+    roughnessMap: concreteRoughnessMap,
+  }), [concreteBumpMap, concreteMap, concreteNormalMap, concreteRoughnessMap]);
+  const floorMaterial = useMemo(() => {
+    const material = terrainMaterial.clone();
+    material.color.set("#3f4953");
+    return material;
+  }, [terrainMaterial]);
 
   useEffect(() => () => floorMaterial.dispose(), [floorMaterial]);
-  useEffect(() => () => platformMaterial.dispose(), [platformMaterial]);
+  useEffect(() => () => terrainMaterial.dispose(), [terrainMaterial]);
   useEffect(() => () => floorGeometry.dispose(), [floorGeometry]);
 
   return (
-    <group name="PremiumMicrocementFloor">
+    <group name="WeatheredConcreteTerrain">
       <RigidBody name="StudioCLTDFloor" type="fixed" colliders={false}>
         <CuboidCollider
           position={[0, -0.09, 0]}
@@ -107,12 +135,12 @@ export function ModularTerrain({ radius }: ModularTerrainProps) {
           restitution={0.18}
         />
       </RigidBody>
-      <mesh rotation-x={-Math.PI / 2}>
+      <mesh rotation-x={-Math.PI / 2} receiveShadow>
         <primitive object={floorGeometry} attach="geometry" />
         <primitive object={floorMaterial} attach="material" />
       </mesh>
       {hubSections.map((section) => (
-        <DestinationPlatform key={section.id} material={platformMaterial} section={section} />
+        <DestinationPlatform key={section.id} material={terrainMaterial} section={section} />
       ))}
     </group>
   );
@@ -122,7 +150,7 @@ function DestinationPlatform({
   material,
   section,
 }: {
-  material: MeshToonMaterial;
+  material: MeshStandardMaterial;
   section: (typeof hubSections)[number];
 }) {
   const [x, height, z] = section.position;
@@ -157,9 +185,8 @@ function DestinationPlatform({
           position={[x, height / 2, z]}
           friction={0.35}
         />
-        <mesh position={[x, height / 2, z]} material={material}>
+        <mesh position={[x, height / 2, z]} material={material} receiveShadow>
           <primitive object={platformGeometry} attach="geometry" />
-          <InteractiveMeshOutline />
         </mesh>
       </RigidBody>
       <RigidBody type="fixed" colliders={false} position={[bridgeX, bridgeCenterY, bridgeZ]} rotation={[0, yaw, 0]}>
@@ -170,10 +197,10 @@ function DestinationPlatform({
         />
         <mesh
           material={material}
+          receiveShadow
           rotation-x={bridgeAngle}
         >
           <primitive object={rampGeometry} attach="geometry" />
-          <InteractiveMeshOutline />
         </mesh>
       </RigidBody>
     </group>

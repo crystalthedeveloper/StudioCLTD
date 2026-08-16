@@ -13,6 +13,7 @@ export function GameHud({ completedSectionCount, onOpenWebsite, onRestart, point
   const remainingMs = useSpeedBoostRemainingMs();
   const active = remainingMs > 0;
   const progress = active ? Math.min(100, (remainingMs / speedBoostDurationMs) * 100) : 0;
+  const sectionProgress = Math.min(100, (completedSectionCount / 8) * 100);
 
   return (
     <aside className="game-hud" aria-label="Game controls and status">
@@ -70,6 +71,36 @@ export function GameHud({ completedSectionCount, onOpenWebsite, onRestart, point
           <span style={{ height: `${progress}%` }} />
         </div>
       </section>
+
+      <div className="game-hud__mobile-cluster">
+        <div className="game-hud__mobile-points" aria-label={`${points} points`} aria-live="polite">
+          {points}
+        </div>
+        <div
+          className="game-hud__mobile-progress-value"
+          aria-label={`${completedSectionCount} of 8 sections complete`}
+          aria-live="polite"
+        >
+          {completedSectionCount}
+        </div>
+        <div className="game-hud__mobile-speed-icon" aria-hidden="true">⚡</div>
+        <svg className="game-hud__mobile-arcs" viewBox="0 0 240 180" aria-hidden="true">
+          <path className="game-hud__mobile-arc-track" d="M 80 25 A 88 88 0 0 0 48 156" pathLength="100" />
+          <path
+            className="game-hud__mobile-arc game-hud__mobile-arc--progress"
+            d="M 80 25 A 88 88 0 0 0 48 156"
+            pathLength="100"
+            strokeDasharray={`${sectionProgress} 100`}
+          />
+          <path className="game-hud__mobile-arc-track game-hud__mobile-arc-track--speed" d="M 160 25 A 88 88 0 0 1 192 156" pathLength="100" />
+          <path
+            className="game-hud__mobile-arc game-hud__mobile-arc--speed"
+            d="M 160 25 A 88 88 0 0 1 192 156"
+            pathLength="100"
+            strokeDasharray={`${progress} 100`}
+          />
+        </svg>
+      </div>
     </aside>
   );
 }

@@ -8,12 +8,10 @@ import {
   RigidBody,
 } from "@react-three/rapier";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Color, Group, Mesh, MeshToonMaterial, Object3D } from "three";
+import { Color, Group, Mesh, MeshStandardMaterial, Object3D } from "three";
 import { activateSpeedBoost } from "../../player/speedBoost";
 import { playCollectibleSound } from "../../audio/collectibleSounds";
-import { comicToneGradient } from "../../characters/cartoonMaterials";
 import { BillboardLabel } from "../../ui/BillboardLabel";
-import { InteractiveOutline } from "../InteractiveOutline";
 import { destinationPlatformRadius, hubSections, sectionRampApproachLength, sectionRampWidth } from "../hubSections";
 import { transportPadPositions } from "./TransportPads";
 
@@ -165,16 +163,17 @@ const logoColors: Record<LogoKind, string> = {
 
 function createSharedMaterial(kind: LogoKind) {
   const color = new Color(logoColors[kind]);
-  return new MeshToonMaterial({
+  return new MeshStandardMaterial({
     color,
     emissive: color,
     emissiveIntensity: kind === "light" ? 0.12 : kind === "coin" ? 0.55 : kind === "contact" ? 0.65 : kind === "dark" ? 0.08 : kind === "speed" ? 0.7 : 0.55,
-    gradientMap: comicToneGradient,
+    metalness: 0.04,
+    roughness: 0.72,
     toneMapped: false,
   });
 }
 
-function createLogoTemplate(source: Group, material: MeshToonMaterial) {
+function createLogoTemplate(source: Group, material: MeshStandardMaterial) {
   const logo = source.clone(true);
 
   logo.traverse((object: Object3D) => {
@@ -418,7 +417,6 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
           scale={logoScale * (logo.scaleMultiplier ?? 1)}
         />
       ) : standardVisual}
-      <InteractiveOutline object={logo.object} />
     </>
   );
 
@@ -438,7 +436,7 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
       />
       {visual}
       {contactCountdown > 0 && (
-        <BillboardLabel color="#75baff" fontSize={0.25} position={[0, 1.75, 0]} maxWidth={4}>
+        <BillboardLabel color="#ffffff" fontSize={0.25} position={[0, 1.75, 0]} maxWidth={4}>
           {`Opening Contact in ${contactCountdown}…`}
         </BillboardLabel>
       )}

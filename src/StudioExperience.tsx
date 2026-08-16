@@ -2,7 +2,7 @@ import { Canvas } from "@react-three/fiber";
 import { useProgress } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { ACESFilmicToneMapping, MathUtils, SRGBColorSpace } from "three";
+import { ACESFilmicToneMapping, MathUtils, PCFSoftShadowMap, SRGBColorSpace } from "three";
 import { isTrackpadCameraInputBlocked } from "./player/cameraInputGuard";
 import { setGameFocused, useGameFocus } from "./player/gameFocus";
 import { HubOverlay } from "./ui/HubOverlay";
@@ -161,7 +161,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
             outputColorSpace: SRGBColorSpace,
             powerPreference: "high-performance",
             toneMapping: ACESFilmicToneMapping,
-            toneMappingExposure: 1.12,
+            toneMappingExposure: 1.08,
           }}
           camera={{ position: [11, 7, 15], fov: 58, near: 0.1, far: 10000 }}
           onPointerDown={focusGame}
@@ -171,10 +171,11 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
           }}
           onCreated={({ gl }) => {
             canvasRef.current = gl.domElement;
-            gl.shadowMap.enabled = false;
+            gl.shadowMap.enabled = true;
+            gl.shadowMap.type = PCFSoftShadowMap;
           }}
         >
-          <color attach="background" args={["#62bff5"]} />
+          <color attach="background" args={["#01030a"]} />
           <fog attach="fog" args={[distanceFog.color, distanceFog.near, distanceFog.far]} />
           <Suspense fallback={null}>
             <Physics gravity={[0, -20, 0]}>

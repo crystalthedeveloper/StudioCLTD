@@ -497,7 +497,7 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
       </mesh>
       {label && (
         <BillboardLabel
-          color={padVisualStyle.color}
+          color={padVisualStyle.labelColor}
           fontSize={label === "More Info" ? 0.24 : 0.28}
           position={[0, triggerPopupLayout.labelHeight, 0]}
           maxWidth={2.5}

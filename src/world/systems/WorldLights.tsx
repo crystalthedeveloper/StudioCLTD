@@ -24,19 +24,19 @@ export function WorldLights() {
 
   return (
     <>
-      <ambientLight intensity={0.58} color="#f4f7f8" />
-      <hemisphereLight intensity={0.92} color="#c9e4f5" groundColor="#686d67" />
-      <ambientLight ref={playerFillRef} intensity={0.36} color="#dce8f2" />
+      <ambientLight intensity={0.92} color="#fffdf8" />
+      <hemisphereLight intensity={1.32} color="#eef7fc" groundColor="#85877f" />
+      <ambientLight ref={playerFillRef} intensity={0.68} color="#fffdf8" />
       <directionalLight
         ref={playerKeyRef}
-        color="#fff1dc"
-        intensity={1.32}
+        color="#fff7ec"
+        intensity={2}
         position={[8, 14, 10]}
       />
       <directionalLight
         ref={playerRimRef}
-        color="#6ebcff"
-        intensity={0.95}
+        color="#e2f2ff"
+        intensity={1.25}
         position={[-12, 9, -14]}
       />
       <ambientLight ref={villainFillRef} intensity={0.12} color="#c7d6e2" />

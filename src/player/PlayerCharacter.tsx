@@ -1,7 +1,7 @@
 import { useAnimations, useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
-import { AnimationAction, Group, LoopOnce, LoopRepeat, Material, Mesh, Object3D } from "three";
+import { AnimationAction, Group, LoopOnce, LoopRepeat, Material, Mesh, Object3D, PointLight } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import {
   applyCharacterMaterials,
@@ -52,6 +52,8 @@ export function PlayerCharacter({
   const model = useGLTF("/characters/char-optimized.glb", false, true);
   const scene = useMemo(() => SkeletonUtils.clone(model.scene), [model.scene]);
   const group = useRef<Group>(null);
+  const playerFrontLightRef = useRef<PointLight>(null);
+  const playerBackLightRef = useRef<PointLight>(null);
   const { actions } = useAnimations(model.animations, group);
   const fixedRequestRef = useRef(0);
   const fixedActionRef = useRef<AnimationAction | null>(null);
@@ -83,6 +85,11 @@ export function PlayerCharacter({
     materialSlotsRef.current = collectBodyMaterialSlots(scene);
     activeMaterialModeRef.current = "default";
   }, [scene]);
+
+  useEffect(() => {
+    playerFrontLightRef.current?.layers.set(playerLightingLayer);
+    playerBackLightRef.current?.layers.set(playerLightingLayer);
+  }, []);
 
   useEffect(() => {
     const updateSpeedBoostActive = () => {
@@ -220,6 +227,22 @@ export function PlayerCharacter({
 
   return (
     <group ref={group}>
+      <pointLight
+        ref={playerFrontLightRef}
+        color="#fff8ec"
+        intensity={15}
+        distance={9}
+        decay={2}
+        position={[1.8, 3.2, 2.8]}
+      />
+      <pointLight
+        ref={playerBackLightRef}
+        color="#edf7ff"
+        intensity={10}
+        distance={8}
+        decay={2}
+        position={[-1.6, 2.5, -2.2]}
+      />
       <DialogueBubble message={dialogue} position={[0, 2.65, 0]} />
       <primitive object={scene} rotation-y={Math.PI} scale={1.05} />
     </group>

@@ -2,7 +2,7 @@ import { Text } from "@react-three/drei";
 import { CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload } from "@react-three/rapier";
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Group, MeshBasicMaterial, SphereGeometry, Vector3 } from "three";
+import { AdditiveBlending, Group, InstancedMesh, MeshBasicMaterial, Object3D, PointLight, SphereGeometry, Vector3 } from "three";
 import {
   hasVillainVoice,
   playVillainDefeatSound,
@@ -56,6 +56,9 @@ const villainDialogueText: Record<string, string> = {
 };
 
 const smokeGeometry = new SphereGeometry(1, 8, 8);
+const fireGeometry = new SphereGeometry(1, 8, 6);
+const fireDurationSeconds = 0.8;
+const fireExpansionSeconds = 0.4;
 const fixPadVisualConfig = {
   pulseBaseScale: 1.05,
   pulseScaleAmount: 0.2,
@@ -359,7 +362,12 @@ function SectionPortalEncounter({
           position={encounter.infoPadPosition}
         />
       )}
-      {smokeActive && <SmokeDeathEffect position={encounter.villainPosition} />}
+      {smokeActive && (
+        <>
+          <FireBurstEffect position={encounter.villainPosition} />
+          <SmokeDeathEffect position={encounter.villainPosition} />
+        </>
+      )}
       {villainVisible && (
         <VillainCharacter
           basePosition={encounter.villainPosition}
@@ -367,6 +375,155 @@ function SectionPortalEncounter({
           villainStatus={villainStatus}
         />
       )}
+    </group>
+  );
+}
+
+type FireLayer = "core" | "flame" | "outer";
+
+type FireParticle = {
+  angle: number;
+  delay: number;
+  elevation: number;
+  phase: number;
+  size: number;
+  speed: number;
+};
+
+const fireLayerCounts: Record<FireLayer, number> = {
+  core: 5,
+  flame: 9,
+  outer: 11,
+};
+
+function createFireParticles(count: number, layerOffset: number): FireParticle[] {
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+
+  return Array.from({ length: count }, (_, index) => ({
+    angle: index * goldenAngle + layerOffset,
+    delay: (index % 4) * 0.018,
+    elevation: -0.28 + ((index * 7) % 13) / 12,
+    phase: index * 1.73 + layerOffset,
+    size: 0.72 + ((index * 5) % 7) * 0.07,
+    speed: 0.82 + ((index * 3) % 8) * 0.055,
+  }));
+}
+
+function FireBurstEffect({ position }: { position: Vector3 }) {
+  const groupRef = useRef<Group>(null);
+  const coreRef = useRef<InstancedMesh>(null);
+  const flameRef = useRef<InstancedMesh>(null);
+  const outerRef = useRef<InstancedMesh>(null);
+  const lightRef = useRef<PointLight>(null);
+  const startedAtRef = useRef(0);
+  const transform = useMemo(() => new Object3D(), []);
+  const particles = useRef<Record<FireLayer, FireParticle[]>>({
+    core: createFireParticles(fireLayerCounts.core, 0.35),
+    flame: createFireParticles(fireLayerCounts.flame, 1.7),
+    outer: createFireParticles(fireLayerCounts.outer, 3.1),
+  });
+  const materials = useMemo(
+    () => ({
+      core: new MeshBasicMaterial({
+        blending: AdditiveBlending,
+        color: "#fffbd1",
+        depthWrite: false,
+        opacity: 1,
+        toneMapped: false,
+        transparent: true,
+      }),
+      flame: new MeshBasicMaterial({
+        blending: AdditiveBlending,
+        color: "#ff8a0a",
+        depthWrite: false,
+        opacity: 0.92,
+        toneMapped: false,
+        transparent: true,
+      }),
+      outer: new MeshBasicMaterial({
+        blending: AdditiveBlending,
+        color: "#b51b08",
+        depthWrite: false,
+        opacity: 0.78,
+        toneMapped: false,
+        transparent: true,
+      }),
+    }),
+    []
+  );
+
+  useEffect(() => () => Object.values(materials).forEach((material) => material.dispose()), [materials]);
+
+  useFrame(({ clock }) => {
+    if (startedAtRef.current === 0) startedAtRef.current = clock.elapsedTime;
+    const elapsed = clock.elapsedTime - startedAtRef.current;
+    const group = groupRef.current;
+    if (!group) return;
+
+    if (elapsed >= fireDurationSeconds) {
+      group.visible = false;
+      return;
+    }
+
+    const expansionProgress = Math.min(elapsed / fireExpansionSeconds, 1);
+    const expansion = 1 - Math.pow(1 - expansionProgress, 3);
+    const refs: Record<FireLayer, InstancedMesh | null> = {
+      core: coreRef.current,
+      flame: flameRef.current,
+      outer: outerRef.current,
+    };
+
+    (Object.keys(refs) as FireLayer[]).forEach((layer) => {
+      const mesh = refs[layer];
+      if (!mesh) return;
+      const layerRadius = layer === "core" ? 0.62 : layer === "flame" ? 1.35 : 1.85;
+      const layerStretch = layer === "core" ? 0.9 : layer === "flame" ? 1.35 : 1.08;
+
+      particles.current[layer].forEach((particle, index) => {
+        const localElapsed = Math.max(0, elapsed - particle.delay);
+        const localExpansion = Math.min(localElapsed / fireExpansionSeconds, 1);
+        const radius = layerRadius * particle.speed * (1 - Math.pow(1 - localExpansion, 3));
+        const turbulence = Math.sin(localElapsed * 24 + particle.phase) * 0.13 * expansion;
+        const verticalTurbulence = Math.cos(localElapsed * 19 + particle.phase) * 0.1 * expansion;
+        const size = particle.size * (0.18 + expansion * 0.82);
+
+        transform.position.set(
+          Math.cos(particle.angle) * radius + turbulence,
+          particle.elevation * radius + verticalTurbulence,
+          Math.sin(particle.angle) * radius - turbulence
+        );
+        transform.rotation.set(
+          particle.elevation * 0.7,
+          particle.angle,
+          Math.sin(particle.phase) * 0.45
+        );
+        transform.scale.set(size * 0.72, size * layerStretch, size * 0.72);
+        transform.updateMatrix();
+        mesh.setMatrixAt(index, transform.matrix);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+    });
+
+    materials.core.opacity = Math.max(0, 1 - elapsed / 0.36);
+    materials.flame.opacity = Math.max(0, Math.min(1, elapsed / 0.045) * (1 - elapsed / 0.68));
+    materials.outer.opacity = Math.max(0, Math.min(0.82, elapsed / 0.09) * (1 - elapsed / fireDurationSeconds));
+
+    if (lightRef.current) {
+      const ignition = Math.min(elapsed / 0.035, 1);
+      lightRef.current.intensity = 70 * ignition * Math.pow(1 - elapsed / fireDurationSeconds, 2);
+    }
+  });
+
+  return (
+    <group
+      ref={groupRef}
+      name="VillainFireBurstEffect"
+      position={[position.x, position.y + 1.15, position.z]}
+    >
+      <pointLight ref={lightRef} color="#ff9a22" decay={2} distance={12} intensity={0} />
+      <instancedMesh ref={outerRef} args={[fireGeometry, materials.outer, fireLayerCounts.outer]} />
+      <instancedMesh ref={flameRef} args={[fireGeometry, materials.flame, fireLayerCounts.flame]} />
+      <instancedMesh ref={coreRef} args={[fireGeometry, materials.core, fireLayerCounts.core]} />
     </group>
   );
 }

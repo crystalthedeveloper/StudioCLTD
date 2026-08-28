@@ -1705,14 +1705,14 @@ body aside.game-hud .game-hud__right .game-hud__shoot {
 body aside.game-hud .game-hud__left .game-hud__stat--points {
   width: 47px !important;
   min-width: 47px !important;
-  justify-self: start;
+  justify-self: end;
 }
 
 body aside.game-hud .direction-controls {
   position: static;
   grid-area: directions;
-  grid-template-columns: repeat(3, 48px);
-  grid-template-rows: repeat(2, 48px);
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(2, 44px);
   justify-content: center;
   justify-self: center;
   align-items: center;

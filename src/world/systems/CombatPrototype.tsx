@@ -25,6 +25,7 @@ import { isPlayerObject } from "../playerCollision";
 import { playerWorldState } from "../playerWorldState";
 import { padVisualStyle } from "../padVisualStyle";
 import { triggerPopupLayout } from "../triggerPopupLayout";
+import { crosshairNdcY } from "../aiming";
 import { fixPulseGeometry, fixRingGeometry, useTriggerPadVisuals } from "../useTriggerPadVisuals";
 
 const cooldownMs = 1800;
@@ -162,7 +163,7 @@ const bonusProjectileHitbox = {
 const energyBallRadius = 0.46;
 const mainVillainHitRadius = 1.45;
 const projectileMaxDistance = 48;
-const crosshairNdc = new Vector2(0, 0);
+const crosshairNdc = new Vector2(0, crosshairNdcY);
 const bonusTargets = new Map<string, {
   alive: boolean;
   hitbox: typeof bonusProjectileHitbox;
@@ -434,11 +435,13 @@ function belongsToAimExcludedObject(object: Object3D) {
 function EnergyProjectileSystem({ onHit, shootRequest }: { onHit: (id: string) => void; shootRequest: number }) {
   const [projectiles, setProjectiles] = useState<EnergyProjectile[]>([]);
   const nextIdRef = useRef(0);
+  const handledShootRequestRef = useRef(shootRequest);
   const raycasterRef = useRef(new Raycaster());
   const { camera, scene } = useThree();
 
   useEffect(() => {
-    if (shootRequest === 0) return undefined;
+    if (shootRequest === handledShootRequestRef.current) return undefined;
+    handledShootRequestRef.current = shootRequest;
     const timer = window.setTimeout(() => {
       const playerYaw = playerWorldState.yaw;
       const playerDirection = new Vector3(-Math.sin(playerYaw), 0, -Math.cos(playerYaw)).normalize();

@@ -13,7 +13,7 @@ import { activateSpeedBoost } from "../../player/speedBoost";
 import { playCollectibleSound } from "../../audio/collectibleSounds";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { destinationPlatformRadius, hubSections, sectionRampApproachLength, sectionRampWidth } from "../hubSections";
-import { transportPadPositions } from "./TransportPads";
+import { homeBaseTransportPadPosition, transportPadPositions } from "./TransportPads";
 import { homeBaseCenter } from "./HomeBase";
 
 const logoPath = "/logo/logo-optimized.glb";
@@ -129,6 +129,10 @@ function isOpenCollectiblePosition(position: readonly [number, number], placed: 
   }
 
   if (transportPadPositions.some(([padX, padZ]) => Math.hypot(x - padX, z - padZ) < transportPadClearance)) {
+    return false;
+  }
+
+  if (Math.hypot(x - homeBaseTransportPadPosition[0], z - homeBaseTransportPadPosition[1]) < transportPadClearance) {
     return false;
   }
 

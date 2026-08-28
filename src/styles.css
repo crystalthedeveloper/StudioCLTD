@@ -1656,7 +1656,7 @@ body aside.game-hud {
   bottom: max(10px, env(safe-area-inset-bottom));
   z-index: 60;
   display: grid;
-  grid-template-columns: 134px 156px 134px;
+  grid-template-columns: 134px 156px 92px;
   grid-template-areas: "left directions shoot";
   gap: 10px;
   align-items: end;
@@ -1722,9 +1722,10 @@ body aside.game-hud .game-hud__left .game-hud__guide-button {
 body aside.game-hud .game-hud__right {
   grid-area: shoot;
   display: grid;
+  grid-template-columns: 92px;
   grid-template-rows: repeat(2, 42px);
   gap: 4px;
-  width: 134px;
+  width: 92px;
   align-self: end;
   pointer-events: auto;
 }
@@ -1732,11 +1733,16 @@ body aside.game-hud .game-hud__right {
 body aside.game-hud .game-hud__right .game-hud__speed-meter,
 body aside.game-hud .game-hud__right .game-hud__shoot {
   position: static;
-  width: 134px;
-  min-width: 134px;
+  grid-column: 1;
+  width: 92px;
+  min-width: 92px;
   height: 42px;
   min-height: 42px;
   box-sizing: border-box;
+}
+
+body aside.game-hud .game-hud__right .game-hud__shoot {
+  padding: 4px;
 }
 
 body aside.game-hud .game-hud__left .game-hud__stat--points {
@@ -1780,7 +1786,7 @@ body aside.game-hud .direction-controls {
     left: 50%;
     right: auto;
     bottom: max(6px, env(safe-area-inset-bottom));
-    grid-template-columns: 134px 156px 134px;
+    grid-template-columns: 134px 156px 92px;
     gap: 4px;
     padding: 5px;
     transform: translateX(-50%);
@@ -1831,15 +1837,15 @@ body aside.game-hud .direction-controls {
   }
 }
 
-@media (max-width: 400px) {
+@media (max-width: 420px) {
   body aside.game-hud {
     bottom: max(8px, calc(env(safe-area-inset-bottom) + 6px));
-    grid-template-columns: 126px 125px minmax(96px, 1fr);
-    gap: 3px;
-    width: calc(100vw - max(8px, calc(env(safe-area-inset-left) + env(safe-area-inset-right) + 8px)));
+    grid-template-columns: 126px 125px 92px;
+    gap: 2px;
+    width: calc(100vw - max(4px, calc(env(safe-area-inset-left) + env(safe-area-inset-right) + 4px)));
     max-width: none;
-    padding-left: max(4px, env(safe-area-inset-left));
-    padding-right: max(4px, env(safe-area-inset-right));
+    padding-left: max(2px, env(safe-area-inset-left));
+    padding-right: max(2px, env(safe-area-inset-right));
   }
 
   body aside.game-hud .game-hud__left {
@@ -1872,14 +1878,21 @@ body aside.game-hud .direction-controls {
   body aside.game-hud .game-hud__right,
   body aside.game-hud .game-hud__right .game-hud__speed-meter,
   body aside.game-hud .game-hud__right .game-hud__shoot {
-    width: 100%;
     min-width: 0;
+  }
+
+  body aside.game-hud .game-hud__right {
+    width: 92px;
+  }
+
+  body aside.game-hud .game-hud__right .game-hud__speed-meter,
+  body aside.game-hud .game-hud__right .game-hud__shoot {
+    width: 92px;
   }
 }
 
 .aim-crosshair {
   position: fixed;
-  top: 50%;
   left: 50%;
   z-index: 55;
   width: 7px;

@@ -35,6 +35,7 @@ export const transportPadPositions = [
   [-3, 8],
   [3, 8],
 ] as const;
+export const homeBaseTransportPadPosition = [12, 0] as const;
 
 export type TransportDestination = {
   id: number;
@@ -60,7 +61,15 @@ export function TransportPads({ onTransport, restartKey }: TransportPadsProps) {
       roughness: 0.42,
       toneMapped: false,
     });
-    return { geometry, material };
+    const homeBaseMaterial = new MeshStandardMaterial({
+      color: "#FACC15",
+      emissive: "#FACC15",
+      emissiveIntensity: 1.35,
+      metalness: 0.05,
+      roughness: 0.36,
+      toneMapped: false,
+    });
+    return { geometry, material, homeBaseMaterial };
   }, []);
 
   useEffect(() => {
@@ -71,6 +80,7 @@ export function TransportPads({ onTransport, restartKey }: TransportPadsProps) {
     () => () => {
       resources.geometry.dispose();
       resources.material.dispose();
+      resources.homeBaseMaterial.dispose();
     },
     [resources],
   );
@@ -118,10 +128,12 @@ export function TransportPads({ onTransport, restartKey }: TransportPadsProps) {
       ))}
       <TransportPad
         geometry={resources.geometry}
-        label="Home Base"
-        material={resources.material}
+        label="HOME BASE"
+        labelColor="#FACC15"
+        material={resources.homeBaseMaterial}
+        glowColor="#FACC15"
         onEnter={(event) => transportDirect([homeBaseCenter[0], homeBaseCenter[1] + 2.2, homeBaseCenter[2] - 6.5], Math.PI, event)}
-        position={[0, 0.04, 0]}
+        position={[homeBaseTransportPadPosition[0], 0.04, homeBaseTransportPadPosition[1]]}
       />
       <TransportPad
         geometry={resources.geometry}
@@ -138,12 +150,16 @@ function TransportPad({
   geometry,
   label,
   material,
+  labelColor = padVisualStyle.labelColor,
+  glowColor,
   onEnter,
   position,
 }: {
   geometry: RingGeometry;
   label: string;
   material: MeshStandardMaterial;
+  labelColor?: string;
+  glowColor?: string;
   onEnter: (event: IntersectionEnterPayload) => void;
   position: readonly [number, number, number];
 }) {
@@ -171,8 +187,9 @@ function TransportPad({
         onIntersectionExit={handleExit}
       />
       <mesh geometry={geometry} material={material} rotation-x={-Math.PI / 2} />
+      {glowColor ? <pointLight color={glowColor} intensity={2.2} distance={7} decay={2} position={[0, 0.35, 0]} /> : null}
       <BillboardLabel
-        color={padVisualStyle.labelColor}
+        color={labelColor}
         fontSize={label === "Site Improvement" ? 0.2 : 0.24}
         position={[0, triggerPopupLayout.labelHeight, 0]}
         maxWidth={3}

@@ -12,6 +12,7 @@ import { triggerTrophyHaptic } from "./ui/haptics";
 import { StudioWorld } from "./world/StudioWorld";
 import { preloadScreenTextures, unlockShowcaseVideoPlayback } from "./world/systems/HubSections";
 import { distanceFog } from "./world/distanceFog";
+import { crosshairViewportY } from "./world/aiming";
 
 type StudioExperienceProps = {
   onOpenWebsite: () => void;
@@ -245,7 +246,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         shootPressed={shootPressed}
         setShootPressed={setShootPressed}
       />
-      <div className="aim-crosshair" aria-hidden="true">
+      <div className="aim-crosshair" aria-hidden="true" style={{ top: `${crosshairViewportY * 100}%` }}>
         <span className="aim-crosshair__mark aim-crosshair__mark--top" />
         <span className="aim-crosshair__mark aim-crosshair__mark--right" />
         <span className="aim-crosshair__mark aim-crosshair__mark--bottom" />

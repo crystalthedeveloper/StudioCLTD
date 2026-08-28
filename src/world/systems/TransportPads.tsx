@@ -6,6 +6,7 @@ import { hubSections } from "../hubSections";
 import { isPlayerObject } from "../playerCollision";
 import { padVisualStyle } from "../padVisualStyle";
 import { triggerPopupLayout } from "../triggerPopupLayout";
+import { homeBaseCenter } from "./HomeBase";
 
 const transportCooldownMs = 1200;
 const arrivalDistanceFromSection = 16;
@@ -94,6 +95,15 @@ export function TransportPads({ onTransport, restartKey }: TransportPadsProps) {
     });
   };
 
+  const transportDirect = (position: [number, number, number], yaw: number, event: IntersectionEnterPayload) => {
+    if (!isPlayerObject(event.other.rigidBodyObject) && !isPlayerObject(event.other.colliderObject)) return;
+    const now = performance.now();
+    if (now - lastTransportAtRef.current < transportCooldownMs) return;
+    lastTransportAtRef.current = now;
+    transportIdRef.current += 1;
+    onTransport({ id: transportIdRef.current, position, yaw });
+  };
+
   return (
     <group name="PlazaTransportHub">
       {transportSections.map((section, index) => (
@@ -103,9 +113,23 @@ export function TransportPads({ onTransport, restartKey }: TransportPadsProps) {
           label={section.name}
           material={resources.material}
           onEnter={(event) => transport(section, event)}
-          position={transportPadPositions[index]}
+          position={[transportPadPositions[index][0], 0.04, transportPadPositions[index][1]]}
         />
       ))}
+      <TransportPad
+        geometry={resources.geometry}
+        label="Home Base"
+        material={resources.material}
+        onEnter={(event) => transportDirect([homeBaseCenter[0], homeBaseCenter[1] + 2.2, homeBaseCenter[2] - 6.5], Math.PI, event)}
+        position={[0, 0.04, 0]}
+      />
+      <TransportPad
+        geometry={resources.geometry}
+        label="Return"
+        material={resources.material}
+        onEnter={(event) => transportDirect([0, 2.8, 11], Math.PI, event)}
+        position={[homeBaseCenter[0], homeBaseCenter[1] + 0.04, homeBaseCenter[2] - 10.5]}
+      />
     </group>
   );
 }
@@ -121,7 +145,7 @@ function TransportPad({
   label: string;
   material: MeshStandardMaterial;
   onEnter: (event: IntersectionEnterPayload) => void;
-  position: readonly [number, number];
+  position: readonly [number, number, number];
 }) {
   const playerInsideRef = useRef(false);
 
@@ -138,7 +162,7 @@ function TransportPad({
   };
 
   return (
-    <RigidBody type="fixed" colliders={false} position={[position[0], 0.04, position[1]]} name={`TransportPad:${label}`}>
+    <RigidBody type="fixed" colliders={false} position={position} name={`TransportPad:${label}`}>
       <CylinderCollider
         sensor
         args={[0.28, 0.82]}

@@ -1,8 +1,11 @@
-import { Text } from "@react-three/drei";
+import { Text, useAnimations, useGLTF } from "@react-three/drei";
 import { CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload } from "@react-three/rapier";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AdditiveBlending, Group, InstancedMesh, MeshBasicMaterial, Object3D, PointLight, SphereGeometry, Vector3 } from "three";
+import { AdditiveBlending, Group, InstancedMesh, LoopRepeat, Mesh, MeshBasicMaterial, Object3D, PointLight, Raycaster, SphereGeometry, Vector2, Vector3 } from "three";
+import { SkeletonUtils } from "three-stdlib";
+import { applyCharacterMaterials, villainMaterialProfile } from "../../characters/characterMaterials";
+import { applyNaturalMaterials } from "../../characters/naturalMaterials";
 import {
   hasVillainVoice,
   playVillainDefeatSound,
@@ -12,6 +15,7 @@ import {
   stopVillainVoice,
 } from "../../audio/villainAudio";
 import { BillboardLabel } from "../../ui/BillboardLabel";
+import { playEnergyBlastSound } from "../../audio/shootSound";
 import { DialogueMessage } from "../../ui/DialogueBubble";
 import { triggerFixHaptic } from "../../ui/haptics";
 import { gameTextFont } from "../../ui/textFont";
@@ -109,28 +113,68 @@ function createSectionEncounters(): SectionEncounterConfig[] {
 }
 
 const sectionEncounters = createSectionEncounters();
+const bonusSpawnSpots = [
+  new Vector3(-18, 0.1, 12),
+  new Vector3(19, 0.1, 11),
+  new Vector3(-16, 0.1, -19),
+  new Vector3(18, 0.1, -20),
+  new Vector3(2, 0.1, 28),
+];
+const bonusProjectileHitbox = {
+  centerY: 1.05,
+  horizontalRadius: 1.2,
+  verticalRadius: 2.25,
+} as const;
+const energyBallRadius = 0.46;
+const mainVillainHitRadius = 1.45;
+const projectileMaxDistance = 48;
+const crosshairNdc = new Vector2(0, 0);
+const bonusTargets = new Map<string, {
+  alive: boolean;
+  hitbox: typeof bonusProjectileHitbox;
+  position: Vector3;
+}>();
+const energyBallGeometry = new SphereGeometry(energyBallRadius, 12, 10);
+const energyBallMaterial = new MeshBasicMaterial({
+  blending: AdditiveBlending,
+  color: "#facc15",
+  depthWrite: false,
+  toneMapped: false,
+});
+const energyBallGlowMaterial = new MeshBasicMaterial({
+  blending: AdditiveBlending,
+  color: "#facc15",
+  depthWrite: false,
+  opacity: 0.24,
+  toneMapped: false,
+  transparent: true,
+});
 
 type CombatPrototypeProps = {
-  onPlayerFixedAnimation: () => void;
+  onBonusCollect: () => void;
   onPlayerDialogue: (text: string) => void;
   onSectionResolved: (sectionId: string) => void;
   onSectionTrigger: (sectionId: string, triggerId: string) => void;
   onVillainDialogue: (sectionName: string, text: string) => void;
   restartKey: number | string;
+  shootRequest: number;
   villainDialogue: (DialogueMessage & { sectionName: string }) | null;
 };
 
 export function CombatPrototype({
-  onPlayerFixedAnimation,
+  onBonusCollect,
   onPlayerDialogue,
   onSectionResolved,
   onSectionTrigger,
   onVillainDialogue,
   restartKey,
+  shootRequest,
   villainDialogue,
 }: CombatPrototypeProps) {
   const [activeInfoId, setActiveInfoId] = useState<string | null>(null);
   const [visibleEncounterCount, setVisibleEncounterCount] = useState(1);
+  const [projectileHit, setProjectileHit] = useState<{ id: string; sequence: number } | null>(null);
+  const [bonusHit, setBonusHit] = useState<{ id: string; sequence: number } | null>(null);
 
   useEffect(() => {
     preloadVillainAudio();
@@ -166,6 +210,22 @@ export function CombatPrototype({
 
   return (
     <group name="SectionPortalEncounters">
+      <EnergyProjectileSystem
+        key={`projectiles:${restartKey}`}
+        onHit={(id) => {
+          if (id.startsWith("bonus:")) {
+            setBonusHit((current) => ({ id, sequence: (current?.sequence ?? 0) + 1 }));
+            return;
+          }
+          setProjectileHit((current) => ({ id, sequence: (current?.sequence ?? 0) + 1 }));
+        }}
+        shootRequest={shootRequest}
+      />
+      <BonusVillainSystem
+        key={`bonus-villains:${restartKey}`}
+        hit={bonusHit}
+        onDefeat={onBonusCollect}
+      />
       {sectionEncounters.slice(0, visibleEncounterCount).map((encounter) => (
         <SectionPortalEncounter
           key={`${encounter.id}:${restartKey}`}
@@ -175,13 +235,259 @@ export function CombatPrototype({
             setActiveInfoId(encounter.id);
             onSectionTrigger(encounter.id, "info");
           }}
-          onPlayerFixedAnimation={onPlayerFixedAnimation}
           onPlayerDialogue={onPlayerDialogue}
           onSectionResolved={onSectionResolved}
           onVillainDialogue={onVillainDialogue}
+          projectileHit={projectileHit}
           villainDialogue={villainDialogue}
         />
       ))}
+    </group>
+  );
+}
+
+function BonusVillainSystem({
+  hit,
+  onDefeat,
+}: {
+  hit: { id: string; sequence: number } | null;
+  onDefeat: () => void;
+}) {
+  return (
+    <group name="BonusVillains">
+      <BonusVillain id="bonus:1" hit={hit} initialSpot={0} onDefeat={onDefeat} />
+      <BonusVillain id="bonus:2" hit={hit} initialSpot={2} onDefeat={onDefeat} />
+    </group>
+  );
+}
+
+function BonusVillain({
+  hit,
+  id,
+  initialSpot,
+  onDefeat,
+}: {
+  hit: { id: string; sequence: number } | null;
+  id: string;
+  initialSpot: number;
+  onDefeat: () => void;
+}) {
+  const model = useGLTF("/characters/char-optimized.glb", false, true);
+  const scene = useMemo(() => SkeletonUtils.clone(model.scene), [model.scene]);
+  const groupRef = useRef<Group>(null);
+  const positionRef = useRef(bonusSpawnSpots[initialSpot].clone());
+  const lastSpawnSpotRef = useRef(initialSpot);
+  const targetSpotRef = useRef((initialSpot + 1) % bonusSpawnSpots.length);
+  const aliveRef = useRef(true);
+  const respawnTimerRef = useRef(0);
+  const pointsTimerRef = useRef(0);
+  const [alive, setAlive] = useState(true);
+  const [showPoints, setShowPoints] = useState(false);
+  const { actions } = useAnimations(model.animations, groupRef);
+
+  useEffect(() => {
+    applyCharacterMaterials(scene, model.materials, villainMaterialProfile);
+    applyNaturalMaterials(scene);
+    scene.traverse((object) => {
+      if (!(object instanceof Mesh)) return;
+      object.castShadow = false;
+      object.receiveShadow = false;
+    });
+  }, [model.materials, scene]);
+
+  useEffect(() => {
+    const action = actions.runV;
+    if (!action) return undefined;
+    action.reset().setLoop(LoopRepeat, Infinity).play();
+    return () => {
+      action.stop();
+    };
+  }, [actions]);
+
+  useEffect(() => {
+    bonusTargets.set(id, { alive: true, hitbox: bonusProjectileHitbox, position: positionRef.current });
+    return () => {
+      window.clearTimeout(respawnTimerRef.current);
+      window.clearTimeout(pointsTimerRef.current);
+      bonusTargets.delete(id);
+    };
+  }, [id]);
+
+  useEffect(() => {
+    if (hit?.id !== id || !aliveRef.current) return;
+    aliveRef.current = false;
+    const target = bonusTargets.get(id);
+    if (target) target.alive = false;
+    setAlive(false);
+    setShowPoints(true);
+    onDefeat();
+    pointsTimerRef.current = window.setTimeout(() => setShowPoints(false), 1100);
+
+    const delay = 8000 + Math.random() * 2000;
+    respawnTimerRef.current = window.setTimeout(() => {
+      const nextSpot = bonusSpawnSpots.findIndex((spot, index) =>
+        index !== lastSpawnSpotRef.current && spot.distanceToSquared(playerWorldState.position) > 14 * 14
+      );
+      const spawnIndex = nextSpot >= 0 ? nextSpot : (lastSpawnSpotRef.current + 2) % bonusSpawnSpots.length;
+      lastSpawnSpotRef.current = spawnIndex;
+      positionRef.current.copy(bonusSpawnSpots[spawnIndex]);
+      targetSpotRef.current = (spawnIndex + 1 + initialSpot) % bonusSpawnSpots.length;
+      groupRef.current?.position.copy(positionRef.current);
+      aliveRef.current = true;
+      const respawnTarget = bonusTargets.get(id);
+      if (respawnTarget) respawnTarget.alive = true;
+      setAlive(true);
+    }, delay);
+  }, [hit, id, initialSpot, onDefeat]);
+
+  useFrame((_, delta) => {
+    const group = groupRef.current;
+    if (!group || !aliveRef.current) return;
+    const target = bonusSpawnSpots[targetSpotRef.current];
+    const dx = target.x - positionRef.current.x;
+    const dz = target.z - positionRef.current.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance < 0.7) {
+      targetSpotRef.current = (targetSpotRef.current + 2) % bonusSpawnSpots.length;
+      return;
+    }
+    const step = Math.min(distance, Math.min(delta, 1 / 30) * 2.1);
+    positionRef.current.x += (dx / distance) * step;
+    positionRef.current.z += (dz / distance) * step;
+    group.position.copy(positionRef.current);
+    group.rotation.y = Math.atan2(dx, dz);
+  });
+
+  return (
+    <>
+      <group ref={groupRef} position={positionRef.current} visible={alive}>
+        <primitive object={scene} scale={0.68} position={[0, 0.18, 0]} />
+      </group>
+      {showPoints && (
+        <BillboardLabel color="#3f7d3a" fontSize={0.38} position={[positionRef.current.x, 2.1, positionRef.current.z]} maxWidth={2}>
+          +3
+        </BillboardLabel>
+      )}
+    </>
+  );
+}
+
+type EnergyProjectile = {
+  direction: Vector3;
+  id: number;
+  maxDistance: number;
+  position: Vector3;
+  yaw: number;
+};
+
+function belongsToAimExcludedObject(object: Object3D) {
+  let current: Object3D | null = object;
+  while (current) {
+    if (current.name === "StudioCLTDPlayer" || current.name === "PlayerEnergyProjectiles") return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+function EnergyProjectileSystem({ onHit, shootRequest }: { onHit: (id: string) => void; shootRequest: number }) {
+  const [projectiles, setProjectiles] = useState<EnergyProjectile[]>([]);
+  const nextIdRef = useRef(0);
+  const raycasterRef = useRef(new Raycaster());
+  const { camera, scene } = useThree();
+
+  useEffect(() => {
+    if (shootRequest === 0) return undefined;
+    const timer = window.setTimeout(() => {
+      const playerYaw = playerWorldState.yaw;
+      const playerDirection = new Vector3(-Math.sin(playerYaw), 0, -Math.cos(playerYaw)).normalize();
+      const right = new Vector3(-playerDirection.z, 0, playerDirection.x);
+      const position = playerWorldState.position.clone()
+        .addScaledVector(playerDirection, 0.75)
+        .addScaledVector(right, 0.34);
+      position.y += 1.35;
+
+      const raycaster = raycasterRef.current;
+      raycaster.setFromCamera(crosshairNdc, camera);
+      const rayHit = raycaster.intersectObjects(scene.children, true).find(({ object }) =>
+        object.visible && !belongsToAimExcludedObject(object)
+      );
+      const target = rayHit?.point.clone() ?? raycaster.ray.at(projectileMaxDistance, new Vector3());
+      const direction = target.clone().sub(position).normalize();
+      const maxDistance = Math.min(projectileMaxDistance, position.distanceTo(target));
+      const yaw = Math.atan2(-direction.x, -direction.z);
+
+      playEnergyBlastSound();
+      nextIdRef.current += 1;
+      setProjectiles((current) => [...current, { direction, id: nextIdRef.current, maxDistance, position, yaw }]);
+    }, 360);
+    return () => window.clearTimeout(timer);
+  }, [camera, scene, shootRequest]);
+
+  return (
+    <group name="PlayerEnergyProjectiles">
+      {projectiles.map((projectile) => (
+        <EnergyBall
+          key={projectile.id}
+          projectile={projectile}
+          onComplete={(hitId) => {
+            setProjectiles((current) => current.filter(({ id }) => id !== projectile.id));
+            if (hitId) onHit(hitId);
+          }}
+        />
+      ))}
+    </group>
+  );
+}
+
+function EnergyBall({ onComplete, projectile }: { onComplete: (hitId?: string) => void; projectile: EnergyProjectile }) {
+  const groupRef = useRef<Group>(null);
+  const travelledRef = useRef(0);
+  const completedRef = useRef(false);
+
+  useFrame((_, delta) => {
+    const group = groupRef.current;
+    if (!group || completedRef.current) return;
+    const step = Math.min(delta, 1 / 30) * 28;
+    travelledRef.current += step;
+    group.position.addScaledVector(projectile.direction, step);
+
+    const hit = sectionEncounters.find(({ villainPosition }) => {
+      const dx = group.position.x - villainPosition.x;
+      const dy = group.position.y - (villainPosition.y + 1.25);
+      const dz = group.position.z - villainPosition.z;
+      const hitRadius = mainVillainHitRadius + energyBallRadius;
+      return dx * dx + dy * dy + dz * dz < hitRadius * hitRadius;
+    });
+    let hitId = hit?.id;
+    if (!hitId) {
+      for (const [id, target] of bonusTargets) {
+        if (!target.alive) continue;
+        const dx = group.position.x - target.position.x;
+        const dy = group.position.y - (target.position.y + target.hitbox.centerY);
+        const dz = group.position.z - target.position.z;
+        const horizontalDistanceSq = dx * dx + dz * dz;
+        const insideBonusHitbox =
+          horizontalDistanceSq / ((target.hitbox.horizontalRadius + energyBallRadius) ** 2)
+          + (dy * dy) / ((target.hitbox.verticalRadius + energyBallRadius) ** 2)
+          < 1;
+        if (insideBonusHitbox) {
+          hitId = id;
+          break;
+        }
+      }
+    }
+    if (!hitId && travelledRef.current < projectile.maxDistance) return;
+    completedRef.current = true;
+    onComplete(hitId);
+  });
+
+  return (
+    <group ref={groupRef} position={projectile.position} rotation-y={projectile.yaw}>
+      <mesh geometry={energyBallGeometry} material={energyBallMaterial} />
+      <mesh geometry={energyBallGeometry} material={energyBallGlowMaterial} scale={1.55} />
+      <mesh geometry={energyBallGeometry} material={energyBallMaterial} position={[0, 0, 0.48]} scale={0.56} />
+      <mesh geometry={energyBallGeometry} material={energyBallGlowMaterial} position={[0, 0, 0.48]} scale={0.9} />
+      <mesh geometry={energyBallGeometry} material={energyBallMaterial} position={[0, 0, 0.82]} scale={0.3} />
     </group>
   );
 }
@@ -190,20 +496,20 @@ function SectionPortalEncounter({
   activeInfoId,
   encounter,
   onInfoOpen,
-  onPlayerFixedAnimation,
   onPlayerDialogue,
   onSectionResolved,
   onVillainDialogue,
   villainDialogue,
+  projectileHit,
 }: {
   activeInfoId: string | null;
   encounter: SectionEncounterConfig;
   onInfoOpen: () => void;
-  onPlayerFixedAnimation: () => void;
   onPlayerDialogue: (text: string) => void;
   onSectionResolved: (sectionId: string) => void;
   onVillainDialogue: (sectionName: string, text: string) => void;
   villainDialogue: (DialogueMessage & { sectionName: string }) | null;
+  projectileHit: { id: string; sequence: number } | null;
 }) {
   const [villainStatus, setVillainStatus] = useState<VillainStatus>("idle");
   const [portalActive, setPortalActive] = useState(false);
@@ -254,12 +560,15 @@ function SectionPortalEncounter({
     setSmokeActive(true);
     setVillainBubbleVisible(false);
     setVillainStatus("dead");
-    onPlayerFixedAnimation();
     onPlayerDialogue("FIXED!");
     sectionResolvedTimerRef.current = window.setTimeout(() => {
       onSectionResolved(encounter.id);
     }, 240);
   };
+
+  useEffect(() => {
+    if (projectileHit?.id === encounter.id) activatePad();
+  }, [projectileHit]);
 
   const activateInfoPad = () => {
     const now = performance.now();
@@ -353,7 +662,6 @@ function SectionPortalEncounter({
 
   return (
     <group name={`PortalEncounter:${encounter.id}`}>
-      <TriggerPad label="Fix" position={encounter.padPosition} active={portalActive} onActivate={activatePad} />
       <TriggerPad label="More Info" position={encounter.infoPadPosition} active={infoPortalActive || activeInfoId === encounter.id} onActivate={activateInfoPad} />
       {activeInfoId === encounter.id && (
         <ServiceInfoPanel

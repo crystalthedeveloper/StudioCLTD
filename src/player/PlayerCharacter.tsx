@@ -16,8 +16,8 @@ import { CharacterAnimationState } from "./playerTypes";
 type PlayerCharacterProps = {
   animationStateRef: MutableRefObject<CharacterAnimationState>;
   dialogue: DialogueMessage | null;
-  fixedAnimationRequest: number;
-  onFixedAnimationComplete: () => void;
+  onShootAnimationComplete: () => void;
+  shootRequest: number;
   yawRef: MutableRefObject<number>;
 };
 
@@ -45,8 +45,8 @@ function fadeOutOtherActions(actions: Record<string, AnimationAction | null>, ac
 export function PlayerCharacter({
   animationStateRef,
   dialogue,
-  fixedAnimationRequest,
-  onFixedAnimationComplete,
+  onShootAnimationComplete,
+  shootRequest,
   yawRef,
 }: PlayerCharacterProps) {
   const model = useGLTF("/characters/char-optimized.glb", false, true);
@@ -55,19 +55,14 @@ export function PlayerCharacter({
   const playerFrontLightRef = useRef<PointLight>(null);
   const playerBackLightRef = useRef<PointLight>(null);
   const { actions } = useAnimations(model.animations, group);
-  const fixedRequestRef = useRef(0);
-  const fixedActionRef = useRef<AnimationAction | null>(null);
+  const shootActionRef = useRef<AnimationAction | null>(null);
+  const shootRequestRef = useRef(0);
   const activeLocomotionStateRef = useRef<CharacterAnimationState | null>(null);
-  const onFixedAnimationCompleteRef = useRef(onFixedAnimationComplete);
   const materialSlotsRef = useRef<PlayerMaterialSlot[]>([]);
   const poweredBodyMaterialRef = useRef<Material | null>(null);
   const activeMaterialModeRef = useRef<"default" | "powered">("default");
   const speedBoostActiveRef = useRef(isSpeedBoostActive());
   const [speedBoostActive, setSpeedBoostActive] = useState(() => isSpeedBoostActive());
-
-  useEffect(() => {
-    onFixedAnimationCompleteRef.current = onFixedAnimationComplete;
-  }, [onFixedAnimationComplete]);
 
   useEffect(() => {
     applyCharacterMaterials(scene, model.materials, playerMaterialProfile);
@@ -130,7 +125,7 @@ export function PlayerCharacter({
   };
 
   const restoreDefaultMaterialIfIdle = () => {
-    if (speedBoostActiveRef.current || fixedActionRef.current || activeMaterialModeRef.current === "default") return;
+    if (speedBoostActiveRef.current || shootActionRef.current || activeMaterialModeRef.current === "default") return;
 
     materialSlotsRef.current.forEach((slot) => {
       if (slot.index === null) {
@@ -145,7 +140,7 @@ export function PlayerCharacter({
   };
 
   const playLocomotionAction = (nextState: CharacterAnimationState) => {
-    if (fixedActionRef.current || activeLocomotionStateRef.current === nextState) return;
+    if (shootActionRef.current || activeLocomotionStateRef.current === nextState) return;
 
     const action = actions[playerAnimationByState[nextState]];
     if (!action) return;
@@ -163,56 +158,58 @@ export function PlayerCharacter({
   }, [actions]);
 
   useEffect(() => {
-    if (fixedAnimationRequest === fixedRequestRef.current) return;
-    fixedRequestRef.current = fixedAnimationRequest;
+    if (shootRequest === shootRequestRef.current) return;
+    shootRequestRef.current = shootRequest;
 
-    const action = actions.fixedH;
+    const action = actions.shoot;
     if (!action) {
-      onFixedAnimationCompleteRef.current();
+      onShootAnimationComplete();
       return;
     }
 
-    fixedActionRef.current = action;
-    applyPoweredMaterial();
+    shootActionRef.current = action;
     fadeOutOtherActions(actions, action);
     action.reset();
-    action.setLoop(LoopOnce, 1);
+    action.enabled = true;
     action.clampWhenFinished = true;
-    action.fadeIn(0.08).play();
+    action.setLoop(LoopOnce, 1);
+    action.fadeIn(0.06).play();
 
     const mixer = action.getMixer();
     let completed = false;
-    let fallbackTimer = 0;
-
-    const completeFixedAnimation = () => {
+    const completeShoot = () => {
       if (completed) return;
       completed = true;
-      fixedActionRef.current = null;
-      action.fadeOut(0.08);
-      onFixedAnimationCompleteRef.current();
-      restoreDefaultMaterialIfIdle();
+      const nextState = animationStateRef.current;
+      const nextAction = actions[playerAnimationByState[nextState]];
 
-      activeLocomotionStateRef.current = null;
-      playLocomotionAction(animationStateRef.current);
+      if (nextAction) {
+        activeLocomotionStateRef.current = nextState;
+        nextAction.enabled = true;
+        nextAction.clampWhenFinished = false;
+        nextAction.setLoop(LoopRepeat, Infinity);
+        nextAction.reset().setEffectiveWeight(1).play();
+        nextAction.crossFadeFrom(action, 0.14, true);
+      }
+
+      shootActionRef.current = null;
+      if (!nextAction) {
+        activeLocomotionStateRef.current = null;
+        playLocomotionAction(nextState);
+      }
       mixer.removeEventListener("finished", handleFinished);
+      onShootAnimationComplete();
     };
-
     const handleFinished = (event: { action: AnimationAction }) => {
-      if (event.action !== action) return;
-      completeFixedAnimation();
+      if (event.action === action) completeShoot();
     };
-
     mixer.addEventListener("finished", handleFinished);
-    fallbackTimer = window.setTimeout(
-      completeFixedAnimation,
-      Math.max(1200, action.getClip().duration * 1000 + 350)
-    );
-
+    const fallbackTimer = window.setTimeout(completeShoot, Math.max(700, action.getClip().duration * 1000 + 180));
     return () => {
       mixer.removeEventListener("finished", handleFinished);
       window.clearTimeout(fallbackTimer);
     };
-  }, [actions, fixedAnimationRequest]);
+  }, [actions, onShootAnimationComplete, shootRequest]);
 
   useFrame(() => {
     if (!group.current) return;

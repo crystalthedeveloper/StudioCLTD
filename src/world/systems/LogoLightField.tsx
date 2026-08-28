@@ -8,12 +8,13 @@ import {
   RigidBody,
 } from "@react-three/rapier";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Color, Group, Mesh, MeshStandardMaterial, Object3D } from "three";
+import { Color, Group, Mesh, MeshStandardMaterial, Object3D, PointLight, Vector3 } from "three";
 import { activateSpeedBoost } from "../../player/speedBoost";
 import { playCollectibleSound } from "../../audio/collectibleSounds";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { destinationPlatformRadius, hubSections, sectionRampApproachLength, sectionRampWidth } from "../hubSections";
 import { transportPadPositions } from "./TransportPads";
+import { homeBaseCenter } from "./HomeBase";
 
 const logoPath = "/logo/logo-optimized.glb";
 const logoScale = 1.8;
@@ -32,15 +33,24 @@ const placementSearchStep = 1.25;
 const placementSearchDirections = 32;
 const placementWorldLimit = 68;
 
-type LogoKind = "coin" | "speed" | "penalty" | "contact" | "light" | "dark";
+type LogoKind = "coin" | "speed" | "penalty" | "contact" | "share" | "light" | "dark";
 
 type PlazaLogo = {
+  height?: number;
   id: string;
   kind: LogoKind;
   position: readonly [number, number];
   rotationOffset?: number;
   scaleMultiplier?: number;
 };
+
+const homeBaseLogos: PlazaLogo[] = [
+  { id: "home-contact", kind: "contact", position: [homeBaseCenter[0] - 8, homeBaseCenter[2] - 2], height: homeBaseCenter[1] + 0.04, rotationOffset: 0.08, scaleMultiplier: 0.9 },
+  { id: "home-share", kind: "share", position: [homeBaseCenter[0] + 8, homeBaseCenter[2] - 2], height: homeBaseCenter[1] + 0.04, rotationOffset: -0.08, scaleMultiplier: 0.9 },
+  { id: "home-coin-1", kind: "coin", position: [homeBaseCenter[0] - 10, homeBaseCenter[2] + 9], height: homeBaseCenter[1] + 0.04, rotationOffset: -0.12 },
+  { id: "home-coin-2", kind: "coin", position: [homeBaseCenter[0], homeBaseCenter[2] - 1], height: homeBaseCenter[1] + 0.04, rotationOffset: 0.08 },
+  { id: "home-coin-3", kind: "coin", position: [homeBaseCenter[0] + 10, homeBaseCenter[2] - 9], height: homeBaseCenter[1] + 0.04, rotationOffset: 0.14 },
+];
 
 const plazaLogos: PlazaLogo[] = [
   { id: "coin-1", kind: "coin", position: [-18, -14] },
@@ -75,7 +85,6 @@ const plazaLogos: PlazaLogo[] = [
   { id: "speed-center-1", kind: "speed", position: [-15, 25], rotationOffset: -0.11, scaleMultiplier: 1.05 },
   { id: "speed-center-2", kind: "speed", position: [26, -10], rotationOffset: 0.09, scaleMultiplier: 0.93 },
   { id: "penalty-center-1", kind: "penalty", position: [-25, -8], rotationOffset: -0.15, scaleMultiplier: 1.04 },
-  { id: "contact", kind: "contact", position: [0, 18], rotationOffset: 0.08, scaleMultiplier: 1.06 },
 ];
 
 function distanceToSegment(
@@ -157,6 +166,7 @@ const logoColors: Record<LogoKind, string> = {
   speed: "#facc15",
   penalty: "#991b1b",
   contact: "#2583e8",
+  share: "#a855f7",
   light: "#ffffff",
   dark: "#000",
 };
@@ -166,7 +176,7 @@ function createSharedMaterial(kind: LogoKind) {
   return new MeshStandardMaterial({
     color,
     emissive: color,
-    emissiveIntensity: kind === "light" ? 0.12 : kind === "coin" ? 0.55 : kind === "contact" ? 0.65 : kind === "dark" ? 0.08 : kind === "speed" ? 0.7 : 0.55,
+    emissiveIntensity: kind === "light" ? 0.12 : kind === "coin" ? 0.55 : kind === "contact" || kind === "share" ? 0.65 : kind === "dark" ? 0.08 : kind === "speed" ? 0.7 : 0.55,
     metalness: 0.04,
     roughness: 0.72,
     toneMapped: false,
@@ -190,10 +200,11 @@ function createLogoTemplate(source: Group, material: MeshStandardMaterial) {
 type LogoLightFieldProps = {
   onCoinCollect: () => void;
   onPenaltyCollect: () => void;
+  onOpenShare: () => void;
   restartKey: number;
 };
 
-export function LogoLightField({ onCoinCollect, onPenaltyCollect, restartKey }: LogoLightFieldProps) {
+export function LogoLightField({ onCoinCollect, onOpenShare, onPenaltyCollect, restartKey }: LogoLightFieldProps) {
   const { scene } = useGLTF(logoPath);
   const materials = useMemo(
     () => ({
@@ -201,6 +212,7 @@ export function LogoLightField({ onCoinCollect, onPenaltyCollect, restartKey }: 
       speed: createSharedMaterial("speed"),
       penalty: createSharedMaterial("penalty"),
       contact: createSharedMaterial("contact"),
+      share: createSharedMaterial("share"),
       light: createSharedMaterial("light"),
       dark: createSharedMaterial("dark"),
     }),
@@ -212,6 +224,7 @@ export function LogoLightField({ onCoinCollect, onPenaltyCollect, restartKey }: 
       speed: createLogoTemplate(scene, materials.speed),
       penalty: createLogoTemplate(scene, materials.penalty),
       contact: createLogoTemplate(scene, materials.contact),
+      share: createLogoTemplate(scene, materials.share),
       light: createLogoTemplate(scene, materials.light),
       dark: createLogoTemplate(scene, materials.dark),
     }),
@@ -220,7 +233,7 @@ export function LogoLightField({ onCoinCollect, onPenaltyCollect, restartKey }: 
 
   const logos = useMemo(
     () =>
-      accessiblePlazaLogos.map((logo) => ({
+      [...accessiblePlazaLogos, ...homeBaseLogos].map((logo) => ({
         ...logo,
         object: templates[logo.kind].clone(true),
       })),
@@ -236,6 +249,7 @@ export function LogoLightField({ onCoinCollect, onPenaltyCollect, restartKey }: 
           key={logo.id}
           logo={logo}
           onCoinCollect={onCoinCollect}
+          onOpenShare={onOpenShare}
           onPenaltyCollect={onPenaltyCollect}
           restartKey={restartKey}
         />
@@ -248,10 +262,11 @@ type PlazaLogoInstanceProps = {
   logo: PlazaLogo & { object: Object3D };
   onCoinCollect: () => void;
   onPenaltyCollect: () => void;
+  onOpenShare: () => void;
   restartKey: number;
 };
 
-function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }: PlazaLogoInstanceProps) {
+function PlazaLogoInstance({ logo, onCoinCollect, onOpenShare, onPenaltyCollect, restartKey }: PlazaLogoInstanceProps) {
   const [available, setAvailable] = useState(true);
   const availableRef = useRef(true);
   const collectedRef = useRef(false);
@@ -278,7 +293,7 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
     setContactCountdown(0);
   }, [clearContactTimers]);
 
-  const startContactCountdown = useCallback(() => {
+  const startActionCountdown = useCallback(() => {
     const now = performance.now();
     if (contactActiveRef.current || now < contactCooldownUntilRef.current) return;
 
@@ -302,9 +317,13 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
       contactCooldownUntilRef.current = performance.now() + contactCooldownMs;
       clearContactTimers();
       setContactCountdown(0);
-      window.open(contactUrl, "_blank", "noopener,noreferrer");
+      if (logo.kind === "share") {
+        onOpenShare();
+      } else {
+        window.open(contactUrl, "_blank", "noopener,noreferrer");
+      }
     }, contactCountdownMs);
-  }, [clearContactTimers]);
+  }, [clearContactTimers, logo.kind, onOpenShare]);
 
   useEffect(() => {
     if (respawnTimerRef.current !== null) {
@@ -382,14 +401,14 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
         return;
       }
 
-      if (logo.kind === "contact") startContactCountdown();
+      if (logo.kind === "contact" || logo.kind === "share") startActionCountdown();
     },
-    [collectAndRespawn, logo.kind, logo.object, onCoinCollect, onPenaltyCollect, startContactCountdown],
+    [collectAndRespawn, logo.kind, logo.object, onCoinCollect, onPenaltyCollect, startActionCountdown],
   );
 
   const handleExit = useCallback(
     ({ other }: IntersectionExitPayload) => {
-      if (logo.kind !== "contact" || other.rigidBodyObject?.name !== "StudioCLTDPlayer") return;
+      if ((logo.kind !== "contact" && logo.kind !== "share") || other.rigidBodyObject?.name !== "StudioCLTDPlayer") return;
       cancelContactCountdown();
     },
     [cancelContactCountdown, logo.kind],
@@ -397,7 +416,7 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
 
   if (!available && logo.kind !== "light") return null;
 
-  const position: [number, number, number] = [logo.position[0], floorLogoY, logo.position[1]];
+  const position: [number, number, number] = [logo.position[0], logo.height ?? floorLogoY, logo.position[1]];
   const standardVisual = (
     <>
       <primitive
@@ -410,8 +429,9 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
   );
   const visual = (
     <>
-      {logo.kind === "contact" || logo.kind === "dark" ? (
+      {logo.kind === "contact" || logo.kind === "share" || logo.kind === "dark" ? (
         <ContactLogoVisual
+          glow={logo.kind === "share"}
           object={logo.object}
           rotation={worldLogoRotation + (logo.rotationOffset ?? 0)}
           scale={logoScale * (logo.scaleMultiplier ?? 1)}
@@ -435,29 +455,45 @@ function PlazaLogoInstance({ logo, onCoinCollect, onPenaltyCollect, restartKey }
         onIntersectionExit={handleExit}
       />
       {visual}
+      {(logo.kind === "contact" || logo.kind === "share") && contactCountdown === 0 && (
+        <BillboardLabel color={logoColors[logo.kind]} fontSize={0.25} position={[0, 1.75, 0]} maxWidth={4}>
+          {logo.kind === "contact" ? "CONTACT" : "SHARE"}
+        </BillboardLabel>
+      )}
       {contactCountdown > 0 && (
         <BillboardLabel color="#ffffff" fontSize={0.25} position={[0, 1.75, 0]} maxWidth={4}>
-          {`Opening Contact in ${contactCountdown}…`}
+          {`Opening ${logo.kind === "share" ? "Share" : "Contact"} in ${contactCountdown}…`}
         </BillboardLabel>
       )}
     </RigidBody>
   );
 }
 
-function ContactLogoVisual({ object, rotation, scale }: { object: Object3D; rotation: number; scale: number }) {
+function ContactLogoVisual({ glow = false, object, rotation, scale }: { glow?: boolean; object: Object3D; rotation: number; scale: number }) {
   const groupRef = useRef<Group>(null);
+  const glowRef = useRef<PointLight>(null);
   const lastUpdateRef = useRef(-Infinity);
+  const logoWorldPosition = useMemo(() => new Vector3(), []);
+  const playerWorldPosition = useMemo(() => new Vector3(), []);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock, scene }) => {
     if (!groupRef.current || clock.elapsedTime - lastUpdateRef.current < 1 / 24) return;
     lastUpdateRef.current = clock.elapsedTime;
     groupRef.current.position.y = 0.1 + Math.sin(clock.elapsedTime * 0.85) * 0.08;
     groupRef.current.rotation.y = rotation + clock.elapsedTime * 0.22;
+    if (glowRef.current) {
+      const player = scene.getObjectByName("StudioCLTDPlayer");
+      const distance = player
+        ? player.getWorldPosition(playerWorldPosition).distanceTo(groupRef.current.getWorldPosition(logoWorldPosition))
+        : 20;
+      glowRef.current.intensity = Math.max(0, Math.min(1, (12 - distance) / 8)) * 2.2;
+    }
   });
 
   return (
     <group ref={groupRef} rotation-y={rotation}>
       <primitive object={object} scale={scale} dispose={null} />
+      {glow && <pointLight ref={glowRef} color="#a855f7" distance={9} decay={2} intensity={0} position={[0, 0.65, 0]} />}
     </group>
   );
 }

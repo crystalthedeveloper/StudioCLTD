@@ -1,10 +1,11 @@
 import { Environment } from "@react-three/drei";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CharacterController } from "../player/CharacterController";
 import { resetSpeedBoost } from "../player/speedBoost";
 import { DialogueMessage } from "../ui/DialogueBubble";
 import { CombatPrototype } from "./systems/CombatPrototype";
 import { HubSections } from "./systems/HubSections";
+import { HomeBase } from "./systems/HomeBase";
 import { LogoLightField } from "./systems/LogoLightField";
 import { ModularTerrain } from "./systems/ModularTerrain";
 import { SpaceSky } from "./systems/SpaceSky";
@@ -13,10 +14,13 @@ import { TransportPads } from "./systems/TransportPads";
 import type { TransportDestination } from "./systems/TransportPads";
 
 type StudioWorldProps = {
+  onBonusCollect: () => void;
   onCoinCollect: () => void;
   onPenaltyCollect: () => void;
+  onOpenShare: () => void;
   onSectionComplete: () => void;
   restartKey: number;
+  shootRequest: number;
 };
 
 const requiredSectionTriggers: Record<string, number> = {
@@ -30,18 +34,17 @@ const requiredSectionTriggers: Record<string, number> = {
   showcase: 1,
 };
 
-export function StudioWorld({ onCoinCollect, onPenaltyCollect, onSectionComplete, restartKey }: StudioWorldProps) {
+export function StudioWorld({ onBonusCollect, onCoinCollect, onOpenShare, onPenaltyCollect, onSectionComplete, restartKey, shootRequest }: StudioWorldProps) {
   const dialogueIdRef = useRef(0);
-  const fixedAnimationRequestRef = useRef(0);
   const activatedSectionTriggersRef = useRef<Record<string, Set<string>>>({});
   const completedSectionsRef = useRef(new Set<string>());
-  const [fixedAnimationRequest, setFixedAnimationRequest] = useState(0);
   const [movementLocked, setMovementLocked] = useState(false);
   const [penaltyResetCount, setPenaltyResetCount] = useState(0);
   const [serviceResolutions, setServiceResolutions] = useState<Record<string, boolean>>({});
   const [playerDialogue, setPlayerDialogue] = useState<DialogueMessage | null>(null);
   const [villainDialogue, setVillainDialogue] = useState<(DialogueMessage & { sectionName: string }) | null>(null);
   const [transportDestination, setTransportDestination] = useState<TransportDestination | null>(null);
+  const handleShootAnimationComplete = useCallback(() => setMovementLocked(false), []);
 
   useEffect(() => {
     activatedSectionTriggersRef.current = {};
@@ -54,6 +57,10 @@ export function StudioWorld({ onCoinCollect, onPenaltyCollect, onSectionComplete
     setTransportDestination(null);
     resetSpeedBoost();
   }, [restartKey]);
+
+  useEffect(() => {
+    if (shootRequest > 0) setMovementLocked(true);
+  }, [shootRequest]);
 
   const recordSectionTrigger = (sectionId: string, triggerId: string) => {
     if (completedSectionsRef.current.has(sectionId)) return;
@@ -94,8 +101,10 @@ export function StudioWorld({ onCoinCollect, onPenaltyCollect, onSectionComplete
       <SpaceSky />
       <Environment preset="warehouse" background={false} environmentIntensity={0.16} />
       <ModularTerrain radius={7} />
+      <HomeBase />
       <LogoLightField
         onCoinCollect={onCoinCollect}
+        onOpenShare={onOpenShare}
         onPenaltyCollect={resetProgressForPenalty}
         restartKey={restartKey}
       />
@@ -106,14 +115,11 @@ export function StudioWorld({ onCoinCollect, onPenaltyCollect, onSectionComplete
         serviceResolutions={serviceResolutions}
       />
       <CombatPrototype
+        onBonusCollect={onBonusCollect}
         restartKey={sectionResetKey}
+        shootRequest={shootRequest}
         onSectionTrigger={recordSectionTrigger}
         onPlayerDialogue={(text) => setPlayerDialogue(createDialogue(text))}
-        onPlayerFixedAnimation={() => {
-          setMovementLocked(true);
-          fixedAnimationRequestRef.current += 1;
-          setFixedAnimationRequest(fixedAnimationRequestRef.current);
-        }}
         onVillainDialogue={(sectionName, text) => {
           setVillainDialogue({
             ...createDialogue(text),
@@ -131,10 +137,10 @@ export function StudioWorld({ onCoinCollect, onPenaltyCollect, onSectionComplete
       />
       <CharacterController
         dialogue={playerDialogue}
-        fixedAnimationRequest={fixedAnimationRequest}
         movementLocked={movementLocked}
-        onFixedAnimationComplete={() => setMovementLocked(false)}
+        onFixedAnimationComplete={handleShootAnimationComplete}
         restartKey={restartKey}
+        shootRequest={shootRequest}
         transportDestination={transportDestination}
       />
     </>

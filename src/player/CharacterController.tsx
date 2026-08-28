@@ -27,19 +27,19 @@ const groundedRayDistance = 1.16;
 
 type CharacterControllerProps = {
   dialogue: DialogueMessage | null;
-  fixedAnimationRequest: number;
   movementLocked: boolean;
   onFixedAnimationComplete: () => void;
   restartKey: number;
+  shootRequest: number;
   transportDestination: TransportDestination | null;
 };
 
 export function CharacterController({
   dialogue,
-  fixedAnimationRequest,
   movementLocked,
   onFixedAnimationComplete,
   restartKey,
+  shootRequest,
   transportDestination,
 }: CharacterControllerProps) {
   const bodyRef = useRef<RapierRigidBody | null>(null);
@@ -100,6 +100,7 @@ export function CharacterController({
     const velocity = body.linvel();
     const translation = body.translation();
     playerWorldState.position.set(translation.x, translation.y, translation.z);
+    playerWorldState.yaw = yawRef.current;
     if (movementLocked) {
       forwardBackSpeedRef.current = 0;
       movementDirectionRef.current.set(0, 0, 0);
@@ -112,7 +113,7 @@ export function CharacterController({
         body.setAngvel({ x: 0, y: 0, z: 0 }, true);
       }
 
-      animationStateRef.current = "idle";
+      animationStateRef.current = controls.forward !== controls.backward ? "run" : "idle";
       return;
     }
 
@@ -219,8 +220,8 @@ export function CharacterController({
         <PlayerCharacter
           animationStateRef={animationStateRef}
           dialogue={dialogue}
-          fixedAnimationRequest={fixedAnimationRequest}
-          onFixedAnimationComplete={onFixedAnimationComplete}
+          onShootAnimationComplete={onFixedAnimationComplete}
+          shootRequest={shootRequest}
           yawRef={yawRef}
         />
       </RigidBody>

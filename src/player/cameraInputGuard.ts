@@ -1,9 +1,9 @@
-let trackpadActive = false;
+let touchControlsActive = false;
 
-export function setTrackpadCameraInputBlocked(active: boolean) {
-  trackpadActive = active;
+export function setTouchCameraInputBlocked(active: boolean) {
+  touchControlsActive = active;
 }
 
-export function isTrackpadCameraInputBlocked() {
-  return trackpadActive;
+export function isTouchControlsCameraInputBlocked() {
+  return touchControlsActive;
 }

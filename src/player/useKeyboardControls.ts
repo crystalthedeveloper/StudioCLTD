@@ -29,7 +29,7 @@ const initialControls: MovementControls = {
 };
 
 const keyboardControls = { ...initialControls };
-const trackpadControls = { ...initialControls };
+const touchControls = { ...initialControls };
 const subscribers = new Set<(controls: MovementControls) => void>();
 
 function mergeControls(): MovementControls {
@@ -38,17 +38,17 @@ function mergeControls(): MovementControls {
   }
 
   return {
-    forward: keyboardControls.forward || trackpadControls.forward,
-    backward: keyboardControls.backward || trackpadControls.backward,
-    left: keyboardControls.left || trackpadControls.left,
-    right: keyboardControls.right || trackpadControls.right,
+    forward: keyboardControls.forward || touchControls.forward,
+    backward: keyboardControls.backward || touchControls.backward,
+    left: keyboardControls.left || touchControls.left,
+    right: keyboardControls.right || touchControls.right,
   };
 }
 
 function resetControls() {
   (Object.keys(initialControls) as (keyof MovementControls)[]).forEach((key) => {
     keyboardControls[key] = false;
-    trackpadControls[key] = false;
+    touchControls[key] = false;
   });
   emitControls();
 }
@@ -58,7 +58,7 @@ function emitControls() {
   subscribers.forEach((subscriber) => subscriber(controls));
 }
 
-export function setTrackpadControls(nextControls: MovementControls) {
+export function setTouchControls(nextControls: MovementControls) {
   if (!isGameFocused()) {
     resetControls();
     return;
@@ -66,8 +66,8 @@ export function setTrackpadControls(nextControls: MovementControls) {
 
   let changed = false;
   (Object.keys(initialControls) as (keyof MovementControls)[]).forEach((key) => {
-    if (trackpadControls[key] === nextControls[key]) return;
-    trackpadControls[key] = nextControls[key];
+    if (touchControls[key] === nextControls[key]) return;
+    touchControls[key] = nextControls[key];
     changed = true;
   });
 

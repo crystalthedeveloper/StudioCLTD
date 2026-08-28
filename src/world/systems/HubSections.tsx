@@ -125,6 +125,8 @@ let lazyTextureRequestIndex = 0;
 let showcaseVideoElement: HTMLVideoElement | null = null;
 let showcaseVideoTexture: VideoTexture | null = null;
 let showcaseUnlockPromise: Promise<void> | null = null;
+let websiteVideoElement: HTMLVideoElement | null = null;
+let websiteVideoTexture: VideoTexture | null = null;
 const requiredScreenImagePaths = Array.from(
   new Set([
     ...Object.values(serviceScreenImages).flatMap((images) => [images.bad, images.good]),
@@ -297,6 +299,49 @@ function getShowcaseVideoTexture(video: HTMLVideoElement) {
   }
 
   return showcaseVideoTexture;
+}
+
+function getWebsiteVideoElement() {
+  if (!websiteVideoElement) {
+    const video = document.createElement("video");
+    const useMobileVideo = window.matchMedia("(max-width: 768px)").matches;
+    video.src = useMobileVideo ? "/videos/myWebsite-mobile.mp4" : "/videos/myWebsite.mp4";
+    video.crossOrigin = "anonymous";
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.autoplay = false;
+    video.preload = "metadata";
+    video.setAttribute("playsinline", "");
+    video.setAttribute("webkit-playsinline", "");
+    websiteVideoElement = video;
+  }
+
+  return websiteVideoElement;
+}
+
+function pauseWebsiteVideo(video = getWebsiteVideoElement(), reset = false) {
+  video.pause();
+  if (reset) video.currentTime = 0;
+}
+
+function playWebsiteVideo(video = getWebsiteVideoElement(), restart = true) {
+  if (restart) video.currentTime = 0;
+  return video.play().then(() => true).catch(() => false);
+}
+
+function getWebsiteVideoTexture(video: HTMLVideoElement) {
+  if (!websiteVideoTexture) {
+    const texture = new VideoTexture(video);
+    texture.colorSpace = SRGBColorSpace;
+    texture.minFilter = LinearFilter;
+    texture.magFilter = LinearFilter;
+    texture.generateMipmaps = false;
+    texture.needsUpdate = false;
+    websiteVideoTexture = texture;
+  }
+
+  return websiteVideoTexture;
 }
 
 export function HubSections({ onSectionTrigger, restartKey, serviceResolutions }: HubSectionsProps) {
@@ -749,6 +794,170 @@ function ShowcaseScreenContent({ isPlaying }: { isPlaying: boolean }) {
         </Html>
       )}
     </>
+  );
+}
+
+function WebsiteScreenContent({ isPlaying }: { isPlaying: boolean }) {
+  const materialRef = useRef<MeshBasicMaterial>(null);
+  const screenOpacityRef = useRef(0);
+  const [videoTexture, setVideoTexture] = useState<VideoTexture | null>(() => websiteVideoTexture);
+  const [showTapToPlay, setShowTapToPlay] = useState(false);
+
+  useEffect(() => {
+    if (!isPlaying && !websiteVideoElement) return undefined;
+
+    const video = getWebsiteVideoElement();
+    let disposed = false;
+    const attachTextureWhenReady = () => {
+      if (disposed || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+      setVideoTexture(getWebsiteVideoTexture(video));
+    };
+
+    video.addEventListener("loadeddata", attachTextureWhenReady);
+    video.addEventListener("canplay", attachTextureWhenReady);
+    video.addEventListener("playing", attachTextureWhenReady);
+
+    if (isPlaying) {
+      setShowTapToPlay(false);
+      void playWebsiteVideo(video).then((playing) => {
+        if (disposed) return;
+        setShowTapToPlay(!playing);
+        if (playing) attachTextureWhenReady();
+      });
+      attachTextureWhenReady();
+    } else {
+      pauseWebsiteVideo(video);
+      setShowTapToPlay(false);
+      screenOpacityRef.current = 0;
+      if (materialRef.current) materialRef.current.opacity = 0;
+      if (websiteVideoTexture) websiteVideoTexture.needsUpdate = false;
+    }
+
+    return () => {
+      disposed = true;
+      video.removeEventListener("loadeddata", attachTextureWhenReady);
+      video.removeEventListener("canplay", attachTextureWhenReady);
+      video.removeEventListener("playing", attachTextureWhenReady);
+    };
+  }, [isPlaying]);
+
+  useEffect(() => () => {
+    if (websiteVideoElement) pauseWebsiteVideo(websiteVideoElement);
+  }, []);
+
+  const handleTapToPlay = () => {
+    const video = getWebsiteVideoElement();
+    void playWebsiteVideo(video).then((playing) => {
+      setShowTapToPlay(!playing);
+      if (playing && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        setVideoTexture(getWebsiteVideoTexture(video));
+      }
+    });
+  };
+
+  useFrame((_, delta) => {
+    const material = materialRef.current;
+    if (!material) return;
+    if (!isPlaying && screenOpacityRef.current <= 0.01) return;
+    const targetOpacity = isPlaying && videoTexture ? 1 : 0;
+    screenOpacityRef.current = MathUtils.damp(screenOpacityRef.current, targetOpacity, isPlaying ? 8 : 18, Math.min(delta, 1 / 30));
+    material.opacity = screenOpacityRef.current;
+  });
+
+  return (
+    <>
+      <mesh geometry={screenContentGeometry} position={[0, -0.03, -0.2]} renderOrder={20} dispose={null}>
+        {videoTexture ? (
+          <meshBasicMaterial
+            ref={materialRef}
+            color={screenImageTint}
+            depthTest={false}
+            map={videoTexture}
+            opacity={0}
+            side={DoubleSide}
+            toneMapped
+            transparent
+          />
+        ) : (
+          <meshBasicMaterial color={screenIdleColor} depthTest={false} side={DoubleSide} toneMapped />
+        )}
+      </mesh>
+      {isPlaying && showTapToPlay && (
+        <Html center position={[0, -0.03, -0.42]} transform distanceFactor={8} zIndexRange={[50, 40]}>
+          <button className="showcase-play-fallback" type="button" onClick={handleTapToPlay}>
+            Tap to Play Website Tour
+          </button>
+        </Html>
+      )}
+    </>
+  );
+}
+
+export function HomeBaseVideoScreen() {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [billboardScale, setBillboardScale] = useState(1);
+  const [billboardYOffset, setBillboardYOffset] = useState(0);
+
+  useEffect(() => {
+    const mobileQuery = window.matchMedia("(max-width: 768px)");
+    const updateMobileBillboard = () => {
+      setBillboardScale(mobileQuery.matches ? mobileBillboardScale : 1);
+      setBillboardYOffset(mobileQuery.matches ? mobileBillboardYOffset : 0);
+    };
+    updateMobileBillboard();
+    mobileQuery.addEventListener("change", updateMobileBillboard);
+
+    return () => mobileQuery.removeEventListener("change", updateMobileBillboard);
+  }, []);
+
+  useEffect(() => () => {
+    if (websiteVideoElement) pauseWebsiteVideo(websiteVideoElement);
+  }, []);
+
+  return (
+    <group name="HomeBaseVideoScreen">
+      <group position={[0, 4.8, 7]} rotation-y={Math.PI}>
+        <RigidBody type="fixed" colliders={false} position={[0, billboardYOffset, 0]}>
+          <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
+        </RigidBody>
+        <group position={[0, billboardYOffset, 0]} scale={billboardScale}>
+          <mesh geometry={tvFrameGeometry} position={[0, 0, -0.08]} dispose={null}>
+            <meshStandardMaterial
+              color="#101621"
+              emissive="#000000"
+              emissiveIntensity={0}
+              metalness={0.12}
+              roughness={0.68}
+            />
+          </mesh>
+          <mesh geometry={tvBackingGeometry} position={[0, 0.1, -0.26]} dispose={null}>
+            <meshStandardMaterial color="#111827" emissive="#ffffff" emissiveIntensity={0.045} metalness={0.08} roughness={0.72} />
+          </mesh>
+          <Text
+            color="#ffffff"
+            font={gameTextFont}
+            fontSize={0.86}
+            anchorX="center"
+            anchorY="middle"
+            position={[0, 3.55, -0.34]}
+            maxWidth={9}
+            outlineColor="#05070b"
+            outlineWidth={0.018}
+          >
+            crystalthedeveloper.ca
+          </Text>
+          <WebsiteScreenContent isPlaying={isPlaying} />
+        </group>
+      </group>
+      <ShowcasePortalPad
+        active={isPlaying}
+        label="PLAY"
+        name="HomeBaseVideo:play"
+        onPlayerEnter={() => setIsPlaying(true)}
+        onPlayerExit={() => setIsPlaying(false)}
+        position={[0, 0.18, 2.5]}
+      />
+    </group>
   );
 }
 

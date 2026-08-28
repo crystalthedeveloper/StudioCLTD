@@ -3,11 +3,11 @@ import { useProgress } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { ACESFilmicToneMapping, MathUtils, PCFSoftShadowMap, SRGBColorSpace } from "three";
-import { isTrackpadCameraInputBlocked } from "./player/cameraInputGuard";
+import { isTouchControlsCameraInputBlocked } from "./player/cameraInputGuard";
 import { setGameFocused, useGameFocus } from "./player/gameFocus";
 import { HubOverlay } from "./ui/HubOverlay";
 import { GameHud } from "./ui/GameHud";
-import { TrackpadControl } from "./ui/TrackpadControl";
+import { ShareWebsiteScreen } from "./ui/ShareWebsiteScreen";
 import { triggerTrophyHaptic } from "./ui/haptics";
 import { StudioWorld } from "./world/StudioWorld";
 import { preloadScreenTextures, unlockShowcaseVideoPlayback } from "./world/systems/HubSections";
@@ -29,6 +29,37 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   const [completedSectionCount, setCompletedSectionCount] = useState(0);
   const [screenAssetProgress, setScreenAssetProgress] = useState(0);
   const [screenAssetsReady, setScreenAssetsReady] = useState(false);
+  const [shareScreenOpen, setShareScreenOpen] = useState(false);
+  const [shootPressed, setShootPressed] = useState(false);
+  const [shootRequest, setShootRequest] = useState(0);
+
+  const shoot = () => {
+    setGameFocused(true);
+    setShootRequest((current) => current + 1);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "Space" || event.repeat || !gameFocused) return;
+      event.preventDefault();
+      setShootPressed(true);
+      shoot();
+    };
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.code !== "Space") return;
+      event.preventDefault();
+      setShootPressed(false);
+    };
+    const releaseShoot = () => setShootPressed(false);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", releaseShoot);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", releaseShoot);
+    };
+  }, [gameFocused]);
 
   useEffect(() => {
     setCoins(0);
@@ -103,7 +134,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
     };
 
     const handlePointerLockChange = () => {
-      if (isTrackpadCameraInputBlocked()) {
+      if (isTouchControlsCameraInputBlocked()) {
         setGameFocused(true);
         return;
       }
@@ -132,7 +163,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   }, [gameFocused]);
 
   const focusGame = () => {
-    if (isTrackpadCameraInputBlocked()) return;
+    if (isTouchControlsCameraInputBlocked()) return;
 
     void unlockShowcaseVideoPlayback();
 
@@ -181,12 +212,19 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
             <Physics gravity={[0, -20, 0]}>
               <StudioWorld
                 onCoinCollect={() => setCoins((current) => current + 1)}
+                onBonusCollect={() => setCoins((current) => current + 3)}
+                onOpenShare={() => {
+                  document.exitPointerLock?.();
+                  setGameFocused(false);
+                  setShareScreenOpen(true);
+                }}
                 onPenaltyCollect={() => {
                   setCoins(0);
                   setCompletedSectionCount(0);
                 }}
                 onSectionComplete={() => setCompletedSectionCount((current) => Math.min(8, current + 1))}
                 restartKey={restartKey}
+                shootRequest={shootRequest}
               />
             </Physics>
           </Suspense>
@@ -200,16 +238,25 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
       />
       <GameHud
         completedSectionCount={completedSectionCount}
+        onShoot={shoot}
         onOpenWebsite={onOpenWebsite}
         onRestart={onRestart}
         points={coins}
+        shootPressed={shootPressed}
+        setShootPressed={setShootPressed}
       />
+      <div className="aim-crosshair" aria-hidden="true">
+        <span className="aim-crosshair__mark aim-crosshair__mark--top" />
+        <span className="aim-crosshair__mark aim-crosshair__mark--right" />
+        <span className="aim-crosshair__mark aim-crosshair__mark--bottom" />
+        <span className="aim-crosshair__mark aim-crosshair__mark--left" />
+      </div>
       <HubOverlay />
       <div className={`game-focus-hint${gameFocused ? "" : " game-focus-hint--visible"}`}>
         <strong>Click to Play</strong>
         <span>Press ESC to exit</span>
       </div>
-      <TrackpadControl />
+      {shareScreenOpen && <ShareWebsiteScreen onClose={() => setShareScreenOpen(false)} />}
     </>
   );
 }

@@ -1,30 +1,19 @@
 # StudioCLTD
 
-StudioCLTD is a lightweight third-person React Three Fiber game world for exploring StudioCLTD's services, website tips, offers, and showcase content. The current world uses a compact 3 × 3 city-block layout with a central plaza, eight interactive sections, and an optimized fantasy-realism art direction.
+StudioCLTD is a lightweight third-person React Three Fiber game world for exploring StudioCLTD services, offers, tips, and showcase content. It contains eight main sections plus a separate teleport-only Home Base.
 
 ## Highlights
 
-- Third-person character movement with keyboard and virtual trackpad controls.
-- Pointer-lock game focus on desktop and touch-friendly controls on mobile.
-- Central Plaza/Hub with straight paths to eight city blocks:
-  - Tips
-  - Offers
-  - Value
-  - Quick Fix
-  - Urgent Fix
-  - Performance
-  - Site Improvement
-  - Showcase
-- Section progress HUD that advances from `0 / 8` to a trophy after every section is complete.
-- Three independent Tips triggers for Navigation, Content, and Images.
-- Interactive TVs with responsive mobile sizing and section-specific content.
-- Villain Fix interactions, section voice lines, defeat audio, and milestone haptics on supported mobile devices.
-- Green point, yellow speed-boost, red reset-penalty, and blue contact collectibles.
-- Permanent decorative black and white CLD logos.
-- Sound toggle persisted through `localStorage`.
-- Crisp 4K cosmic sky with textured spherical Earth and Venus and no extra procedural star or cloud layers.
-- One shared weathered dark-concrete material across the ground, walkways, ramps, and platforms.
-- Smooth loading progress that remains monotonic from 0% to 100%.
+- Eight interactive sections tracked independently from `0/8`: Tips, Offers, Value, Quick Fix, Urgent Fix, Performance, Site Improvement, and Showcase.
+- Third-person movement with WASD, keyboard arrows, and multi-touch on-screen arrows.
+- Shoot/Fix mechanic using the one-shot `shoot` animation and a large yellow energy projectile.
+- Movement locks during shooting, then crossfades directly into idle or run.
+- Main villains advance section Progress through the existing Fix logic.
+- Two roaming bonus villains award `+3` Points and respawn after 8–10 seconds without affecting Progress.
+- Green Coin, yellow Speed, red Penalty, blue Contact, purple Share, and decorative black/white logos.
+- Responsive Showcase and Home Base website-video screens.
+- Compact responsive HUD with Progress, Points, Speed, D-pad, Fix, sound, guide, restart, and website controls.
+- Full-page restart for a completely fresh game state.
 
 ## World Layout
 
@@ -38,123 +27,99 @@ StudioCLTD is a lightweight third-person React Three Fiber game world for explor
 └──────────────────┴──────────────────┴──────────────────┘
 ```
 
+The Home Base is a separate hidden level beyond the main camera range. The central transport pad is its only entrance, and a return pad sends the player back. Home Base does not count as a ninth section.
+
+Home Base contains Contact and Share, a responsive `crystalthedeveloper.ca` video screen, three standard Coin pickups, and a lightweight luxury black-marble floor.
+
 ## Controls
 
-| Action | Desktop | Mobile |
-| --- | --- | --- |
-| Move forward/backward | `W` / `S` or arrow keys | Virtual trackpad |
-| Turn left/right | `A` / `D` or arrow keys | Virtual trackpad |
-| Enter game focus | Click **Play** | Tap **Play** |
-| Release pointer lock | `Esc` | Not applicable |
-| Interact | Walk onto a trigger and use its displayed action | Same |
+| Action | Controls |
+| --- | --- |
+| Move forward/backward | `W` / `S`, ↑ / ↓, or on-screen arrows |
+| Turn left/right | `A` / `D`, ← / →, or on-screen arrows |
+| Combined movement | Hold forward/backward with left/right |
+| Shoot/Fix | `Space` or **FIX** |
+| Game Guide | `1` or Info |
+| Toggle sound | `2` or Sound |
+| Full restart | `3` or Restart |
+| Open website | `4` or Website |
+| Enter game focus | Click/tap **Play** |
+| Release pointer lock | `Esc` |
 
-The HUD includes sound, restart, score, speed, and section-progress controls and indicators.
+The centered crosshair indicates the firing direction. Held movement input resumes as soon as shooting finishes.
+
+## Logo Guide
+
+| Color | Purpose |
+| --- | --- |
+| Green `#3F7D3A` | Coin / Points |
+| Yellow `#FACC15` | Speed Boost |
+| Red | Penalty |
+| Blue `#2583E8` | Contact |
+| Purple `#A855F7` | Share |
+| White / Black | Decorative |
 
 ## Tech Stack
 
-- React 18
-- TypeScript
+- React 18 and TypeScript
 - Vite 5
-- Three.js
-- React Three Fiber
-- Drei
+- Three.js, React Three Fiber, and Drei
 - Rapier physics
 
 ## Project Structure
 
 ```text
 src/
-├── audio/          Shared sound state and villain audio
-├── characters/     Shared character materials
-├── player/         Controller, camera, animations, footsteps, and boosts
-├── ui/             HUD, labels, dialogue, and loading interface
-└── world/          Section configuration, terrain, triggers, and game systems
+├── audio/          Shared game, collectible, and villain audio
+├── characters/     Shared character material configuration
+├── player/         Movement, camera, animation, footsteps, and boosts
+├── ui/             HUD, D-pad, guide, overlays, and labels
+└── world/          Terrain, sections, combat, transport, and Home Base
 
 public/
-├── audio/          Villain voices and defeat audio
-├── characters/     Optimized shared character model
-├── images/         TV, planet, logo, and environment assets
-└── videos/         Showcase video
+├── audio/          Voice, collectible, and defeat audio
+├── characters/     Optimized shared player/villain GLB
+├── images/         Screen, planet, logo, and environment assets
+├── textures/       Home Base marble material maps
+└── videos/         Responsive Showcase and website videos
 ```
 
-The game reuses shared geometries, materials, collision helpers, trigger visuals, and audio services to limit allocations and duplicate resource loading. Avoid creating Three.js objects inside `useFrame`; prefer module-level shared resources or memoized component resources with explicit cleanup.
+## Character Asset and Animations
 
-## Character Asset
+The player and villains share `public/characters/char-optimized.glb`, optimized to approximately 1.7 MB.
 
-The player and villains use the shared model:
-
-```text
-public/characters/char-optimized.glb
-```
-
-Animation clips currently used by the game include:
-
-- Player: `idleH`, `runH`
-- Villain: `idleV`, `runV`, `dieV`
-
-Villains face the player while active, stop tracking when defeated, and remain defeated until the relevant game state is reset.
-
-## Audio
-
-Section voice files are mapped as follows:
-
-| Section | File |
-| --- | --- |
-| Urgent Fix | `Urgent-Fix.mp3` |
-| Quick Fix | `Quick-Fix.mp3` |
-| Site Improvement | `Site-Improvement.mp3` |
-| Performance | `Performance.mp3` |
-| Villain defeat | `defeat.mp3` |
-
-Voice lines play once when entering an active villain's platform, stop on exit or defeat, and can replay after re-entry while the villain remains active. All audio respects the persisted HUD sound setting.
+- Player: `idleH`, `runH`, `shoot`
+- Villain: `idleV`, `runV`, `dieV`, `fixedH`
 
 ## Development
 
-Install dependencies:
-
 ```bash
 npm install
-```
-
-Start the local development server:
-
-```bash
 npm run dev
 ```
 
-Create a production build:
+Production build and preview:
 
 ```bash
 npm run build
-```
-
-Preview the production output:
-
-```bash
 npm run preview
 ```
 
 The production build runs TypeScript before Vite and writes deployable files to `dist/`.
 
-For a stricter unused-code check during maintenance:
-
-```bash
-npx tsc --noEmit --noUnusedLocals --noUnusedParameters
-```
-
 ## Maintenance Guidelines
 
-- Preserve the eight section IDs and required-trigger mappings when changing section content.
-- Record trigger completion by stable trigger ID so repeated activation cannot increment progress twice.
-- Keep trigger animation scales relative to a fixed base scale; pointer-lock changes must never compound mesh scale.
-- Reuse the shared sound setting and audio services so sounds do not stack or bypass mute state.
-- Clean up timers, subscriptions, event listeners, audio playback, and generated Three.js resources on unmount.
-- Keep platform colliders continuous with ramps and preserve the current city-block positions.
-- Use lightweight meshes and textures; avoid expensive volumetrics and screen-space post-processing.
-- Test both keyboard/pointer-lock and touch/trackpad flows after interaction changes.
+- Preserve the eight section IDs and required-trigger mappings.
+- Keep bonus-villain Points separate from section Progress.
+- Reuse shared projectile, collectible, trigger, material, and audio systems.
+- Keep Contact and Share exclusively on Home Base.
+- Clean up timers, listeners, video/audio playback, and Three.js resources on unmount.
+- Avoid creating reusable Three.js objects inside `useFrame`.
+- Preserve keyboard, pointer-lock, touch, multi-touch, and responsive HUD behavior.
+- Run `npm run build` before deployment.
 
 ## Production Notes
 
-- The main game world is lazy-loaded separately from the initial application shell.
-- The Three.js/R3F renderer bundle may exceed Vite's default chunk-size advisory. This is expected for the renderer, physics, models, and world systems and does not prevent a successful production build.
-- Run `npm run build` before deployment to catch TypeScript and bundling errors.
+- The 3D experience is lazy-loaded separately from the launch screen.
+- Responsive videos and compressed WebP textures reduce mobile bandwidth.
+- The Three.js renderer bundle can exceed Vite's default chunk-size advisory; this does not prevent a successful build.

@@ -4,6 +4,12 @@ import { setGameFocused } from "../player/gameFocus";
 import { MovementControls, setTouchControls, useKeyboardControls } from "../player/useKeyboardControls";
 
 type Direction = keyof MovementControls;
+type DirectionButton = {
+  directions: readonly Direction[];
+  id: string;
+  label: string;
+  symbol: string;
+};
 
 const releasedControls: MovementControls = {
   forward: false,
@@ -12,21 +18,25 @@ const releasedControls: MovementControls = {
   right: false,
 };
 
-const directionButtons: Array<{ direction: Direction; label: string; symbol: string }> = [
-  { direction: "forward", label: "Forward", symbol: "↑" },
-  { direction: "left", label: "Turn or move left", symbol: "←" },
-  { direction: "backward", label: "Backward", symbol: "↓" },
-  { direction: "right", label: "Turn or move right", symbol: "→" },
+const directionButtons: DirectionButton[] = [
+  { directions: ["forward", "left"], id: "forward-left", label: "Forward and left", symbol: "↖" },
+  { directions: ["forward"], id: "forward", label: "Forward", symbol: "↑" },
+  { directions: ["forward", "right"], id: "forward-right", label: "Forward and right", symbol: "↗" },
+  { directions: ["left"], id: "left", label: "Turn or move left", symbol: "←" },
+  { directions: ["backward"], id: "backward", label: "Backward", symbol: "↓" },
+  { directions: ["right"], id: "right", label: "Turn or move right", symbol: "→" },
 ];
 
 export function DirectionControls() {
-  const activePointersRef = useRef(new Map<number, Direction>());
+  const activePointersRef = useRef(new Map<number, readonly Direction[]>());
   const pressed = useKeyboardControls();
 
   const publishControls = () => {
     const next = { ...releasedControls };
-    activePointersRef.current.forEach((direction) => {
-      next[direction] = true;
+    activePointersRef.current.forEach((directions) => {
+      directions.forEach((direction) => {
+        next[direction] = true;
+      });
     });
     setTouchControls(next);
     setTouchCameraInputBlocked(activePointersRef.current.size > 0);
@@ -57,9 +67,9 @@ export function DirectionControls() {
     event.nativeEvent.stopImmediatePropagation?.();
   };
 
-  const pressDirection = (direction: Direction, event: PointerEvent<HTMLButtonElement>) => {
+  const pressDirection = (directions: readonly Direction[], event: PointerEvent<HTMLButtonElement>) => {
     blockGameInput(event);
-    activePointersRef.current.set(event.pointerId, direction);
+    activePointersRef.current.set(event.pointerId, directions);
     event.currentTarget.setPointerCapture(event.pointerId);
     setGameFocused(true);
     document.exitPointerLock?.();
@@ -77,22 +87,25 @@ export function DirectionControls() {
 
   return (
     <div className="direction-controls" aria-label="Movement controls">
-      {directionButtons.map(({ direction, label, symbol }) => (
+      {directionButtons.map(({ directions, id, label, symbol }) => {
+        const active = directions.every((direction) => pressed[direction]);
+        return (
         <button
-          key={direction}
+          key={id}
           type="button"
-          className={`direction-controls__button direction-controls__button--${direction}${pressed[direction] ? " direction-controls__button--pressed" : ""}`}
+          className={`direction-controls__button direction-controls__button--${id}${active ? " direction-controls__button--pressed" : ""}`}
           aria-label={label}
-          aria-pressed={pressed[direction]}
+          aria-pressed={active}
           onContextMenu={(event) => event.preventDefault()}
           onLostPointerCapture={releaseDirection}
           onPointerCancel={releaseDirection}
-          onPointerDown={(event) => pressDirection(direction, event)}
+          onPointerDown={(event) => pressDirection(directions, event)}
           onPointerUp={releaseDirection}
         >
           {symbol}
         </button>
-      ))}
+        );
+      })}
     </div>
   );
 }

@@ -20,7 +20,7 @@ import { DialogueMessage } from "../../ui/DialogueBubble";
 import { triggerFixHaptic } from "../../ui/haptics";
 import { gameTextFont } from "../../ui/textFont";
 import { VillainCharacter, VillainStatus } from "../../villain/VillainCharacter";
-import { destinationPlatformRadius, hubSections } from "../hubSections";
+import { destinationPlatformRadius, hubSections, sectionRampApproachLength, sectionRampWidth } from "../hubSections";
 import { isPlayerObject } from "../playerCollision";
 import { playerWorldState } from "../playerWorldState";
 import { padVisualStyle } from "../padVisualStyle";
@@ -115,11 +115,45 @@ function createSectionEncounters(): SectionEncounterConfig[] {
 const sectionEncounters = createSectionEncounters();
 const bonusSpawnSpots = [
   new Vector3(-18, 0.1, 12),
-  new Vector3(19, 0.1, 11),
-  new Vector3(-16, 0.1, -19),
-  new Vector3(18, 0.1, -20),
-  new Vector3(2, 0.1, 28),
+  new Vector3(18, 0.1, 12),
+  new Vector3(-16, 0.1, -16),
+  new Vector3(16, 0.1, -16),
+  new Vector3(0, 0.1, 15),
 ];
+const bonusRoamingLimit = 18;
+const bonusRampClearance = 2;
+
+function distanceToBonusRamp(
+  x: number,
+  z: number,
+  startX: number,
+  startZ: number,
+  endX: number,
+  endZ: number,
+) {
+  const segmentX = endX - startX;
+  const segmentZ = endZ - startZ;
+  const lengthSq = segmentX * segmentX + segmentZ * segmentZ;
+  const projection = lengthSq === 0
+    ? 0
+    : Math.max(0, Math.min(1, ((x - startX) * segmentX + (z - startZ) * segmentZ) / lengthSq));
+  return Math.hypot(x - (startX + segmentX * projection), z - (startZ + segmentZ * projection));
+}
+
+function isSafeBonusRoamingPosition(x: number, z: number) {
+  if (Math.abs(x) > bonusRoamingLimit || Math.abs(z) > bonusRoamingLimit) return false;
+
+  return hubSections.every((section) => {
+    const [sectionX, , sectionZ] = section.position;
+    const [directionX, directionZ] = section.entrance;
+    const rampStartX = sectionX + directionX * destinationPlatformRadius;
+    const rampStartZ = sectionZ + directionZ * destinationPlatformRadius;
+    const rampEndX = rampStartX + directionX * sectionRampApproachLength;
+    const rampEndZ = rampStartZ + directionZ * sectionRampApproachLength;
+    return distanceToBonusRamp(x, z, rampStartX, rampStartZ, rampEndX, rampEndZ)
+      >= sectionRampWidth / 2 + bonusRampClearance;
+  });
+}
 const bonusProjectileHitbox = {
   centerY: 1.05,
   horizontalRadius: 1.2,
@@ -326,7 +360,9 @@ function BonusVillain({
     const delay = 8000 + Math.random() * 2000;
     respawnTimerRef.current = window.setTimeout(() => {
       const nextSpot = bonusSpawnSpots.findIndex((spot, index) =>
-        index !== lastSpawnSpotRef.current && spot.distanceToSquared(playerWorldState.position) > 14 * 14
+        index !== lastSpawnSpotRef.current
+        && isSafeBonusRoamingPosition(spot.x, spot.z)
+        && spot.distanceToSquared(playerWorldState.position) > 14 * 14
       );
       const spawnIndex = nextSpot >= 0 ? nextSpot : (lastSpawnSpotRef.current + 2) % bonusSpawnSpots.length;
       lastSpawnSpotRef.current = spawnIndex;
@@ -352,8 +388,14 @@ function BonusVillain({
       return;
     }
     const step = Math.min(distance, Math.min(delta, 1 / 30) * 2.1);
-    positionRef.current.x += (dx / distance) * step;
-    positionRef.current.z += (dz / distance) * step;
+    const nextX = positionRef.current.x + (dx / distance) * step;
+    const nextZ = positionRef.current.z + (dz / distance) * step;
+    if (!isSafeBonusRoamingPosition(nextX, nextZ)) {
+      targetSpotRef.current = (targetSpotRef.current + 1 + initialSpot) % bonusSpawnSpots.length;
+      return;
+    }
+    positionRef.current.x = nextX;
+    positionRef.current.z = nextZ;
     group.position.copy(positionRef.current);
     group.rotation.y = Math.atan2(dx, dz);
   });

@@ -72,7 +72,7 @@ const serviceScreenImages: Record<string, { bad: string; good: string }> = {
     good: "/images/optimized/urgentFix/urgent-fix-good.jpg",
   },
   performance: {
-    bad: "/images/optimized/performance/performance-bad.jpg",
+    bad: "/images/optimized/performance/performance-bad.webp",
     good: "/images/optimized/performance/performance-good.webp",
   },
   "site-improvement": {
@@ -81,9 +81,9 @@ const serviceScreenImages: Record<string, { bad: string; good: string }> = {
   },
 };
 const tipDisplayOptions = [
-  { id: "navigation", label: "Navigation", imagePath: "/images/optimized/tips/Navigation-tip.jpg", position: [-3.6, 0.18, 5.5] as [number, number, number] },
-  { id: "content", label: "Content", imagePath: "/images/optimized/tips/Content-tip.jpg", position: [0, 0.18, 6.3] as [number, number, number] },
-  { id: "images", label: "Images", imagePath: "/images/optimized/tips/Images-tip.jpg", position: [3.6, 0.18, 5.5] as [number, number, number] },
+  { id: "navigation", label: "Navigation", imagePath: "/images/optimized/tips/navigation-tip.webp", position: [-3.6, 0.18, 5.5] as [number, number, number] },
+  { id: "content", label: "Content", imagePath: "/images/optimized/tips/content-tip.webp", position: [0, 0.18, 6.3] as [number, number, number] },
+  { id: "images", label: "Images", imagePath: "/images/optimized/tips/images-tip.webp", position: [3.6, 0.18, 5.5] as [number, number, number] },
 ];
 const valueDisplayOptions = [
   { id: "trust", label: "Trust", imagePath: "/images/optimized/values/value.jpg", position: [-1.8, 0.18, selectorRowZ] as [number, number, number] },

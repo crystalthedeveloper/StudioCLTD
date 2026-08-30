@@ -86,8 +86,8 @@ const tipDisplayOptions = [
   { id: "images", label: "Images", imagePath: "/images/optimized/tips/images-tip.webp", position: [3.6, 0.18, 5.5] as [number, number, number] },
 ];
 const valueDisplayOptions = [
-  { id: "trust", label: "Trust", imagePath: "/images/optimized/values/value.jpg", position: [-1.8, 0.18, selectorRowZ] as [number, number, number] },
-  { id: "speed", label: "Speed", imagePath: "/images/optimized/values/value-2.jpg", position: [1.8, 0.18, selectorRowZ] as [number, number, number] },
+  { id: "trust", label: "Trust", imagePath: "/images/optimized/values/value.webp", position: [-1.8, 0.18, selectorRowZ] as [number, number, number] },
+  { id: "speed", label: "Speed", imagePath: "/images/optimized/values/value-speed.webp", position: [1.8, 0.18, selectorRowZ] as [number, number, number] },
 ];
 const offerOptions = [
   {

@@ -107,6 +107,7 @@ export function StudioWorld({ damageFlashUntil, onBonusCollect, onCoinCollect, o
         serviceResolutions={serviceResolutions}
       />
       <CombatPrototype
+        key={`combat:${restartKey}`}
         onBonusCollect={onBonusCollect}
         onInfoChange={setActiveServiceInfoId}
         onPlayerDamage={onPlayerDamage}

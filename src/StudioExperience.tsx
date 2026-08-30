@@ -38,7 +38,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   const [shootPressed, setShootPressed] = useState(false);
   const [shootRequest, setShootRequest] = useState(0);
 
-  const resetGame = useCallback(() => {
+  const resetGameSession = useCallback(() => {
     damageCooldownUntilRef.current = 0;
     previousCompletedSectionCountRef.current = 0;
     setCoins(0);
@@ -51,6 +51,14 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
     setShareScreenOpen(false);
     onRestart();
   }, [onRestart]);
+
+  const handlePlayerDeath = useCallback(() => {
+    resetGameSession();
+  }, [resetGameSession]);
+
+  const handleManualRestart = useCallback(() => {
+    resetGameSession();
+  }, [resetGameSession]);
 
   const damagePlayer = useCallback(() => {
     const now = performance.now();
@@ -101,8 +109,8 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
 
   useEffect(() => {
     if (health !== 0) return;
-    resetGame();
-  }, [health, resetGame]);
+    handlePlayerDeath();
+  }, [health, handlePlayerDeath]);
 
   useEffect(() => {
     if (completedSectionCount === 8 && previousCompletedSectionCountRef.current < 8) {
@@ -258,7 +266,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
                 }}
                 onHealthCollect={collectHealth}
                 onPlayerDamage={damagePlayer}
-                onReset={resetGame}
+                onReset={handleManualRestart}
                 onSectionComplete={() => setCompletedSectionCount((current) => Math.min(8, current + 1))}
                 restartKey={restartKey}
                 shootRequest={shootRequest}
@@ -278,7 +286,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         health={health}
         onShoot={shoot}
         onOpenWebsite={onOpenWebsite}
-        onRestart={resetGame}
+        onRestart={handleManualRestart}
         points={coins}
         shootPressed={shootPressed}
         setShootPressed={setShootPressed}

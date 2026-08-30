@@ -38,6 +38,10 @@ const triggerPadFrontOffset = 5.8;
 const triggerPadSideOffset = 3.6;
 const mainVillainContactRadiusSq = 1.2 * 1.2;
 const bonusVillainContactRadiusSq = 1 * 1;
+const bonusVillainDetectionRadiusSq = 8 * 8;
+const bonusVillainChaseReleaseRadiusSq = 11 * 11;
+const bonusVillainMoveSpeed = 2.1;
+const bonusVillainSteeringAngles = [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, Math.PI] as const;
 
 const smokeGeometry = new SphereGeometry(1, 8, 8);
 const fireGeometry = new SphereGeometry(1, 8, 6);
@@ -121,18 +125,34 @@ function distanceToBonusRamp(
 }
 
 function isSafeBonusRoamingPosition(x: number, z: number) {
-  if (Math.abs(x) > bonusRoamingLimit || Math.abs(z) > bonusRoamingLimit) return false;
+  return getBonusRoamingClearance(x, z) >= 0;
+}
 
-  return hubSections.every((section) => {
+function getBonusRoamingClearance(x: number, z: number) {
+  let clearance = bonusRoamingLimit - Math.max(Math.abs(x), Math.abs(z));
+
+  for (const section of hubSections) {
     const [sectionX, , sectionZ] = section.position;
     const [directionX, directionZ] = section.entrance;
     const rampStartX = sectionX + directionX * destinationPlatformRadius;
     const rampStartZ = sectionZ + directionZ * destinationPlatformRadius;
     const rampEndX = rampStartX + directionX * sectionRampApproachLength;
     const rampEndZ = rampStartZ + directionZ * sectionRampApproachLength;
-    return distanceToBonusRamp(x, z, rampStartX, rampStartZ, rampEndX, rampEndZ)
-      >= sectionRampWidth / 2 + bonusRampClearance;
-  });
+    const rampClearance = distanceToBonusRamp(x, z, rampStartX, rampStartZ, rampEndX, rampEndZ)
+      - (sectionRampWidth / 2 + bonusRampClearance);
+    clearance = Math.min(clearance, rampClearance);
+  }
+
+  return clearance;
+}
+
+function canBonusVillainMove(fromX: number, fromZ: number, toX: number, toZ: number) {
+  const nextClearance = getBonusRoamingClearance(toX, toZ);
+  if (nextClearance >= 0) return true;
+
+  // A legacy spawn point may begin inside the conservative clearance margin.
+  // Permit only steps that move it outward until it is back in valid ground.
+  return nextClearance > getBonusRoamingClearance(fromX, fromZ) + 0.0001;
 }
 const bonusProjectileHitbox = {
   centerY: 1.05,
@@ -295,6 +315,7 @@ function BonusVillain({
   const lastSpawnSpotRef = useRef(initialSpot);
   const targetSpotRef = useRef((initialSpot + 1) % bonusSpawnSpots.length);
   const aliveRef = useRef(true);
+  const chasingPlayerRef = useRef(false);
   const touchingPlayerRef = useRef(false);
   const respawnTimerRef = useRef(0);
   const pointsTimerRef = useRef(0);
@@ -334,6 +355,7 @@ function BonusVillain({
   useEffect(() => {
     if (hit?.id !== id || !aliveRef.current) return;
     aliveRef.current = false;
+    chasingPlayerRef.current = false;
     touchingPlayerRef.current = false;
     const target = bonusTargets.get(id);
     if (target) target.alive = false;
@@ -355,6 +377,7 @@ function BonusVillain({
       lastSpawnSpotRef.current = spawnIndex;
       positionRef.current.copy(bonusSpawnSpots[spawnIndex]);
       targetSpotRef.current = (spawnIndex + 1 + initialSpot) % bonusSpawnSpots.length;
+      chasingPlayerRef.current = false;
       groupRef.current?.position.copy(positionRef.current);
       aliveRef.current = true;
       const respawnTarget = bonusTargets.get(id);
@@ -371,9 +394,48 @@ function BonusVillain({
     }
     const playerDx = playerWorldState.position.x - positionRef.current.x;
     const playerDz = playerWorldState.position.z - positionRef.current.z;
-    const touchingPlayer = playerDx * playerDx + playerDz * playerDz <= bonusVillainContactRadiusSq;
+    const playerDistanceSq = playerDx * playerDx + playerDz * playerDz;
+    const touchingPlayer = playerDistanceSq <= bonusVillainContactRadiusSq;
     if (touchingPlayer && !touchingPlayerRef.current) onPlayerDamage();
     touchingPlayerRef.current = touchingPlayer;
+
+    if (chasingPlayerRef.current) {
+      if (playerDistanceSq > bonusVillainChaseReleaseRadiusSq) chasingPlayerRef.current = false;
+    } else if (playerDistanceSq <= bonusVillainDetectionRadiusSq) {
+      chasingPlayerRef.current = true;
+    }
+
+    if (chasingPlayerRef.current) {
+      const distance = Math.sqrt(playerDistanceSq);
+      if (distance === 0) return;
+
+      const directionX = playerDx / distance;
+      const directionZ = playerDz / distance;
+      const step = Math.min(distance, Math.min(delta, 1 / 30) * bonusVillainMoveSpeed);
+      const playerHeading = Math.atan2(directionX, directionZ);
+      const safeHeading = bonusVillainSteeringAngles
+        .map((angle) => playerHeading + angle)
+        .find((candidateHeading) => canBonusVillainMove(
+          positionRef.current.x,
+          positionRef.current.z,
+          positionRef.current.x + Math.sin(candidateHeading) * step,
+          positionRef.current.z + Math.cos(candidateHeading) * step,
+        ));
+
+      if (safeHeading !== undefined) {
+        positionRef.current.x += Math.sin(safeHeading) * step;
+        positionRef.current.z += Math.cos(safeHeading) * step;
+        group.position.copy(positionRef.current);
+        const turnDelta = Math.atan2(
+          Math.sin(safeHeading - group.rotation.y),
+          Math.cos(safeHeading - group.rotation.y),
+        );
+        group.rotation.y += turnDelta * Math.min(1, delta * 10);
+      }
+
+      return;
+    }
+
     const target = bonusSpawnSpots[targetSpotRef.current];
     const dx = target.x - positionRef.current.x;
     const dz = target.z - positionRef.current.z;
@@ -382,17 +444,21 @@ function BonusVillain({
       targetSpotRef.current = (targetSpotRef.current + 2) % bonusSpawnSpots.length;
       return;
     }
-    const step = Math.min(distance, Math.min(delta, 1 / 30) * 2.1);
-    const nextX = positionRef.current.x + (dx / distance) * step;
-    const nextZ = positionRef.current.z + (dz / distance) * step;
-    if (!isSafeBonusRoamingPosition(nextX, nextZ)) {
+    if (distance === 0) return;
+
+    const step = Math.min(distance, Math.min(delta, 1 / 30) * bonusVillainMoveSpeed);
+    const heading = Math.atan2(dx, dz);
+    const nextX = positionRef.current.x + Math.sin(heading) * step;
+    const nextZ = positionRef.current.z + Math.cos(heading) * step;
+    if (!canBonusVillainMove(positionRef.current.x, positionRef.current.z, nextX, nextZ)) {
       targetSpotRef.current = (targetSpotRef.current + 1 + initialSpot) % bonusSpawnSpots.length;
       return;
     }
+
     positionRef.current.x = nextX;
     positionRef.current.z = nextZ;
     group.position.copy(positionRef.current);
-    group.rotation.y = Math.atan2(dx, dz);
+    group.rotation.y = heading;
   });
 
   return (

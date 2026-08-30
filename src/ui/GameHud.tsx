@@ -131,7 +131,7 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
 
         <section className="game-hud__stat" aria-label={`${completedSectionCount} of 8 sections complete`} aria-live="polite">
           <span className="game-hud__stat-label">Progress</span>
-          <strong>{`${completedSectionCount}/8`}</strong>
+          <strong>{completedSectionCount >= 8 ? "🏆" : `${completedSectionCount}/8`}</strong>
         </section>
 
         <section className="game-hud__stat game-hud__stat--points" aria-label={`${points} points`} aria-live="polite">

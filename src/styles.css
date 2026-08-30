@@ -853,7 +853,7 @@ canvas {
 .aim-crosshair__mark--left { right: 8px; }
 .aim-crosshair__mark--right { left: 8px; }
 
-/* Top-right status row and bottom-center gameplay controls */
+/* Left-side action toolbar, top-right status row, and bottom-center gameplay controls */
 body aside.game-hud {
   display: contents;
 }
@@ -880,7 +880,7 @@ body aside.game-hud .game-hud__left .game-hud__actions {
   left: max(12px, env(safe-area-inset-left));
   z-index: 60;
   display: flex;
-  flex-flow: row nowrap;
+  flex-flow: column nowrap;
   gap: 5px;
 }
 

@@ -1,7 +1,7 @@
 import { Canvas } from "@react-three/fiber";
 import { useProgress } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ACESFilmicToneMapping, MathUtils, PCFSoftShadowMap, SRGBColorSpace } from "three";
 import { isTouchControlsCameraInputBlocked } from "./player/cameraInputGuard";
 import { setGameFocused, useGameFocus } from "./player/gameFocus";
@@ -26,13 +26,50 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   const gameFocused = useGameFocus();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previousCompletedSectionCountRef = useRef(0);
+  const damageCooldownUntilRef = useRef(0);
+  const healthRef = useRef(3);
   const [coins, setCoins] = useState(0);
   const [completedSectionCount, setCompletedSectionCount] = useState(0);
+  const [health, setHealth] = useState(3);
+  const [damageFlashUntil, setDamageFlashUntil] = useState(0);
   const [screenAssetProgress, setScreenAssetProgress] = useState(0);
   const [screenAssetsReady, setScreenAssetsReady] = useState(false);
   const [shareScreenOpen, setShareScreenOpen] = useState(false);
   const [shootPressed, setShootPressed] = useState(false);
   const [shootRequest, setShootRequest] = useState(0);
+
+  const resetGame = useCallback(() => {
+    damageCooldownUntilRef.current = 0;
+    previousCompletedSectionCountRef.current = 0;
+    setCoins(0);
+    setCompletedSectionCount(0);
+    setHealth(3);
+    healthRef.current = 3;
+    setDamageFlashUntil(0);
+    setShootPressed(false);
+    setShootRequest(0);
+    setShareScreenOpen(false);
+    onRestart();
+  }, [onRestart]);
+
+  const damagePlayer = useCallback(() => {
+    const now = performance.now();
+    if (now < damageCooldownUntilRef.current) return;
+
+    const cooldownUntil = now + 1250;
+    damageCooldownUntilRef.current = cooldownUntil;
+    setDamageFlashUntil(cooldownUntil);
+    const nextHealth = Math.max(0, healthRef.current - 1);
+    healthRef.current = nextHealth;
+    setHealth(nextHealth);
+  }, []);
+
+  const collectHealth = useCallback(() => {
+    if (healthRef.current >= 3) return false;
+    healthRef.current += 1;
+    setHealth(healthRef.current);
+    return true;
+  }, []);
 
   const shoot = () => {
     setGameFocused(true);
@@ -63,10 +100,9 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   }, [gameFocused]);
 
   useEffect(() => {
-    setCoins(0);
-    setCompletedSectionCount(0);
-    previousCompletedSectionCountRef.current = 0;
-  }, [restartKey]);
+    if (health !== 0) return;
+    resetGame();
+  }, [health, resetGame]);
 
   useEffect(() => {
     if (completedSectionCount === 8 && previousCompletedSectionCountRef.current < 8) {
@@ -212,6 +248,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
           <Suspense fallback={null}>
             <Physics gravity={[0, -20, 0]}>
               <StudioWorld
+                damageFlashUntil={damageFlashUntil}
                 onCoinCollect={() => setCoins((current) => current + 1)}
                 onBonusCollect={() => setCoins((current) => current + 3)}
                 onOpenShare={() => {
@@ -219,10 +256,9 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
                   setGameFocused(false);
                   setShareScreenOpen(true);
                 }}
-                onPenaltyCollect={() => {
-                  setCoins(0);
-                  setCompletedSectionCount(0);
-                }}
+                onHealthCollect={collectHealth}
+                onPlayerDamage={damagePlayer}
+                onReset={resetGame}
                 onSectionComplete={() => setCompletedSectionCount((current) => Math.min(8, current + 1))}
                 restartKey={restartKey}
                 shootRequest={shootRequest}
@@ -239,9 +275,10 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
       />
       <GameHud
         completedSectionCount={completedSectionCount}
+        health={health}
         onShoot={shoot}
         onOpenWebsite={onOpenWebsite}
-        onRestart={onRestart}
+        onRestart={resetGame}
         points={coins}
         shootPressed={shootPressed}
         setShootPressed={setShootPressed}

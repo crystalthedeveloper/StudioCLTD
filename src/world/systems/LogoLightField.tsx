@@ -22,6 +22,7 @@ const floorLogoY = 0.04;
 const worldLogoRotation = -0.35;
 const pickupColliderRadius = 1.55;
 const speedRespawnMs = 28000;
+const healthGroupRespawnMs = 36000;
 const contactCountdownMs = 3000;
 const contactCooldownMs = 1200;
 const contactUrl = "https://www.crystalthedeveloper.ca/contact";
@@ -203,13 +204,17 @@ function createLogoTemplate(source: Group, material: MeshStandardMaterial) {
 
 type LogoLightFieldProps = {
   onCoinCollect: () => void;
-  onPenaltyCollect: () => void;
+  onHealthCollect: () => boolean;
+  onReset: () => void;
   onOpenShare: () => void;
   restartKey: number;
 };
 
-export function LogoLightField({ onCoinCollect, onOpenShare, onPenaltyCollect, restartKey }: LogoLightFieldProps) {
+export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, onReset, restartKey }: LogoLightFieldProps) {
   const { scene } = useGLTF(logoPath);
+  const collectedHealthLogoIdsRef = useRef(new Set<string>());
+  const healthRespawnTimerRef = useRef<number | null>(null);
+  const [healthRespawnGeneration, setHealthRespawnGeneration] = useState(0);
   const materials = useMemo(
     () => ({
       coin: createSharedMaterial("coin"),
@@ -243,6 +248,30 @@ export function LogoLightField({ onCoinCollect, onOpenShare, onPenaltyCollect, r
       })),
     [templates],
   );
+  const healthLogoCount = useMemo(() => logos.filter((logo) => logo.kind === "dark").length, [logos]);
+
+  const handleHealthLogoCollected = useCallback((logoId: string) => {
+    collectedHealthLogoIdsRef.current.add(logoId);
+    if (collectedHealthLogoIdsRef.current.size < healthLogoCount || healthRespawnTimerRef.current !== null) return;
+
+    healthRespawnTimerRef.current = window.setTimeout(() => {
+      healthRespawnTimerRef.current = null;
+      collectedHealthLogoIdsRef.current.clear();
+      setHealthRespawnGeneration((current) => current + 1);
+    }, healthGroupRespawnMs);
+  }, [healthLogoCount]);
+
+  useEffect(() => {
+    if (healthRespawnTimerRef.current !== null) {
+      window.clearTimeout(healthRespawnTimerRef.current);
+      healthRespawnTimerRef.current = null;
+    }
+    collectedHealthLogoIdsRef.current.clear();
+
+    return () => {
+      if (healthRespawnTimerRef.current !== null) window.clearTimeout(healthRespawnTimerRef.current);
+    };
+  }, [restartKey]);
 
   useEffect(() => () => Object.values(materials).forEach((material) => material.dispose()), [materials]);
 
@@ -251,10 +280,13 @@ export function LogoLightField({ onCoinCollect, onOpenShare, onPenaltyCollect, r
       {logos.map((logo) => (
         <PlazaLogoInstance
           key={logo.id}
+          healthRespawnGeneration={healthRespawnGeneration}
           logo={logo}
           onCoinCollect={onCoinCollect}
+          onHealthCollect={onHealthCollect}
+          onHealthLogoCollected={handleHealthLogoCollected}
           onOpenShare={onOpenShare}
-          onPenaltyCollect={onPenaltyCollect}
+          onReset={onReset}
           restartKey={restartKey}
         />
       ))}
@@ -263,14 +295,17 @@ export function LogoLightField({ onCoinCollect, onOpenShare, onPenaltyCollect, r
 }
 
 type PlazaLogoInstanceProps = {
+  healthRespawnGeneration: number;
   logo: PlazaLogo & { object: Object3D };
   onCoinCollect: () => void;
-  onPenaltyCollect: () => void;
+  onHealthCollect: () => boolean;
+  onHealthLogoCollected: (logoId: string) => void;
+  onReset: () => void;
   onOpenShare: () => void;
   restartKey: number;
 };
 
-function PlazaLogoInstance({ logo, onCoinCollect, onOpenShare, onPenaltyCollect, restartKey }: PlazaLogoInstanceProps) {
+function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHealthCollect, onHealthLogoCollected, onOpenShare, onReset, restartKey }: PlazaLogoInstanceProps) {
   const [available, setAvailable] = useState(true);
   const availableRef = useRef(true);
   const collectedRef = useRef(false);
@@ -351,7 +386,7 @@ function PlazaLogoInstance({ logo, onCoinCollect, onOpenShare, onPenaltyCollect,
       }
       clearContactTimers();
     };
-  }, [clearContactTimers, logo.object, restartKey]);
+  }, [clearContactTimers, healthRespawnGeneration, logo.object, restartKey]);
 
   const collectAndRespawn = useCallback(
     (reward: () => void) => {
@@ -392,7 +427,7 @@ function PlazaLogoInstance({ logo, onCoinCollect, onOpenShare, onPenaltyCollect,
       if (logo.kind === "penalty") {
         collectAndRespawn(() => {
           playCollectibleSound("penalty");
-          onPenaltyCollect();
+          onReset();
         });
         return;
       }
@@ -405,9 +440,21 @@ function PlazaLogoInstance({ logo, onCoinCollect, onOpenShare, onPenaltyCollect,
         return;
       }
 
+      if (logo.kind === "dark") {
+        if (!onHealthCollect()) return;
+        collectedRef.current = true;
+        availableRef.current = false;
+        colliderRef.current?.setEnabled(false);
+        logo.object.visible = false;
+        setAvailable(false);
+        playCollectibleSound("health");
+        onHealthLogoCollected(logo.id);
+        return;
+      }
+
       if (logo.kind === "contact" || logo.kind === "share") startActionCountdown();
     },
-    [collectAndRespawn, logo.kind, logo.object, onCoinCollect, onPenaltyCollect, startActionCountdown],
+    [collectAndRespawn, logo.id, logo.kind, logo.object, onCoinCollect, onHealthCollect, onHealthLogoCollected, onReset, startActionCountdown],
   );
 
   const handleExit = useCallback(
@@ -444,7 +491,7 @@ function PlazaLogoInstance({ logo, onCoinCollect, onOpenShare, onPenaltyCollect,
     </>
   );
 
-  if (logo.kind === "light" || logo.kind === "dark") {
+  if (logo.kind === "light") {
     return <group position={position}>{visual}</group>;
   }
 

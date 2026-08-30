@@ -29,7 +29,7 @@ StudioCLTD is a lightweight third-person React Three Fiber game world for explor
 
 The Home Base is a separate hidden level beyond the main camera range. The central transport pad is its only entrance, and a return pad sends the player back. Home Base does not count as a ninth section.
 
-Home Base contains Contact and Share, a responsive `crystalthedeveloper.ca` video screen, three standard Coin pickups, and a lightweight luxury black-marble floor.
+Home Base contains Contact and Share, a responsive `crystalthedeveloper.ca` video screen, three standard Coin pickups, and the same weathered concrete ground finish as the main world.
 
 ## Controls
 

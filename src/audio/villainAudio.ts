@@ -9,7 +9,31 @@ const villainVoicePaths: Record<string, string> = {
 };
 
 const audioElements = new Map<string, HTMLAudioElement>();
+const voiceListenersInstalled = new Set<string>();
+const voiceStateListeners = new Set<() => void>();
+let activeVillainVoiceId: string | null = null;
 let audioSubscriptionInstalled = false;
+
+function setActiveVillainVoiceId(sectionId: string | null) {
+  if (activeVillainVoiceId === sectionId) return;
+  activeVillainVoiceId = sectionId;
+  voiceStateListeners.forEach((listener) => listener());
+}
+
+function getVoiceAudio(sectionId: string, path: string) {
+  const audio = getAudio(path, 0.48);
+  if (voiceListenersInstalled.has(sectionId)) return audio;
+
+  voiceListenersInstalled.add(sectionId);
+  audio.addEventListener("play", () => setActiveVillainVoiceId(sectionId));
+  audio.addEventListener("pause", () => {
+    if (activeVillainVoiceId === sectionId) setActiveVillainVoiceId(null);
+  });
+  audio.addEventListener("ended", () => {
+    if (activeVillainVoiceId === sectionId) setActiveVillainVoiceId(null);
+  });
+  return audio;
+}
 
 function getAudio(path: string, volume: number) {
   const cached = audioElements.get(path);
@@ -53,7 +77,7 @@ function stopAndRewind(audio?: HTMLAudioElement) {
 export function preloadVillainAudio() {
   installAudioSubscription();
   getAudio(defeatAudioPath, 0.5);
-  Object.values(villainVoicePaths).forEach((path) => getAudio(path, 0.48));
+  Object.entries(villainVoicePaths).forEach(([sectionId, path]) => getVoiceAudio(sectionId, path));
 }
 
 export function hasVillainVoice(sectionId: string) {
@@ -64,7 +88,7 @@ export function playVillainVoice(sectionId: string) {
   const path = villainVoicePaths[sectionId];
   if (!path) return;
   installAudioSubscription();
-  playFromStart(getAudio(path, 0.48));
+  playFromStart(getVoiceAudio(sectionId, path));
 }
 
 export function stopVillainVoice(sectionId: string) {
@@ -79,4 +103,14 @@ export function playVillainDefeatSound() {
 
 export function stopAllVillainAudio() {
   audioElements.forEach(stopAndRewind);
+  setActiveVillainVoiceId(null);
+}
+
+export function getActiveVillainVoiceId() {
+  return activeVillainVoiceId;
+}
+
+export function subscribeVillainVoice(listener: () => void) {
+  voiceStateListeners.add(listener);
+  return () => voiceStateListeners.delete(listener);
 }

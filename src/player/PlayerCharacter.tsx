@@ -15,6 +15,7 @@ import { CharacterAnimationState } from "./playerTypes";
 
 type PlayerCharacterProps = {
   animationStateRef: MutableRefObject<CharacterAnimationState>;
+  damageFlashUntil: number;
   dialogue: DialogueMessage | null;
   onShootAnimationComplete: () => void;
   shootRequest: number;
@@ -44,6 +45,7 @@ function fadeOutOtherActions(actions: Record<string, AnimationAction | null>, ac
 
 export function PlayerCharacter({
   animationStateRef,
+  damageFlashUntil,
   dialogue,
   onShootAnimationComplete,
   shootRequest,
@@ -52,8 +54,7 @@ export function PlayerCharacter({
   const model = useGLTF("/characters/char-optimized.glb", false, true);
   const scene = useMemo(() => SkeletonUtils.clone(model.scene), [model.scene]);
   const group = useRef<Group>(null);
-  const playerFrontLightRef = useRef<PointLight>(null);
-  const playerBackLightRef = useRef<PointLight>(null);
+  const playerFillLightRef = useRef<PointLight>(null);
   const { actions } = useAnimations(model.animations, group);
   const shootActionRef = useRef<AnimationAction | null>(null);
   const shootRequestRef = useRef(0);
@@ -82,8 +83,7 @@ export function PlayerCharacter({
   }, [scene]);
 
   useEffect(() => {
-    playerFrontLightRef.current?.layers.set(playerLightingLayer);
-    playerBackLightRef.current?.layers.set(playerLightingLayer);
+    playerFillLightRef.current?.layers.set(playerLightingLayer);
   }, []);
 
   useEffect(() => {
@@ -220,25 +220,22 @@ export function PlayerCharacter({
     group.current.position.y = -1.05;
     group.current.rotation.z = 0;
     group.current.rotation.x = 0;
+    scene.visible = performance.now() >= damageFlashUntil || Math.floor(performance.now() / 90) % 2 === 0;
   });
+
+  useEffect(() => () => {
+    scene.visible = true;
+  }, [scene]);
 
   return (
     <group ref={group}>
       <pointLight
-        ref={playerFrontLightRef}
-        color="#fff8ec"
-        intensity={15}
-        distance={9}
-        decay={2}
-        position={[1.8, 3.2, 2.8]}
-      />
-      <pointLight
-        ref={playerBackLightRef}
-        color="#edf7ff"
-        intensity={10}
+        ref={playerFillLightRef}
+        color="#fff4e8"
+        intensity={12}
         distance={8}
         decay={2}
-        position={[-1.6, 2.5, -2.2]}
+        position={[1.6, 3, 2.3]}
       />
       <DialogueBubble message={dialogue} position={[0, 2.65, 0]} />
       <primitive object={scene} rotation-y={Math.PI} scale={1.05} />

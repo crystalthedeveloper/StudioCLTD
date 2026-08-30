@@ -5,13 +5,13 @@ const StudioExperience = lazy(() =>
 );
 
 export default function App() {
-  const [restartKey] = useState(0);
+  const [restartKey, setRestartKey] = useState(0);
   const [studioStarted, setStudioStarted] = useState(false);
   const [studioReady, setStudioReady] = useState(false);
   const [studioLoadProgress, setStudioLoadProgress] = useState(0);
 
   const restartGame = () => {
-    window.location.reload();
+    setRestartKey((current) => current + 1);
   };
 
   const launchStudio = () => {

@@ -1,11 +1,13 @@
 import { useSpeedBoostRemainingMs, speedBoostDurationMs } from "../player/speedBoost";
 import { setGameAudioEnabled, useGameAudioEnabled } from "../audio/gameAudio";
-import { useEffect, useState } from "react";
+import { getActiveVillainVoiceId, subscribeVillainVoice } from "../audio/villainAudio";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { DirectionControls } from "./DirectionControls";
 
 type GameHudProps = {
   completedSectionCount: number;
+  health: number;
   onOpenWebsite: () => void;
   onRestart: () => void;
   onShoot: () => void;
@@ -14,9 +16,22 @@ type GameHudProps = {
   setShootPressed: (pressed: boolean) => void;
 };
 
-export function GameHud({ completedSectionCount, onOpenWebsite, onRestart, onShoot, points, setShootPressed, shootPressed }: GameHudProps) {
+const villainVoiceLabels: Record<string, string> = {
+  "quick-fix": "Quick Fix",
+  "urgent-fix": "Urgent Fix",
+  performance: "Performance",
+  "site-improvement": "Site Improvement",
+};
+
+export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestart, onShoot, points, setShootPressed, shootPressed }: GameHudProps) {
   const [guideOpen, setGuideOpen] = useState(false);
   const audioEnabled = useGameAudioEnabled();
+  const activeVillainVoiceId = useSyncExternalStore(
+    subscribeVillainVoice,
+    getActiveVillainVoiceId,
+    getActiveVillainVoiceId,
+  );
+  const activeVillainVoiceLabel = activeVillainVoiceId ? villainVoiceLabels[activeVillainVoiceId] : null;
   const remainingMs = useSpeedBoostRemainingMs();
   const active = remainingMs > 0;
   const progress = active ? Math.min(100, (remainingMs / speedBoostDurationMs) * 100) : 0;
@@ -82,12 +97,14 @@ export function GameHud({ completedSectionCount, onOpenWebsite, onRestart, onSho
           </button>
           <button
             type="button"
+            className={activeVillainVoiceLabel ? "game-hud__sound-button game-hud__sound-button--speaking" : "game-hud__sound-button"}
             onClick={() => setGameAudioEnabled(!audioEnabled)}
             aria-label={audioEnabled ? "Mute game audio" : "Enable game audio"}
             aria-pressed={!audioEnabled}
             title={audioEnabled ? "Sound On" : "Sound Off"}
           >
             <span className="game-hud__sound-icon" aria-hidden="true">{audioEnabled ? "🔊" : "🔇"}</span>
+            {activeVillainVoiceLabel && <span className="game-hud__sound-label">{activeVillainVoiceLabel}</span>}
             <small className="game-hud__shortcut" aria-hidden="true">2</small>
           </button>
           <button type="button" onClick={onRestart} aria-label="Restart world" title="Restart">
@@ -105,24 +122,33 @@ export function GameHud({ completedSectionCount, onOpenWebsite, onRestart, onSho
           </button>
         </div>
 
+        <section className="game-hud__health" aria-label={`${health} of 3 hearts`} aria-live="polite">
+          <span className="game-hud__stat-label">Health</span>
+          <strong aria-hidden="true">
+            {Array.from({ length: 3 }, (_, index) => index < health ? "❤️" : "♡").join(" ")}
+          </strong>
+        </section>
+
         <section className="game-hud__stat" aria-label={`${completedSectionCount} of 8 sections complete`} aria-live="polite">
+          <span className="game-hud__stat-label">Progress</span>
           <strong>{`${completedSectionCount}/8`}</strong>
         </section>
 
         <section className="game-hud__stat game-hud__stat--points" aria-label={`${points} points`} aria-live="polite">
+          <span className="game-hud__stat-label">Score</span>
           <strong>{points}</strong>
         </section>
-      </div>
 
-      <DirectionControls />
-
-      <div className="game-hud__right">
         <div className="game-hud__speed-meter">
           <span>Speed</span>
           <div className="game-hud__meter-track game-hud__meter-track--speed" role="progressbar" aria-label="Speed boost time remaining" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
             <i style={{ width: `${progress}%` }} />
           </div>
         </div>
+      </div>
+
+      <div className="game-hud__bottom">
+        <DirectionControls />
         <button
           type="button"
           className={`game-hud__shoot${shootPressed ? " game-hud__shoot--pressed" : ""}`}
@@ -164,7 +190,7 @@ export function GameHud({ completedSectionCount, onOpenWebsite, onRestart, onSho
               <li><span>🔵</span> Blue — Contact</li>
               <li><span>🟣</span> Purple — Share</li>
               <li><span>⚪</span> White — Decorative</li>
-              <li><span>⚫</span> Black — Decorative</li>
+              <li><span>⚫</span> Black — Health</li>
             </ul>
           </section>
         </div>,

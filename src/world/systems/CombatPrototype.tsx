@@ -1,8 +1,8 @@
-import { Text, useAnimations, useGLTF } from "@react-three/drei";
+import { useAnimations, useGLTF } from "@react-three/drei";
 import { CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload } from "@react-three/rapier";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AdditiveBlending, Group, InstancedMesh, LoopRepeat, Mesh, MeshBasicMaterial, Object3D, PointLight, Raycaster, SphereGeometry, Vector2, Vector3 } from "three";
+import { AdditiveBlending, CylinderGeometry, Group, InstancedMesh, LoopRepeat, Mesh, MeshBasicMaterial, Object3D, PointLight, Quaternion, Raycaster, SphereGeometry, Vector2, Vector3 } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import { applyCharacterMaterials, villainMaterialProfile } from "../../characters/characterMaterials";
 import { applyNaturalMaterials } from "../../characters/naturalMaterials";
@@ -16,10 +16,9 @@ import {
 } from "../../audio/villainAudio";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { playEnergyBlastSound } from "../../audio/shootSound";
-import { DialogueMessage } from "../../ui/DialogueBubble";
 import { triggerFixHaptic } from "../../ui/haptics";
-import { gameTextFont } from "../../ui/textFont";
 import { VillainCharacter, VillainStatus } from "../../villain/VillainCharacter";
+import { hideVillainMask } from "../../villain/hideVillainMask";
 import { destinationPlatformRadius, hubSections, sectionRampApproachLength, sectionRampWidth } from "../hubSections";
 import { isPlayerObject } from "../playerCollision";
 import { playerWorldState } from "../playerWorldState";
@@ -31,34 +30,14 @@ import { fixPulseGeometry, fixRingGeometry, useTriggerPadVisuals } from "../useT
 const cooldownMs = 1800;
 const triggerPadRadius = 1.33;
 const padActivationCooldownMs = 900;
-const dialoguePadRadius = 6.5;
-const dialogueVillainRadius = 9;
-const dialoguePadRadiusSq = dialoguePadRadius * dialoguePadRadius;
-const dialogueVillainRadiusSq = dialogueVillainRadius * dialogueVillainRadius;
 const encounterSectionIds = ["quick-fix", "urgent-fix", "performance", "site-improvement"];
-const infoPanelDurationMs = 10000;
 const smokeDurationMs = 1700;
 const villainFrontOffset = 2.8;
 const villainSideOffset = 5.1;
 const triggerPadFrontOffset = 5.8;
 const triggerPadSideOffset = 3.6;
-
-const serviceInfoText: Record<string, string> = {
-  "quick-fix":
-    "A button that doesn't work can cost you real customers.\n\nEvery click should lead somewhere-not to frustration.\n\nI help businesses fix website issues so every button, form, and interaction works as expected.",
-  "urgent-fix":
-    "A website that's down can cost you customers fast.\n\nWhen your website isn't available, visitors leave and opportunities are lost.\n\nI fix urgent website issues quickly to get your site back online.",
-  performance:
-    "A slow website can cost you visitors before they even contact you.\n\nImproving performance helps pages load faster, feel smoother, and support better SEO.\n\nI help optimize websites so users get a faster, cleaner experience.",
-  "site-improvement": "Contact forms should just work.\n\nFailed submissions and missing emails can cost you customers.\n\nI fix forms so every message gets delivered.",
-};
-
-const villainDialogueText: Record<string, string> = {
-  "quick-fix": "😈 Broken Button!",
-  "urgent-fix": "👿 Not secure!",
-  performance: "😈 Poor PageSpeed",
-  "site-improvement": "😈 Form Broken",
-};
+const mainVillainContactRadiusSq = 1.2 * 1.2;
+const bonusVillainContactRadiusSq = 1 * 1;
 
 const smokeGeometry = new SphereGeometry(1, 8, 8);
 const fireGeometry = new SphereGeometry(1, 8, 6);
@@ -163,53 +142,57 @@ const bonusProjectileHitbox = {
 const energyBallRadius = 0.46;
 const mainVillainHitRadius = 1.45;
 const projectileMaxDistance = 48;
+const projectileSpeed = 260;
 const crosshairNdc = new Vector2(0, crosshairNdcY);
 const bonusTargets = new Map<string, {
   alive: boolean;
   hitbox: typeof bonusProjectileHitbox;
   position: Vector3;
 }>();
-const energyBallGeometry = new SphereGeometry(energyBallRadius, 12, 10);
-const energyBallMaterial = new MeshBasicMaterial({
+const tracerGeometry = new CylinderGeometry(0.025, 0.025, 1.35, 6);
+const tracerGlowGeometry = new CylinderGeometry(0.07, 0.07, 1.35, 6);
+const tracerMaterial = new MeshBasicMaterial({
   blending: AdditiveBlending,
-  color: "#facc15",
+  color: "#fff9cf",
   depthWrite: false,
   toneMapped: false,
 });
-const energyBallGlowMaterial = new MeshBasicMaterial({
+const tracerGlowMaterial = new MeshBasicMaterial({
   blending: AdditiveBlending,
-  color: "#facc15",
+  color: "#f4c928",
   depthWrite: false,
-  opacity: 0.24,
+  opacity: 0.2,
   toneMapped: false,
   transparent: true,
 });
+const effectSphereGeometry = new SphereGeometry(1, 8, 6);
+const effectCoreMaterial = new MeshBasicMaterial({ blending: AdditiveBlending, color: "#fffbe0", depthWrite: false, toneMapped: false, transparent: true });
+const effectGlowMaterial = new MeshBasicMaterial({ blending: AdditiveBlending, color: "#facc15", depthWrite: false, opacity: 0.28, toneMapped: false, transparent: true });
 
 type CombatPrototypeProps = {
   onBonusCollect: () => void;
+  onInfoChange: (sectionId: string | null) => void;
+  onPlayerDamage: () => void;
   onPlayerDialogue: (text: string) => void;
   onSectionResolved: (sectionId: string) => void;
   onSectionTrigger: (sectionId: string, triggerId: string) => void;
-  onVillainDialogue: (sectionName: string, text: string) => void;
   restartKey: number | string;
   shootRequest: number;
-  villainDialogue: (DialogueMessage & { sectionName: string }) | null;
 };
 
 export function CombatPrototype({
   onBonusCollect,
+  onInfoChange,
+  onPlayerDamage,
   onPlayerDialogue,
   onSectionResolved,
   onSectionTrigger,
-  onVillainDialogue,
   restartKey,
   shootRequest,
-  villainDialogue,
 }: CombatPrototypeProps) {
-  const [activeInfoId, setActiveInfoId] = useState<string | null>(null);
   const [visibleEncounterCount, setVisibleEncounterCount] = useState(1);
   const [projectileHit, setProjectileHit] = useState<{ id: string; sequence: number } | null>(null);
-  const [bonusHit, setBonusHit] = useState<{ id: string; sequence: number } | null>(null);
+  const [bonusHit, setBonusHit] = useState<{ id: string; position: Vector3; sequence: number } | null>(null);
 
   useEffect(() => {
     preloadVillainAudio();
@@ -219,19 +202,9 @@ export function CombatPrototype({
   useEffect(() => stopAllVillainAudio(), [restartKey]);
 
   useEffect(() => {
-    if (!activeInfoId) return undefined;
-
-    const timeout = window.setTimeout(() => {
-      setActiveInfoId(null);
-    }, infoPanelDurationMs);
-
-    return () => window.clearTimeout(timeout);
-  }, [activeInfoId]);
-
-  useEffect(() => {
-    setActiveInfoId(null);
+    onInfoChange(null);
     setVisibleEncounterCount(1);
-  }, [restartKey]);
+  }, [onInfoChange, restartKey]);
 
   useEffect(() => {
     if (visibleEncounterCount >= sectionEncounters.length) return undefined;
@@ -247,9 +220,9 @@ export function CombatPrototype({
     <group name="SectionPortalEncounters">
       <EnergyProjectileSystem
         key={`projectiles:${restartKey}`}
-        onHit={(id) => {
+        onHit={(id, position) => {
           if (id.startsWith("bonus:")) {
-            setBonusHit((current) => ({ id, sequence: (current?.sequence ?? 0) + 1 }));
+            setBonusHit((current) => ({ id, position, sequence: (current?.sequence ?? 0) + 1 }));
             return;
           }
           setProjectileHit((current) => ({ id, sequence: (current?.sequence ?? 0) + 1 }));
@@ -260,21 +233,21 @@ export function CombatPrototype({
         key={`bonus-villains:${restartKey}`}
         hit={bonusHit}
         onDefeat={onBonusCollect}
+        onPlayerDamage={onPlayerDamage}
       />
       {sectionEncounters.slice(0, visibleEncounterCount).map((encounter) => (
         <SectionPortalEncounter
           key={`${encounter.id}:${restartKey}`}
-          activeInfoId={activeInfoId}
           encounter={encounter}
+          onInfoClose={() => onInfoChange(null)}
           onInfoOpen={() => {
-            setActiveInfoId(encounter.id);
+            onInfoChange(encounter.id);
             onSectionTrigger(encounter.id, "info");
           }}
           onPlayerDialogue={onPlayerDialogue}
+          onPlayerDamage={onPlayerDamage}
           onSectionResolved={onSectionResolved}
-          onVillainDialogue={onVillainDialogue}
           projectileHit={projectileHit}
-          villainDialogue={villainDialogue}
         />
       ))}
     </group>
@@ -284,14 +257,16 @@ export function CombatPrototype({
 function BonusVillainSystem({
   hit,
   onDefeat,
+  onPlayerDamage,
 }: {
-  hit: { id: string; sequence: number } | null;
+  hit: { id: string; position: Vector3; sequence: number } | null;
   onDefeat: () => void;
+  onPlayerDamage: () => void;
 }) {
   return (
     <group name="BonusVillains">
-      <BonusVillain id="bonus:1" hit={hit} initialSpot={0} onDefeat={onDefeat} />
-      <BonusVillain id="bonus:2" hit={hit} initialSpot={2} onDefeat={onDefeat} />
+      <BonusVillain id="bonus:1" hit={hit} initialSpot={0} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} />
+      <BonusVillain id="bonus:2" hit={hit} initialSpot={2} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} />
     </group>
   );
 }
@@ -301,23 +276,31 @@ function BonusVillain({
   id,
   initialSpot,
   onDefeat,
+  onPlayerDamage,
 }: {
-  hit: { id: string; sequence: number } | null;
+  hit: { id: string; position: Vector3; sequence: number } | null;
   id: string;
   initialSpot: number;
   onDefeat: () => void;
+  onPlayerDamage: () => void;
 }) {
   const model = useGLTF("/characters/char-optimized.glb", false, true);
-  const scene = useMemo(() => SkeletonUtils.clone(model.scene), [model.scene]);
+  const scene = useMemo(() => {
+    const villainScene = SkeletonUtils.clone(model.scene);
+    hideVillainMask(villainScene);
+    return villainScene;
+  }, [model.scene]);
   const groupRef = useRef<Group>(null);
   const positionRef = useRef(bonusSpawnSpots[initialSpot].clone());
   const lastSpawnSpotRef = useRef(initialSpot);
   const targetSpotRef = useRef((initialSpot + 1) % bonusSpawnSpots.length);
   const aliveRef = useRef(true);
+  const touchingPlayerRef = useRef(false);
   const respawnTimerRef = useRef(0);
   const pointsTimerRef = useRef(0);
   const [alive, setAlive] = useState(true);
   const [showPoints, setShowPoints] = useState(false);
+  const pointsPositionRef = useRef(new Vector3());
   const { actions } = useAnimations(model.animations, groupRef);
 
   useEffect(() => {
@@ -351,9 +334,12 @@ function BonusVillain({
   useEffect(() => {
     if (hit?.id !== id || !aliveRef.current) return;
     aliveRef.current = false;
+    touchingPlayerRef.current = false;
     const target = bonusTargets.get(id);
     if (target) target.alive = false;
     setAlive(false);
+    pointsPositionRef.current.copy(hit.position);
+    pointsPositionRef.current.y += 0.55;
     setShowPoints(true);
     onDefeat();
     pointsTimerRef.current = window.setTimeout(() => setShowPoints(false), 1100);
@@ -379,7 +365,15 @@ function BonusVillain({
 
   useFrame((_, delta) => {
     const group = groupRef.current;
-    if (!group || !aliveRef.current) return;
+    if (!group || !aliveRef.current) {
+      touchingPlayerRef.current = false;
+      return;
+    }
+    const playerDx = playerWorldState.position.x - positionRef.current.x;
+    const playerDz = playerWorldState.position.z - positionRef.current.z;
+    const touchingPlayer = playerDx * playerDx + playerDz * playerDz <= bonusVillainContactRadiusSq;
+    if (touchingPlayer && !touchingPlayerRef.current) onPlayerDamage();
+    touchingPlayerRef.current = touchingPlayer;
     const target = bonusSpawnSpots[targetSpotRef.current];
     const dx = target.x - positionRef.current.x;
     const dz = target.z - positionRef.current.z;
@@ -407,7 +401,12 @@ function BonusVillain({
         <primitive object={scene} scale={0.68} position={[0, 0.18, 0]} />
       </group>
       {showPoints && (
-        <BillboardLabel color="#3f7d3a" fontSize={0.38} position={[positionRef.current.x, 2.1, positionRef.current.z]} maxWidth={2}>
+        <BillboardLabel
+          color="#3f7d3a"
+          fontSize={0.38}
+          position={[pointsPositionRef.current.x, pointsPositionRef.current.y, pointsPositionRef.current.z]}
+          maxWidth={2}
+        >
           +3
         </BillboardLabel>
       )}
@@ -420,7 +419,11 @@ type EnergyProjectile = {
   id: number;
   maxDistance: number;
   position: Vector3;
-  yaw: number;
+};
+
+type EnergyImpact = {
+  id: number;
+  position: Vector3;
 };
 
 function belongsToAimExcludedObject(object: Object3D) {
@@ -432,8 +435,9 @@ function belongsToAimExcludedObject(object: Object3D) {
   return false;
 }
 
-function EnergyProjectileSystem({ onHit, shootRequest }: { onHit: (id: string) => void; shootRequest: number }) {
+function EnergyProjectileSystem({ onHit, shootRequest }: { onHit: (id: string, position: Vector3) => void; shootRequest: number }) {
   const [projectiles, setProjectiles] = useState<EnergyProjectile[]>([]);
+  const [impacts, setImpacts] = useState<EnergyImpact[]>([]);
   const nextIdRef = useRef(0);
   const handledShootRequestRef = useRef(shootRequest);
   const raycasterRef = useRef(new Raycaster());
@@ -459,11 +463,9 @@ function EnergyProjectileSystem({ onHit, shootRequest }: { onHit: (id: string) =
       const target = rayHit?.point.clone() ?? raycaster.ray.at(projectileMaxDistance, new Vector3());
       const direction = target.clone().sub(position).normalize();
       const maxDistance = Math.min(projectileMaxDistance, position.distanceTo(target));
-      const yaw = Math.atan2(-direction.x, -direction.z);
-
       playEnergyBlastSound();
       nextIdRef.current += 1;
-      setProjectiles((current) => [...current, { direction, id: nextIdRef.current, maxDistance, position, yaw }]);
+      setProjectiles((current) => [...current, { direction, id: nextIdRef.current, maxDistance, position }]);
     }, 360);
     return () => window.clearTimeout(timer);
   }, [camera, scene, shootRequest]);
@@ -474,86 +476,162 @@ function EnergyProjectileSystem({ onHit, shootRequest }: { onHit: (id: string) =
         <EnergyBall
           key={projectile.id}
           projectile={projectile}
-          onComplete={(hitId) => {
+          onComplete={(hitId, impactPosition) => {
             setProjectiles((current) => current.filter(({ id }) => id !== projectile.id));
-            if (hitId) onHit(hitId);
+            setImpacts((current) => [...current, { id: projectile.id, position: impactPosition }]);
+            if (hitId) onHit(hitId, impactPosition);
           }}
+        />
+      ))}
+      {impacts.map((impact) => (
+        <ImpactBurst
+          key={impact.id}
+          position={impact.position}
+          onComplete={() => setImpacts((current) => current.filter(({ id }) => id !== impact.id))}
         />
       ))}
     </group>
   );
 }
 
-function EnergyBall({ onComplete, projectile }: { onComplete: (hitId?: string) => void; projectile: EnergyProjectile }) {
+function EnergyBall({ onComplete, projectile }: { onComplete: (hitId: string | undefined, position: Vector3) => void; projectile: EnergyProjectile }) {
   const groupRef = useRef<Group>(null);
   const travelledRef = useRef(0);
   const completedRef = useRef(false);
+  const orientation = useMemo(
+    () => new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), projectile.direction),
+    [projectile.direction],
+  );
 
   useFrame((_, delta) => {
     const group = groupRef.current;
     if (!group || completedRef.current) return;
-    const step = Math.min(delta, 1 / 30) * 28;
-    travelledRef.current += step;
-    group.position.addScaledVector(projectile.direction, step);
+    const frameStep = Math.min(delta, 1 / 30) * projectileSpeed;
+    const substepCount = Math.max(1, Math.ceil(frameStep / 0.2));
+    const substep = frameStep / substepCount;
+    let hitId: string | undefined;
 
-    const hit = sectionEncounters.find(({ villainPosition }) => {
-      const dx = group.position.x - villainPosition.x;
-      const dy = group.position.y - (villainPosition.y + 1.25);
-      const dz = group.position.z - villainPosition.z;
-      const hitRadius = mainVillainHitRadius + energyBallRadius;
-      return dx * dx + dy * dy + dz * dz < hitRadius * hitRadius;
-    });
-    let hitId = hit?.id;
-    if (!hitId) {
-      for (const [id, target] of bonusTargets) {
-        if (!target.alive) continue;
-        const dx = group.position.x - target.position.x;
-        const dy = group.position.y - (target.position.y + target.hitbox.centerY);
-        const dz = group.position.z - target.position.z;
-        const horizontalDistanceSq = dx * dx + dz * dz;
-        const insideBonusHitbox =
-          horizontalDistanceSq / ((target.hitbox.horizontalRadius + energyBallRadius) ** 2)
-          + (dy * dy) / ((target.hitbox.verticalRadius + energyBallRadius) ** 2)
-          < 1;
-        if (insideBonusHitbox) {
-          hitId = id;
-          break;
+    for (let stepIndex = 0; stepIndex < substepCount; stepIndex += 1) {
+      const remainingDistance = projectile.maxDistance - travelledRef.current;
+      const distance = Math.min(substep, remainingDistance);
+      travelledRef.current += distance;
+      group.position.addScaledVector(projectile.direction, distance);
+
+      const hit = sectionEncounters.find(({ villainPosition }) => {
+        const dx = group.position.x - villainPosition.x;
+        const dy = group.position.y - (villainPosition.y + 1.25);
+        const dz = group.position.z - villainPosition.z;
+        const hitRadius = mainVillainHitRadius + energyBallRadius;
+        return dx * dx + dy * dy + dz * dz < hitRadius * hitRadius;
+      });
+      hitId = hit?.id;
+      if (!hitId) {
+        for (const [id, target] of bonusTargets) {
+          if (!target.alive) continue;
+          const dx = group.position.x - target.position.x;
+          const dy = group.position.y - (target.position.y + target.hitbox.centerY);
+          const dz = group.position.z - target.position.z;
+          const horizontalDistanceSq = dx * dx + dz * dz;
+          const insideBonusHitbox =
+            horizontalDistanceSq / ((target.hitbox.horizontalRadius + energyBallRadius) ** 2)
+            + (dy * dy) / ((target.hitbox.verticalRadius + energyBallRadius) ** 2)
+            < 1;
+          if (insideBonusHitbox) {
+            hitId = id;
+            break;
+          }
         }
       }
+      if (hitId || travelledRef.current >= projectile.maxDistance) break;
     }
     if (!hitId && travelledRef.current < projectile.maxDistance) return;
     completedRef.current = true;
-    onComplete(hitId);
+    onComplete(hitId, group.position.clone());
   });
 
   return (
-    <group ref={groupRef} position={projectile.position} rotation-y={projectile.yaw}>
-      <mesh geometry={energyBallGeometry} material={energyBallMaterial} />
-      <mesh geometry={energyBallGeometry} material={energyBallGlowMaterial} scale={1.55} />
-      <mesh geometry={energyBallGeometry} material={energyBallMaterial} position={[0, 0, 0.48]} scale={0.56} />
-      <mesh geometry={energyBallGeometry} material={energyBallGlowMaterial} position={[0, 0, 0.48]} scale={0.9} />
-      <mesh geometry={energyBallGeometry} material={energyBallMaterial} position={[0, 0, 0.82]} scale={0.3} />
+    <>
+      <MuzzleFlash position={projectile.position} />
+      <group ref={groupRef} position={projectile.position} quaternion={orientation}>
+        <mesh geometry={tracerGeometry} material={tracerMaterial} position={[0, -0.675, 0]} />
+        <mesh geometry={tracerGlowGeometry} material={tracerGlowMaterial} position={[0, -0.675, 0]} />
+      </group>
+    </>
+  );
+}
+
+function MuzzleFlash({ position }: { position: Vector3 }) {
+  const groupRef = useRef<Group>(null);
+  const elapsedRef = useRef(0);
+
+  useFrame((_, delta) => {
+    elapsedRef.current += delta;
+    const group = groupRef.current;
+    if (!group) return;
+    const progress = Math.min(elapsedRef.current / 0.075, 1);
+    group.visible = progress < 1;
+    group.scale.setScalar(0.14 + progress * 0.18);
+  });
+
+  return (
+    <group ref={groupRef} position={position}>
+      <mesh geometry={effectSphereGeometry} material={effectCoreMaterial} scale={[1, 0.65, 1]} />
+      <mesh geometry={effectSphereGeometry} material={effectGlowMaterial} scale={1.7} />
+      <pointLight color="#ffe9a3" intensity={0.45} distance={2.2} decay={2} />
+    </group>
+  );
+}
+
+function ImpactBurst({ onComplete, position }: { onComplete: () => void; position: Vector3 }) {
+  const groupRef = useRef<Group>(null);
+  const elapsedRef = useRef(0);
+  const sparkDirections = useMemo(() => [
+    new Vector3(0.8, 0.5, 0.2),
+    new Vector3(-0.55, 0.75, 0.35),
+    new Vector3(0.25, 0.9, -0.65),
+    new Vector3(-0.4, 0.35, -0.8),
+  ].map((direction) => direction.normalize()), []);
+
+  useFrame((_, delta) => {
+    elapsedRef.current += delta;
+    const progress = Math.min(elapsedRef.current / 0.16, 1);
+    const group = groupRef.current;
+    if (group) {
+      group.scale.setScalar(0.12 + progress * 0.34);
+      group.children.forEach((child, index) => {
+        if (index < 2) return;
+        child.position.copy(sparkDirections[index - 2]).multiplyScalar(progress * 0.7);
+      });
+    }
+    if (progress >= 1) onComplete();
+  });
+
+  return (
+    <group ref={groupRef} position={position}>
+      <mesh geometry={effectSphereGeometry} material={effectCoreMaterial} />
+      <mesh geometry={effectSphereGeometry} material={effectGlowMaterial} scale={1.65} />
+      {sparkDirections.map((_, index) => (
+        <mesh key={index} geometry={effectSphereGeometry} material={effectCoreMaterial} scale={0.12} />
+      ))}
     </group>
   );
 }
 
 function SectionPortalEncounter({
-  activeInfoId,
   encounter,
+  onInfoClose,
   onInfoOpen,
   onPlayerDialogue,
+  onPlayerDamage,
   onSectionResolved,
-  onVillainDialogue,
-  villainDialogue,
   projectileHit,
 }: {
-  activeInfoId: string | null;
   encounter: SectionEncounterConfig;
+  onInfoClose: () => void;
   onInfoOpen: () => void;
   onPlayerDialogue: (text: string) => void;
+  onPlayerDamage: () => void;
   onSectionResolved: (sectionId: string) => void;
-  onVillainDialogue: (sectionName: string, text: string) => void;
-  villainDialogue: (DialogueMessage & { sectionName: string }) | null;
   projectileHit: { id: string; sequence: number } | null;
 }) {
   const [villainStatus, setVillainStatus] = useState<VillainStatus>("idle");
@@ -561,30 +639,17 @@ function SectionPortalEncounter({
   const [infoPortalActive, setInfoPortalActive] = useState(false);
   const [smokeActive, setSmokeActive] = useState(false);
   const [villainVisible, setVillainVisible] = useState(true);
-  const [villainBubbleVisible, setVillainBubbleVisible] = useState(false);
   const voiceEnabled = hasVillainVoice(encounter.id);
   const lastActivatedRef = useRef(0);
   const lastInfoActivatedRef = useRef(0);
-  const wasNearDialogueRef = useRef(false);
-  const wasNearVillainRef = useRef(false);
   const wasOnVoicePlatformRef = useRef(false);
-  const villainBubbleUpdateTimerRef = useRef(0);
-  const villainDialogueTimerRef = useRef(0);
+  const touchingPlayerRef = useRef(false);
   const sectionResolvedTimerRef = useRef(0);
   const defeatedRef = useRef(false);
   useEffect(() => () => stopVillainVoice(encounter.id), [encounter.id]);
 
-  const setVillainBubbleVisibilitySoon = (visible: boolean) => {
-    window.clearTimeout(villainBubbleUpdateTimerRef.current);
-    villainBubbleUpdateTimerRef.current = window.setTimeout(() => {
-      setVillainBubbleVisible(visible);
-    }, 0);
-  };
-
   useEffect(() => {
     return () => {
-      window.clearTimeout(villainBubbleUpdateTimerRef.current);
-      window.clearTimeout(villainDialogueTimerRef.current);
       window.clearTimeout(sectionResolvedTimerRef.current);
     };
   }, []);
@@ -597,13 +662,10 @@ function SectionPortalEncounter({
     defeatedRef.current = true;
     triggerFixHaptic();
     lastActivatedRef.current = now;
-    window.clearTimeout(villainBubbleUpdateTimerRef.current);
-    window.clearTimeout(villainDialogueTimerRef.current);
     stopVillainVoice(encounter.id);
     playVillainDefeatSound();
     setPortalActive(true);
     setSmokeActive(true);
-    setVillainBubbleVisible(false);
     setVillainStatus("dead");
     onPlayerDialogue("FIXED!");
     sectionResolvedTimerRef.current = window.setTimeout(() => {
@@ -622,6 +684,11 @@ function SectionPortalEncounter({
     lastInfoActivatedRef.current = now;
     setInfoPortalActive(true);
     onInfoOpen();
+  };
+
+  const deactivateInfoPad = () => {
+    setInfoPortalActive(false);
+    onInfoClose();
   };
 
   useEffect(() => {
@@ -645,76 +712,30 @@ function SectionPortalEncounter({
     return () => window.clearTimeout(timeout);
   }, [smokeActive]);
 
-  useEffect(() => {
-    if (!infoPortalActive) return;
-
-    const timeout = window.setTimeout(() => {
-      setInfoPortalActive(false);
-    }, 1000);
-
-    return () => window.clearTimeout(timeout);
-  }, [infoPortalActive]);
-
   useFrame(() => {
-    const padDeltaX = playerWorldState.position.x - encounter.padPosition.x;
-    const padDeltaZ = playerWorldState.position.z - encounter.padPosition.z;
-    const padDistanceSq = padDeltaX * padDeltaX + padDeltaZ * padDeltaZ;
-    const infoPadDeltaX = playerWorldState.position.x - encounter.infoPadPosition.x;
-    const infoPadDeltaZ = playerWorldState.position.z - encounter.infoPadPosition.z;
-    const infoPadDistanceSq = infoPadDeltaX * infoPadDeltaX + infoPadDeltaZ * infoPadDeltaZ;
-    const villainDeltaX = playerWorldState.position.x - encounter.villainPosition.x;
-    const villainDeltaZ = playerWorldState.position.z - encounter.villainPosition.z;
-    const villainDistanceSq = villainDeltaX * villainDeltaX + villainDeltaZ * villainDeltaZ;
-    const nearDialogueArea =
-      padDistanceSq <= dialoguePadRadiusSq ||
-      infoPadDistanceSq <= dialoguePadRadiusSq ||
-      villainDistanceSq <= dialogueVillainRadiusSq;
-    const nearVillain = !defeatedRef.current && villainDistanceSq <= dialogueVillainRadiusSq;
+    const playerDeltaX = playerWorldState.position.x - encounter.villainPosition.x;
+    const playerDeltaZ = playerWorldState.position.z - encounter.villainPosition.z;
+    const touchingPlayer = !defeatedRef.current
+      && playerDeltaX * playerDeltaX + playerDeltaZ * playerDeltaZ <= mainVillainContactRadiusSq;
+    if (touchingPlayer && !touchingPlayerRef.current) onPlayerDamage();
+    touchingPlayerRef.current = touchingPlayer;
+
     const onVoicePlatform =
       voiceEnabled &&
       Math.abs(playerWorldState.position.x - encounter.platformPosition.x) <= destinationPlatformRadius &&
       Math.abs(playerWorldState.position.z - encounter.platformPosition.z) <= destinationPlatformRadius;
-
-    if (nearVillain !== wasNearVillainRef.current) {
-      setVillainBubbleVisibilitySoon(nearVillain);
-    }
 
     if (onVoicePlatform !== wasOnVoicePlatformRef.current) {
       if (onVoicePlatform && !defeatedRef.current) playVillainVoice(encounter.id);
       else stopVillainVoice(encounter.id);
     }
 
-    if (!defeatedRef.current && encounter.id !== "quick-fix" && nearDialogueArea && !wasNearDialogueRef.current) {
-      window.clearTimeout(villainDialogueTimerRef.current);
-      villainDialogueTimerRef.current = window.setTimeout(() => {
-        onVillainDialogue(encounter.name, villainDialogueText[encounter.id]);
-      }, 0);
-    }
-
-    wasNearDialogueRef.current = nearDialogueArea;
-    wasNearVillainRef.current = nearVillain;
     wasOnVoicePlatformRef.current = onVoicePlatform;
   });
 
-  const villainCharacterDialogue =
-    villainStatus === "dead"
-      ? null
-      : villainBubbleVisible
-        ? { id: 1, text: villainDialogueText[encounter.id] }
-        : villainDialogue?.sectionName === encounter.name
-          ? villainDialogue
-          : null;
-
   return (
     <group name={`PortalEncounter:${encounter.id}`}>
-      <TriggerPad label="More Info" position={encounter.infoPadPosition} active={infoPortalActive || activeInfoId === encounter.id} onActivate={activateInfoPad} />
-      {activeInfoId === encounter.id && (
-        <ServiceInfoPanel
-          text={serviceInfoText[encounter.id]}
-          title={encounter.name}
-          position={encounter.infoPadPosition}
-        />
-      )}
+      <TriggerPad label="More Info" position={encounter.infoPadPosition} active={infoPortalActive} onActivate={activateInfoPad} onDeactivate={deactivateInfoPad} />
       {smokeActive && (
         <>
           <FireBurstEffect position={encounter.villainPosition} />
@@ -724,7 +745,7 @@ function SectionPortalEncounter({
       {villainVisible && (
         <VillainCharacter
           basePosition={encounter.villainPosition}
-          dialogue={villainCharacterDialogue}
+          dialogue={null}
           villainStatus={villainStatus}
         />
       )}
@@ -963,10 +984,11 @@ type TriggerPadProps = {
   active: boolean;
   label?: string;
   onActivate: () => void;
+  onDeactivate?: () => void;
   position: Vector3;
 };
 
-export function TriggerPad({ active, label, onActivate, position }: TriggerPadProps) {
+export function TriggerPad({ active, label, onActivate, onDeactivate, position }: TriggerPadProps) {
   const { pulseRef, ringRef } = useTriggerPadVisuals(active, fixPadVisualConfig);
   const playerInsideRef = useRef(false);
   const lastTriggeredAtRef = useRef(-Infinity);
@@ -988,6 +1010,7 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
   const handleExit = (event: IntersectionExitPayload) => {
     if (!isPlayerEvent(event)) return;
     playerInsideRef.current = false;
+    onDeactivate?.();
   };
 
   return (
@@ -1000,7 +1023,7 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
         onIntersectionExit={handleExit}
       />
       <mesh ref={ringRef} geometry={fixRingGeometry} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} dispose={null}>
-        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.66} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.5} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh ref={pulseRef} geometry={fixPulseGeometry} rotation-x={-Math.PI / 2} position={[0, 0.05, 0]} visible={false} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
@@ -1015,74 +1038,6 @@ export function TriggerPad({ active, label, onActivate, position }: TriggerPadPr
           {label}
         </BillboardLabel>
       )}
-    </group>
-  );
-}
-
-function ServiceInfoPanel({
-  position,
-  text,
-  title,
-}: {
-  position: Vector3;
-  text: string;
-  title: string;
-}) {
-  const panelRef = useRef<Group>(null);
-  const panelWidth = 6;
-  const panelHeight = 3.65;
-
-  useFrame(({ camera }) => {
-    if (!panelRef.current) return;
-    panelRef.current.rotation.y = Math.atan2(
-      camera.position.x - position.x,
-      camera.position.z - position.z,
-    );
-  });
-
-  return (
-    <group
-      ref={panelRef}
-      position={[position.x, position.y + triggerPopupLayout.panelCenterOffset, position.z]}
-    >
-      <mesh position={[0, 0, -0.07]}>
-        <planeGeometry args={[panelWidth, panelHeight]} />
-        <meshBasicMaterial color="#000000" transparent opacity={0.94} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <mesh position={[0, -0.08, -0.06]}>
-        <planeGeometry args={[5.55, 2.95]} />
-        <meshBasicMaterial color="#000000" transparent opacity={0.72} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <mesh position={[0, 1.27, -0.05]}>
-        <planeGeometry args={[5.75, 0.72]} />
-        <meshBasicMaterial color="#05070b" transparent opacity={0.54} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <mesh position={[0, -1.28, -0.05]}>
-        <planeGeometry args={[5.75, 0.72]} />
-        <meshBasicMaterial color="#000000" transparent opacity={0.42} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <mesh position={[0, panelHeight / 2 + 0.035, -0.04]}>
-        <boxGeometry args={[panelWidth + 0.03, 0.035, 0.035]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.28} toneMapped={false} />
-      </mesh>
-      <mesh position={[0, -panelHeight / 2 - 0.035, -0.04]}>
-        <boxGeometry args={[panelWidth + 0.03, 0.035, 0.035]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.16} toneMapped={false} />
-      </mesh>
-      <mesh position={[-panelWidth / 2 - 0.02, 0, -0.04]}>
-        <boxGeometry args={[0.035, panelHeight, 0.035]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.18} toneMapped={false} />
-      </mesh>
-      <mesh position={[panelWidth / 2 + 0.02, 0, -0.04]}>
-        <boxGeometry args={[0.035, panelHeight, 0.035]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.18} toneMapped={false} />
-      </mesh>
-      <Text color="#ffffff" font={gameTextFont} fontSize={0.3} anchorX="center" anchorY="middle" position={[0, 1.18, 0]} maxWidth={5.1}>
-        {title}
-      </Text>
-      <Text color="#ffffff" font={gameTextFont} fontSize={0.17} anchorX="center" anchorY="middle" position={[0, -0.3, 0]} maxWidth={4.95} lineHeight={1.35}>
-        {text}
-      </Text>
     </group>
   );
 }

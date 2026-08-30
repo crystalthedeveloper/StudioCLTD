@@ -26,6 +26,7 @@ const maxFrameDelta = 1 / 30;
 const groundedRayDistance = 1.16;
 
 type CharacterControllerProps = {
+  damageFlashUntil: number;
   dialogue: DialogueMessage | null;
   movementLocked: boolean;
   onFixedAnimationComplete: () => void;
@@ -35,6 +36,7 @@ type CharacterControllerProps = {
 };
 
 export function CharacterController({
+  damageFlashUntil,
   dialogue,
   movementLocked,
   onFixedAnimationComplete,
@@ -219,6 +221,7 @@ export function CharacterController({
         <CapsuleCollider args={[0.65, 0.38]} friction={0} restitution={0} />
         <PlayerCharacter
           animationStateRef={animationStateRef}
+          damageFlashUntil={damageFlashUntil}
           dialogue={dialogue}
           onShootAnimationComplete={onFixedAnimationComplete}
           shootRequest={shootRequest}

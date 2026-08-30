@@ -13,17 +13,19 @@ type ThirdPersonCameraProps = {
 };
 
 const cameraSettings = {
-  distance: 7.6,
-  height: 2,
+  distance: 4.35,
+  height: 0.02,
   targetHeight: 1.45,
-  pitch: -0.24,
+  pitch: -0.04,
+  shoulderOffset: 0.5,
+  framingLookOffset: 0.06,
   minPitch: MathUtils.degToRad(-35),
   maxPitch: MathUtils.degToRad(55),
-  lookAtDamping: 12,
-  pitchDamping: 12,
-  targetDamping: 20,
-  yawDamping: 10,
-  yawFollowDamping: 5.8,
+  lookAtDamping: 9,
+  pitchDamping: 9,
+  targetDamping: 10,
+  yawDamping: 7,
+  yawFollowDamping: 4.8,
 };
 
 const cameraTarget = new Vector3();
@@ -91,11 +93,12 @@ export function ThirdPersonCamera({
     const verticalOffset = cameraSettings.height + Math.sin(pitch) * cameraDistance;
 
     desiredPosition.set(
-      smoothedCameraTarget.x + Math.sin(yaw) * horizontalDistance,
+      smoothedCameraTarget.x + Math.sin(yaw) * horizontalDistance + Math.cos(yaw) * cameraSettings.shoulderOffset,
       smoothedCameraTarget.y + verticalOffset,
-      smoothedCameraTarget.z + Math.cos(yaw) * horizontalDistance
+      smoothedCameraTarget.z + Math.cos(yaw) * horizontalDistance - Math.sin(yaw) * cameraSettings.shoulderOffset
     );
     lookAt.copy(cameraTarget);
+    lookAt.y += cameraSettings.framingLookOffset;
     smoothedLookAt.lerp(lookAt, 1 - Math.exp(-frameDelta * cameraSettings.lookAtDamping));
 
     camera.position.copy(desiredPosition);

@@ -12,6 +12,7 @@ import {
 import { applyNaturalMaterials } from "../characters/naturalMaterials";
 import { DialogueBubble, DialogueMessage } from "../ui/DialogueBubble";
 import { playerWorldState } from "../world/playerWorldState";
+import { hideVillainMask } from "./hideVillainMask";
 
 export type VillainStatus = "idle" | "running" | "dead";
 
@@ -52,7 +53,11 @@ function fadeOutOtherActions(actions: Record<string, AnimationAction | null>, ac
 
 export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "danger", villainStatus }: VillainCharacterProps) {
   const model = useGLTF("/characters/char-optimized.glb", false, true);
-  const scene = useMemo(() => SkeletonUtils.clone(model.scene), [model.scene]);
+  const scene = useMemo(() => {
+    const villainScene = SkeletonUtils.clone(model.scene);
+    hideVillainMask(villainScene);
+    return villainScene;
+  }, [model.scene]);
   const rootRef = useRef<Group>(null);
   const modelRef = useRef<Group>(null);
   const frozenDeathYawRef = useRef<number | null>(null);

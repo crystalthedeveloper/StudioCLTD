@@ -1,5 +1,5 @@
 export const padVisualStyle = {
-  color: "#ffffff",
-  emissiveIntensity: 0.62,
-  labelColor: "#ffffff",
+  color: "#c7ced3",
+  emissiveIntensity: 0.3,
+  labelColor: "#c3cbd0",
 } as const;

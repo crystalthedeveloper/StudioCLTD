@@ -20,10 +20,12 @@ type ModularTerrainProps = {
   radius: number;
 };
 
-const concreteTexturePath = "/images/optimized/floor/world-weathered-concrete-seamless.webp";
-const concreteBumpTexturePath = "/images/optimized/floor/world-weathered-concrete-bump.webp";
-const concreteRoughnessTexturePath = "/images/optimized/floor/world-weathered-concrete-roughness.webp";
-const concreteNormalTexturePath = "/images/optimized/floor/world-weathered-concrete-normal.webp";
+export const concreteTexturePaths: string[] = [
+  "/images/optimized/floor/world-weathered-concrete-seamless.webp",
+  "/images/optimized/floor/world-weathered-concrete-bump.webp",
+  "/images/optimized/floor/world-weathered-concrete-roughness.webp",
+  "/images/optimized/floor/world-weathered-concrete-normal.webp",
+];
 const concreteNormalScale = new Vector2(0.82, 0.82);
 const rampThickness = 0.36;
 // Box surfaces retain this shared world-space scale. The main ground plane uses
@@ -38,6 +40,33 @@ function configureFloorTexture(texture: Texture, repeat: number) {
   texture.minFilter = LinearMipmapLinearFilter;
   texture.magFilter = LinearFilter;
   texture.generateMipmaps = true;
+  texture.anisotropy = 4;
+  texture.needsUpdate = true;
+}
+
+type ConcreteTextures = Texture[];
+
+export function configureConcreteTextures(textures: ConcreteTextures) {
+  textures.forEach((texture) => configureFloorTexture(texture, 1 / concreteTextureWorldSize));
+  textures[0].colorSpace = SRGBColorSpace;
+  textures[1].colorSpace = NoColorSpace;
+  textures[2].colorSpace = NoColorSpace;
+  textures[3].colorSpace = NoColorSpace;
+}
+
+export function createConcreteMaterial(textures: ConcreteTextures, color: string) {
+  return new MeshStandardMaterial({
+    bumpMap: textures[1],
+    bumpScale: 0.06,
+    color,
+    envMapIntensity: 0.22,
+    map: textures[0],
+    metalness: 0.01,
+    normalMap: textures[3],
+    normalScale: concreteNormalScale,
+    roughness: 1,
+    roughnessMap: textures[2],
+  });
 }
 
 function applyWorldScaleBoxUvs(geometry: BufferGeometry, offsetX = 0, offsetZ = 0) {
@@ -66,7 +95,7 @@ function applyWorldScaleBoxUvs(geometry: BufferGeometry, offsetX = 0, offsetZ = 
   return geometry;
 }
 
-function createConcreteBoxGeometry(width: number, height: number, depth: number, offsetX = 0, offsetZ = 0) {
+export function createConcreteBoxGeometry(width: number, height: number, depth: number, offsetX = 0, offsetZ = 0) {
   return applyWorldScaleBoxUvs(new BoxGeometry(width, height, depth), offsetX, offsetZ);
 }
 
@@ -87,34 +116,14 @@ function createConcreteFloorGeometry(size: number) {
 
 export function ModularTerrain({ radius }: ModularTerrainProps) {
   const platformSize = radius * 20 + 10;
-  const [concreteMap, concreteBumpMap, concreteRoughnessMap, concreteNormalMap] = useTexture([
-    concreteTexturePath,
-    concreteBumpTexturePath,
-    concreteRoughnessTexturePath,
-    concreteNormalTexturePath,
-  ]);
-  const textureRepeat = 1 / concreteTextureWorldSize;
+  const concreteTextures = useTexture(concreteTexturePaths);
   const floorGeometry = useMemo(() => createConcreteFloorGeometry(platformSize), [platformSize]);
 
-  [concreteMap, concreteBumpMap, concreteRoughnessMap, concreteNormalMap].forEach((texture) => {
-    configureFloorTexture(texture, textureRepeat);
-  });
-  concreteMap.colorSpace = SRGBColorSpace;
-  concreteBumpMap.colorSpace = NoColorSpace;
-  concreteRoughnessMap.colorSpace = NoColorSpace;
-  concreteNormalMap.colorSpace = NoColorSpace;
-  const terrainMaterial = useMemo(() => new MeshStandardMaterial({
-    bumpMap: concreteBumpMap,
-    bumpScale: 0.06,
-    color: "#46515d",
-    envMapIntensity: 0.22,
-    map: concreteMap,
-    metalness: 0.01,
-    normalMap: concreteNormalMap,
-    normalScale: concreteNormalScale,
-    roughness: 1,
-    roughnessMap: concreteRoughnessMap,
-  }), [concreteBumpMap, concreteMap, concreteNormalMap, concreteRoughnessMap]);
+  configureConcreteTextures(concreteTextures);
+  const terrainMaterial = useMemo(
+    () => createConcreteMaterial(concreteTextures, "#46515d"),
+    [concreteTextures],
+  );
   const floorMaterial = useMemo(() => {
     const material = terrainMaterial.clone();
     material.color.set("#3f4953");

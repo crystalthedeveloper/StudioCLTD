@@ -21,8 +21,10 @@ import { isPlayerObject } from "../playerCollision";
 import { padVisualStyle } from "../padVisualStyle";
 import { triggerPopupLayout } from "../triggerPopupLayout";
 import { portalPulseGeometry, portalRingGeometry, useTriggerPadVisuals } from "../useTriggerPadVisuals";
+import { serviceInfoText } from "../serviceInfo";
 
 type HubSectionsProps = {
+  activeServiceInfoId: string | null;
   onSectionTrigger: (sectionId: string, triggerId: string) => void;
   restartKey: number | string;
   serviceResolutions: Record<string, boolean>;
@@ -53,6 +55,7 @@ const white = "#f5f7fb";
 const screenImageTint = "#f0f0f0";
 const screenIdleColor = "#0b1018";
 const screenContentScale = 1.1;
+const screenViewingHeight = 4.3;
 const screenContentSize: [number, number] = [9.05 * screenContentScale, 4.62 * screenContentScale];
 const screenContentAspect = screenContentSize[0] / screenContentSize[1];
 const screenContentGeometry = new PlaneGeometry(...screenContentSize);
@@ -344,7 +347,7 @@ function getWebsiteVideoTexture(video: HTMLVideoElement) {
   return websiteVideoTexture;
 }
 
-export function HubSections({ onSectionTrigger, restartKey, serviceResolutions }: HubSectionsProps) {
+export function HubSections({ activeServiceInfoId, onSectionTrigger, restartKey, serviceResolutions }: HubSectionsProps) {
   const displayTimersRef = useRef<Record<string, number>>({});
   const [activeSimpleDisplays, setActiveSimpleDisplays] = useState<Record<string, string>>({});
   const [billboardScale, setBillboardScale] = useState(1);
@@ -432,6 +435,7 @@ export function HubSections({ onSectionTrigger, restartKey, serviceResolutions }
     <group name="HubSections">
       {hubSections.slice(0, visibleSectionCount).map((section) => (
         <HubSectionDistrict
+          activeServiceInfoId={activeServiceInfoId}
           key={`${section.id}:${restartKey}`}
           billboardScale={billboardScale}
           billboardYOffset={billboardYOffset}
@@ -460,6 +464,7 @@ export function HubSections({ onSectionTrigger, restartKey, serviceResolutions }
 }
 
 function HubSectionDistrict({
+  activeServiceInfoId,
   activeSimpleDisplays,
   billboardScale,
   billboardYOffset,
@@ -472,6 +477,7 @@ function HubSectionDistrict({
   selectedOffer,
   showcaseVideoState,
 }: {
+  activeServiceInfoId: string | null;
   activeSimpleDisplays: Record<string, string>;
   billboardScale: number;
   billboardYOffset: number;
@@ -491,6 +497,7 @@ function HubSectionDistrict({
   return (
     <group name={`HubSection:${section.id}`} position={section.position} rotation-y={rotation}>
       <SectionBillboard
+        activeServiceInfoId={activeServiceInfoId}
         activeSimpleDisplays={activeSimpleDisplays}
         billboardScale={billboardScale}
         billboardYOffset={billboardYOffset}
@@ -524,6 +531,7 @@ function HubSectionDistrict({
 }
 
 function SectionBillboard({
+  activeServiceInfoId,
   activeSimpleDisplays,
   billboardScale,
   billboardYOffset,
@@ -532,6 +540,7 @@ function SectionBillboard({
   selectedOffer,
   showcaseVideoState,
 }: {
+  activeServiceInfoId: string | null;
   activeSimpleDisplays: Record<string, string>;
   billboardScale: number;
   billboardYOffset: number;
@@ -547,7 +556,7 @@ function SectionBillboard({
   const isShowcase = section.id === "showcase";
 
   return (
-    <group name={`Billboard:${section.id}`} position={[0, 4.8, 0]}>
+    <group name={`Billboard:${section.id}`} position={[0, screenViewingHeight, 0]}>
       <RigidBody type="fixed" colliders={false} position={[0, billboardYOffset, 0]}>
         <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
       </RigidBody>
@@ -588,7 +597,11 @@ function SectionBillboard({
       ) : simpleDisplay || section.id === "value" ? (
         <SimpleDisplayScreen imagePath={selectedSimpleDisplayPath} />
       ) : isServiceSection ? (
-        <ServiceScreenContent resolved={Boolean(serviceResolutions[section.id])} section={section} />
+        activeServiceInfoId === section.id ? (
+          <ServiceInfoScreen section={section} />
+        ) : (
+          <ServiceScreenContent resolved={Boolean(serviceResolutions[section.id])} section={section} />
+        )
       ) : isShowcase ? (
         <ShowcaseScreenContent isPlaying={showcaseVideoState.playing} />
       ) : (
@@ -672,6 +685,32 @@ function ServiceScreenContent({ resolved, section }: { resolved: boolean; sectio
   if (!images) return null;
 
   return <ServiceImageScreen badImage={images.bad} goodImage={images.good} resolved={resolved} />;
+}
+
+function ServiceInfoScreen({ section }: { section: HubSection }) {
+  return (
+    <group name={`ServiceInfoScreen:${section.id}`}>
+      <mesh geometry={screenContentGeometry} position={[0, -0.03, -0.2]} renderOrder={20} dispose={null}>
+        <meshBasicMaterial color="#05070b" depthTest={false} side={DoubleSide} toneMapped={false} />
+      </mesh>
+      <Text
+        color="#ffffff"
+        font={gameTextFont}
+        fontSize={0.32}
+        anchorX="center"
+        anchorY="middle"
+        position={[0, -0.12, -0.4]}
+        maxWidth={8.4}
+        lineHeight={1.3}
+        renderOrder={21}
+        material-depthTest={false}
+        material-depthWrite={false}
+        material-toneMapped={false}
+      >
+        {serviceInfoText[section.id]}
+      </Text>
+    </group>
+  );
 }
 
 function ServiceImageScreen({
@@ -916,7 +955,7 @@ export function HomeBaseVideoScreen() {
 
   return (
     <group name="HomeBaseVideoScreen">
-      <group position={[0, 4.8, 7]} rotation-y={Math.PI}>
+      <group position={[0, screenViewingHeight, 7]} rotation-y={Math.PI}>
         <RigidBody type="fixed" colliders={false} position={[0, billboardYOffset, 0]}>
           <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
         </RigidBody>
@@ -1158,7 +1197,7 @@ function OfferPortalPad({
         onIntersectionExit={handleExit}
       />
       <mesh ref={ringRef} geometry={portalRingGeometry} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]} dispose={null}>
-        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.68} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.5} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh ref={pulseRef} geometry={portalPulseGeometry} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
@@ -1246,7 +1285,7 @@ function ShowcasePortalPad({
         onIntersectionExit={handleExit}
       />
       <mesh ref={ringRef} geometry={portalRingGeometry} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]} dispose={null}>
-        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.7} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.52} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh ref={pulseRef} geometry={portalPulseGeometry} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />

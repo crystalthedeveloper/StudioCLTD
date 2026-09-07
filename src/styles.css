@@ -1,3 +1,37 @@
+.studio-button {
+  border-radius: 0;
+}
+
+/* Shared StudioCLTD button appearance. Location classes only size/position controls.
+   Backdrop buttons are invisible dialog dismissal hit areas, not visible controls. */
+.studio-button:not(.studio-button--backdrop) {
+  box-sizing: border-box;
+  appearance: none;
+  border: 1px solid #333333;
+  background: #000000;
+  color: #FFD60A;
+  font-family: inherit;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.studio-button:not(.studio-button--backdrop):not(:disabled):is(:hover, :active, [aria-pressed="true"]) {
+  background: #FFD60A;
+  color: #000000;
+}
+.studio-button:not(.studio-button--backdrop):focus-visible {
+  outline: 2px solid #FFD60A;
+  outline-offset: 4px;
+}
+.studio-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 html,
 body,
 #root {
@@ -90,11 +124,6 @@ canvas {
   position: absolute;
   top: 10px;
   right: 12px;
-  border: 0;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.68);
-  cursor: pointer;
-  font: inherit;
   font-size: 26px;
   line-height: 1;
 }
@@ -126,17 +155,8 @@ canvas {
 
 .share-screen__primary,
 .share-screen__options a {
-  box-sizing: border-box;
-  border: 1px solid rgba(168, 85, 247, 0.52);
-  border-radius: 7px;
-  background: rgba(168, 85, 247, 0.12);
-  color: #f8f4ff;
-  cursor: pointer;
-  font: inherit;
   font-size: 13px;
   font-weight: 750;
-  text-decoration: none;
-  touch-action: manipulation;
 }
 
 .share-screen__primary {
@@ -145,9 +165,6 @@ canvas {
 
 .share-screen__native {
   display: none;
-  border-color: #a855f7;
-  background: #a855f7;
-  color: #100617;
 }
 
 .share-screen__options {
@@ -158,15 +175,6 @@ canvas {
 
 .share-screen__options a {
   padding: 10px 6px;
-}
-
-.share-screen__primary:hover,
-.share-screen__primary:focus-visible,
-.share-screen__options a:hover,
-.share-screen__options a:focus-visible {
-  border-color: #c084fc;
-  background: rgba(168, 85, 247, 0.24);
-  outline: none;
 }
 
 @media (pointer: coarse), (max-width: 700px) {
@@ -196,18 +204,9 @@ canvas {
 .studio-launch__button {
   min-width: 220px;
   padding: 14px 28px;
-  border: 1px solid rgba(255, 230, 0, 0.48);
-  background: rgba(7, 9, 14, 0.82);
-  color: #FFE600;
-  cursor: pointer;
-  font: inherit;
   font-size: 18px;
   font-weight: 800;
   letter-spacing: 0;
-}
-
-.studio-launch__button:hover {
-  background: rgba(255, 230, 0, 0.12);
 }
 
 .dialogue-bubble {
@@ -267,6 +266,8 @@ canvas {
 }
 
 .game-shell {
+  position: relative;
+  isolation: isolate;
   width: 100%;
   height: 100%;
   cursor: auto;
@@ -340,54 +341,44 @@ canvas {
   transform: translate(-50%, -50%);
 }
 
-.game-focus-hint {
+.game-pause-overlay {
   position: fixed;
-  left: 50%;
-  top: 64px;
-  z-index: 25;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 148px;
-  padding: 9px 14px;
-  border: 1px solid rgba(245, 247, 251, 0.18);
-  background: rgba(4, 6, 12, 0.64);
-  color: #ffffff;
-  opacity: 0;
-  pointer-events: none;
+  inset: 0;
+  z-index: 70;
+  background: rgba(2, 4, 10, 0.58);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.game-pause-overlay__content {
+  position: relative;
   text-align: center;
-  transform: translateX(-50%) translateY(-8px);
-  transition: opacity 160ms ease, transform 160ms ease;
 }
 
-.game-focus-hint--visible {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
+.game-focus-hint {
+  min-width: min(280px, 80vw);
+  min-height: 76px;
+  padding: 20px 32px;
+  font-size: clamp(24px, 4vw, 32px);
 }
 
-.game-focus-hint strong {
+.game-pause-overlay__content p {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  margin: 16px 0 0;
+  color: rgba(255, 255, 255, 0.8);
   font-size: 14px;
-  font-weight: 700;
-}
-
-.game-focus-hint span {
-  color: #ffffff;
-  font-size: 11px;
 }
 
 .showcase-play-fallback {
   min-width: 170px;
   padding: 12px 18px;
-  border: 1px solid rgba(250, 204, 21, 0.72);
-  border-radius: 8px;
-  background: rgba(5, 7, 12, 0.94);
-  box-shadow: 0 0 24px rgba(250, 204, 21, 0.2);
-  color: #facc15;
-  cursor: pointer;
-  font: inherit;
   font-size: 14px;
   font-weight: 800;
-  touch-action: manipulation;
   white-space: nowrap;
 }
 
@@ -437,7 +428,6 @@ canvas {
   min-height: 0 !important;
   padding: 0 !important;
   border: 0 !important;
-  border-radius: 0 !important;
   background: rgba(2, 3, 8, 0.76) !important;
   backdrop-filter: blur(7px);
   clip-path: none !important;
@@ -466,11 +456,6 @@ canvas {
   height: 34px !important;
   min-height: 34px !important;
   padding: 0 !important;
-  border: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  clip-path: none !important;
-  color: rgba(255, 255, 255, 0.72) !important;
   font-size: 24px !important;
 }
 
@@ -541,15 +526,6 @@ canvas {
 }
 
 .game-hud button {
-  box-sizing: border-box;
-  border: 1px solid rgba(137, 170, 188, 0.34);
-  border-radius: 5px;
-  background: rgba(5, 9, 16, 0.86);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.025);
-  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
-}
-
-.game-hud button {
   display: grid;
   place-items: center;
   width: 100%;
@@ -557,14 +533,9 @@ canvas {
   height: clamp(44px, 6vmin, 58px);
   min-height: 44px;
   padding: clamp(8px, 1.2vmin, 11px);
-  color: rgba(247, 249, 252, 0.94);
-  cursor: pointer;
-  font: inherit;
   font-size: clamp(10px, 1.5vw, 12px);
-  font-weight: 700;
   line-height: 1;
   pointer-events: auto;
-  touch-action: manipulation;
 }
 
 .game-hud button svg {
@@ -581,13 +552,6 @@ canvas {
   display: block;
   font-size: clamp(19px, 2.5vmin, 25px);
   line-height: 1;
-}
-
-.game-hud button:hover,
-.game-hud button:focus-visible {
-  border-color: rgba(245, 247, 251, 0.44);
-  background: rgba(14, 18, 28, 0.82);
-  outline: none;
 }
 
 .loading-screen {
@@ -652,19 +616,10 @@ canvas {
   width: 100%;
   height: 100%;
   padding: 0;
-  border: 1px solid rgba(245, 247, 251, 0.42);
-  border-radius: 12px;
-  background: rgba(4, 7, 13, 0.8);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.38), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.94);
-  cursor: pointer;
-  font: inherit;
   font-size: clamp(26px, 3.6vw, 34px);
   line-height: 1;
   pointer-events: auto;
   touch-action: none;
-  transition: border-color 100ms ease, background 100ms ease, box-shadow 100ms ease, color 100ms ease, transform 100ms ease;
-  -webkit-tap-highlight-color: transparent;
 }
 
 .direction-controls__button--forward {
@@ -697,14 +652,6 @@ canvas {
   grid-row: 2;
 }
 
-.direction-controls__button--pressed {
-  border-color: rgba(255, 230, 0, 0.94);
-  background: rgba(255, 230, 0, 0.24);
-  box-shadow: 0 0 22px rgba(255, 230, 0, 0.24), inset 0 0 0 1px rgba(255, 230, 0, 0.16);
-  color: #ffe600;
-  transform: scale(0.94);
-}
-
 .game-hud {
   left: auto;
   right: max(14px, env(safe-area-inset-right));
@@ -728,8 +675,6 @@ canvas {
 .game-hud__shoot {
   display: flex !important;
   gap: 3px;
-  border-color: rgba(250, 204, 21, 0.58) !important;
-  color: #facc15 !important;
 }
 
 .game-hud__shoot span {
@@ -739,12 +684,6 @@ canvas {
 .game-hud__shoot small {
   font-size: 8px;
   font-weight: 900;
-}
-
-.game-hud__shoot--pressed {
-  background: rgba(250, 204, 21, 0.28) !important;
-  box-shadow: 0 0 20px rgba(250, 204, 21, 0.3) !important;
-  transform: scale(0.95);
 }
 
 .game-hud__meter-track {
@@ -793,7 +732,7 @@ canvas {
   position: absolute;
   top: 3px;
   right: 4px;
-  color: rgba(255, 255, 255, 0.62);
+  color: inherit;
   font-size: 7px;
   font-weight: 700;
   line-height: 1;
@@ -914,7 +853,7 @@ body aside.game-hud .game-hud__left .game-hud__sound-button--speaking {
 }
 
 body aside.game-hud .game-hud__left .game-hud__sound-label {
-  color: rgba(247, 249, 252, 0.88);
+  color: inherit;
   font-size: 9px;
   font-weight: 800;
   line-height: 1;
@@ -936,12 +875,9 @@ body aside.game-hud .game-hud__left .game-hud__speed-meter {
   padding: 0 9px;
 }
 
-body aside.game-hud .game-hud__left button,
 body aside.game-hud .game-hud__left .game-hud__health,
 body aside.game-hud .game-hud__left .game-hud__stat,
-body aside.game-hud .game-hud__left .game-hud__speed-meter,
-body aside.game-hud .game-hud__bottom .direction-controls__button,
-body aside.game-hud .game-hud__bottom .game-hud__shoot {
+body aside.game-hud .game-hud__left .game-hud__speed-meter {
   box-sizing: border-box;
   border: 0;
   border-radius: 7px;
@@ -950,22 +886,6 @@ body aside.game-hud .game-hud__bottom .game-hud__shoot {
   clip-path: none;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-}
-
-body aside.game-hud .game-hud__left button:hover,
-body aside.game-hud .game-hud__left button:focus-visible,
-body aside.game-hud .game-hud__bottom .direction-controls__button:hover,
-body aside.game-hud .game-hud__bottom .direction-controls__button:focus-visible {
-  border: 0;
-  background: rgba(20, 27, 38, 0.68);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-}
-
-body aside.game-hud .game-hud__bottom .direction-controls__button--pressed {
-  border: 0;
-  background: rgba(116, 96, 15, 0.62);
-  box-shadow: 0 0 18px rgba(250, 204, 21, 0.18), inset 0 1px 0 rgba(255, 238, 154, 0.14);
-  color: #facc15;
 }
 
 body aside.game-hud .game-hud__left .game-hud__stat {
@@ -1074,24 +994,6 @@ body aside.game-hud .game-hud__bottom .game-hud__shoot {
   min-height: 42px;
   align-self: end;
   padding: 4px;
-  background: rgba(7, 12, 20, 0.58);
-  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  color: rgba(247, 249, 252, 0.94) !important;
-  transform: none;
-}
-
-body aside.game-hud .game-hud__bottom .game-hud__shoot:hover,
-body aside.game-hud .game-hud__bottom .game-hud__shoot:focus-visible {
-  border: 0;
-  background: rgba(20, 27, 38, 0.68);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-}
-
-body aside.game-hud .game-hud__bottom .game-hud__shoot--pressed {
-  background: rgba(116, 96, 15, 0.72) !important;
-  box-shadow: 0 0 20px rgba(250, 204, 21, 0.24), inset 0 1px 0 rgba(255, 238, 154, 0.16) !important;
-  color: #facc15 !important;
-  transform: scale(0.95);
 }
 
 @media (max-width: 700px) {
@@ -1204,4 +1106,21 @@ body aside.game-hud .game-hud__bottom .game-hud__shoot--pressed {
     min-height: 38px;
     padding: 0 5px;
   }
+}
+
+.game-paused .game-shell *,
+.game-paused .game-shell *::before,
+.game-paused .game-shell *::after {
+  animation-play-state: paused !important;
+}
+
+/* A brief confirmation at the existing aim point; simulation time freezes it on pause. */
+.aim-crosshair--hit {
+  border-color: #FFD60A;
+  box-shadow: 0 0 8px rgba(255, 214, 10, 0.65);
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.6);
+}
+.aim-crosshair--hit .aim-crosshair__mark {
+  background: #FFD60A;
 }

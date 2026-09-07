@@ -1,6 +1,9 @@
-import { useAnimations, useGLTF } from "@react-three/drei";
-import { useFrame } from "@react-three/fiber";
-import { MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
+import { useGameFrame } from "./useGameFrame";
+import { useGameAnimations } from "./useGameFrame";
+import { gameNow } from "./gameFocus";
+import { gameTimers } from "./gameFocus";
+import { useGLTF } from "@react-three/drei";
+import { MutableRefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimationAction, Group, LoopOnce, LoopRepeat, Material, Mesh, Object3D, PointLight } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import {
@@ -17,7 +20,6 @@ type PlayerCharacterProps = {
   animationStateRef: MutableRefObject<CharacterAnimationState>;
   damageFlashUntil: number;
   dialogue: DialogueMessage | null;
-  onShootAnimationComplete: () => void;
   shootRequest: number;
   yawRef: MutableRefObject<number>;
 };
@@ -47,7 +49,6 @@ export function PlayerCharacter({
   animationStateRef,
   damageFlashUntil,
   dialogue,
-  onShootAnimationComplete,
   shootRequest,
   yawRef,
 }: PlayerCharacterProps) {
@@ -55,7 +56,7 @@ export function PlayerCharacter({
   const scene = useMemo(() => SkeletonUtils.clone(model.scene), [model.scene]);
   const group = useRef<Group>(null);
   const playerFillLightRef = useRef<PointLight>(null);
-  const { actions } = useAnimations(model.animations, group);
+  const { actions } = useGameAnimations(model.animations, group, "idleH");
   const shootActionRef = useRef<AnimationAction | null>(null);
   const shootRequestRef = useRef(0);
   const activeLocomotionStateRef = useRef<CharacterAnimationState | null>(null);
@@ -152,9 +153,11 @@ export function PlayerCharacter({
     action.reset().fadeIn(0.16).play();
   };
 
-  useEffect(() => {
-    activeLocomotionStateRef.current = null;
-    playLocomotionAction(animationStateRef.current);
+  useLayoutEffect(() => {
+    const idle = actions.idleH;
+    if (!idle) return;
+    activeLocomotionStateRef.current = "idle";
+    idle.reset().setLoop(LoopRepeat, Infinity).setEffectiveWeight(1).play();
   }, [actions]);
 
   useEffect(() => {
@@ -163,7 +166,6 @@ export function PlayerCharacter({
 
     const action = actions.shoot;
     if (!action) {
-      onShootAnimationComplete();
       return;
     }
 
@@ -198,20 +200,19 @@ export function PlayerCharacter({
         playLocomotionAction(nextState);
       }
       mixer.removeEventListener("finished", handleFinished);
-      onShootAnimationComplete();
     };
     const handleFinished = (event: { action: AnimationAction }) => {
       if (event.action === action) completeShoot();
     };
     mixer.addEventListener("finished", handleFinished);
-    const fallbackTimer = window.setTimeout(completeShoot, Math.max(700, action.getClip().duration * 1000 + 180));
+    const fallbackTimer = gameTimers.setTimeout(completeShoot, 140);
     return () => {
       mixer.removeEventListener("finished", handleFinished);
-      window.clearTimeout(fallbackTimer);
+      gameTimers.clearTimeout(fallbackTimer);
     };
-  }, [actions, onShootAnimationComplete, shootRequest]);
+  }, [actions, shootRequest]);
 
-  useFrame(() => {
+  useGameFrame(() => {
     if (!group.current) return;
 
     playLocomotionAction(animationStateRef.current);
@@ -220,7 +221,7 @@ export function PlayerCharacter({
     group.current.position.y = -1.05;
     group.current.rotation.z = 0;
     group.current.rotation.x = 0;
-    scene.visible = performance.now() >= damageFlashUntil || Math.floor(performance.now() / 90) % 2 === 0;
+    scene.visible = gameNow() >= damageFlashUntil || Math.floor(gameNow() / 90) % 2 === 0;
   });
 
   useEffect(() => () => {
@@ -228,11 +229,11 @@ export function PlayerCharacter({
   }, [scene]);
 
   return (
-    <group ref={group}>
+    <group ref={group} position={[0, -1.05, 0]}>
       <pointLight
         ref={playerFillLightRef}
         color="#fff4e8"
-        intensity={12}
+        intensity={8}
         distance={8}
         decay={2}
         position={[1.6, 3, 2.3]}

@@ -1,16 +1,19 @@
+import { useGameFrame } from "./player/useGameFrame";
+import { fireFixShot, isFixHeld, lastFixHitAt, resetFixShooter, setFixHeld, subscribeFixInput, subscribeFixShot } from "./player/fixShooter";
+import { gameNow } from "./player/gameFocus";
 import { Canvas } from "@react-three/fiber";
 import { useProgress } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 import { ACESFilmicToneMapping, MathUtils, PCFSoftShadowMap, SRGBColorSpace } from "three";
 import { isTouchControlsCameraInputBlocked } from "./player/cameraInputGuard";
-import { setGameFocused, useGameFocus } from "./player/gameFocus";
+import { isGameFocused, subscribeGameFocus, setGameFocused, useGameFocus } from "./player/gameFocus";
 import { HubOverlay } from "./ui/HubOverlay";
 import { GameHud } from "./ui/GameHud";
 import { ShareWebsiteScreen } from "./ui/ShareWebsiteScreen";
 import { triggerTrophyHaptic } from "./ui/haptics";
 import { StudioWorld } from "./world/StudioWorld";
-import { preloadScreenTextures, unlockShowcaseVideoPlayback } from "./world/systems/HubSections";
+import { preloadScreenTextures } from "./world/systems/HubSections";
 import { distanceFog } from "./world/distanceFog";
 import { crosshairViewportY } from "./world/aiming";
 
@@ -24,6 +27,8 @@ type StudioExperienceProps = {
 
 export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRestart, restartKey }: StudioExperienceProps) {
   const gameFocused = useGameFocus();
+  const playRequestedRef = useRef(false);
+  const crosshairRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previousCompletedSectionCountRef = useRef(0);
   const damageCooldownUntilRef = useRef(0);
@@ -35,8 +40,17 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   const [screenAssetProgress, setScreenAssetProgress] = useState(0);
   const [screenAssetsReady, setScreenAssetsReady] = useState(false);
   const [shareScreenOpen, setShareScreenOpen] = useState(false);
-  const [shootPressed, setShootPressed] = useState(false);
+  const shootPressed = useSyncExternalStore(subscribeFixInput, isFixHeld);
   const [shootRequest, setShootRequest] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = subscribeGameFocus((running) => {
+      document.documentElement.classList.toggle("game-paused", !running);
+
+    });
+    document.documentElement.classList.toggle("game-paused", !isGameFocused());
+    return () => { unsubscribe(); setGameFocused(false); };
+  }, []);
 
   const resetGameSession = useCallback(() => {
     damageCooldownUntilRef.current = 0;
@@ -46,7 +60,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
     setHealth(3);
     healthRef.current = 3;
     setDamageFlashUntil(0);
-    setShootPressed(false);
+    resetFixShooter();
     setShootRequest(0);
     setShareScreenOpen(false);
     onRestart();
@@ -61,7 +75,8 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   }, [resetGameSession]);
 
   const damagePlayer = useCallback(() => {
-    const now = performance.now();
+    if (!isGameFocused()) return;
+    const now = gameNow();
     if (now < damageCooldownUntilRef.current) return;
 
     const cooldownUntil = now + 1250;
@@ -73,39 +88,39 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   }, []);
 
   const collectHealth = useCallback(() => {
+    if (!isGameFocused()) return false;
     if (healthRef.current >= 3) return false;
     healthRef.current += 1;
     setHealth(healthRef.current);
     return true;
   }, []);
 
-  const shoot = () => {
-    setGameFocused(true);
-    setShootRequest((current) => current + 1);
-  };
-
+  useEffect(() => subscribeFixShot(() => setShootRequest((current) => current + 1)), []);
   useEffect(() => {
+    resetFixShooter();
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.code !== "Space" || event.repeat || !gameFocused) return;
+      if (event.code !== "Space" || event.repeat || !isGameFocused()) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest("input, textarea, [contenteditable=true], button:not(.game-hud__shoot)")) return;
       event.preventDefault();
-      setShootPressed(true);
-      shoot();
+      setFixHeld("keyboard", true);
     };
     const handleKeyUp = (event: KeyboardEvent) => {
-      if (event.code !== "Space") return;
-      event.preventDefault();
-      setShootPressed(false);
+      if (event.code === "Space") { event.preventDefault(); setFixHeld("keyboard", false); }
     };
-    const releaseShoot = () => setShootPressed(false);
+    const releasePointer = (event: PointerEvent) => setFixHeld(`pointer:${event.pointerId}`, false);
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
-    window.addEventListener("blur", releaseShoot);
+    window.addEventListener("pointerup", releasePointer);
+    window.addEventListener("pointercancel", releasePointer);
     return () => {
+      resetFixShooter();
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
-      window.removeEventListener("blur", releaseShoot);
+      window.removeEventListener("pointerup", releasePointer);
+      window.removeEventListener("pointercancel", releasePointer);
     };
-  }, [gameFocused]);
+  }, []);
 
   useEffect(() => {
     if (health !== 0) return;
@@ -174,20 +189,21 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      playRequestedRef.current = false;
       setGameFocused(false);
       document.exitPointerLock?.();
     };
 
     const handlePointerLockChange = () => {
-      if (isTouchControlsCameraInputBlocked()) {
-        setGameFocused(true);
-        return;
-      }
-
-      setGameFocused(document.pointerLockElement === canvasRef.current);
+      const locked = document.pointerLockElement === canvasRef.current;
+      if (locked && !playRequestedRef.current) { document.exitPointerLock?.(); return; }
+      if (!locked) playRequestedRef.current = false;
+      setGameFocused(locked);
     };
 
-    const handleBlur = () => setGameFocused(false);
+    const handleBlur = () => { playRequestedRef.current = false; setGameFocused(false); document.exitPointerLock?.(); };
+    const handleVisibility = () => { if (document.hidden) handleBlur(); };
+    document.addEventListener("visibilitychange", handleVisibility);
     const handleWheel = (event: WheelEvent) => {
       if (!gameFocused) return;
       event.preventDefault();
@@ -200,6 +216,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
     document.addEventListener("pointerlockchange", handlePointerLockChange);
 
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("blur", handleBlur);
       window.removeEventListener("wheel", handleWheel, { capture: true });
@@ -210,20 +227,26 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   const focusGame = () => {
     if (isTouchControlsCameraInputBlocked()) return;
 
-    void unlockShowcaseVideoPlayback();
-
+    if (shareScreenOpen) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    if (document.pointerLockElement !== canvas) {
-      canvas.requestPointerLock?.();
-      if (!canvas.requestPointerLock) {
-        setGameFocused(true);
-      }
-      return;
-    }
-
+    // The Play click starts the simulation. Pointer lock is optional: embedded
+    // browsers can expose the API but reject the request.
+    playRequestedRef.current = true;
     setGameFocused(true);
+    if (window.matchMedia("(pointer: coarse)").matches) return;
+
+    if (document.pointerLockElement !== canvas && canvas.requestPointerLock) {
+      try {
+        void Promise.resolve(canvas.requestPointerLock()).catch(() => {
+          // Keep playing with keyboard/on-screen controls when lock is denied.
+          // ESC, blur and actual pointer-lock loss still use the shared pause state.
+        });
+      } catch {
+        // Older browsers may throw synchronously instead of returning a promise.
+      }
+    }
   };
 
   return (
@@ -240,21 +263,33 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
             toneMappingExposure: 1.08,
           }}
           camera={{ position: [11, 7, 15], fov: 58, near: 0.1, far: 10000 }}
-          onPointerDown={focusGame}
+
+          onPointerDown={(event) => {
+            if (event.button === 0) setFixHeld(`pointer:${event.pointerId}`, true);
+          }}
           onWheel={(event) => {
             event.stopPropagation();
             event.nativeEvent.preventDefault();
           }}
-          onCreated={({ gl }) => {
+          onCreated={({ gl, clock }) => {
+            let previous = gameNow();
+            clock.getDelta = () => {
+              const now = gameNow();
+              const delta = Math.max(0, (now - previous) / 1000);
+              previous = now;
+              clock.elapsedTime = now / 1000;
+              return delta;
+            };
             canvasRef.current = gl.domElement;
             gl.shadowMap.enabled = true;
             gl.shadowMap.type = PCFSoftShadowMap;
           }}
         >
+          <FixHitFeedback crosshairRef={crosshairRef} />
           <color attach="background" args={["#01030a"]} />
           <fog attach="fog" args={[distanceFog.color, distanceFog.near, distanceFog.far]} />
           <Suspense fallback={null}>
-            <Physics gravity={[0, -20, 0]}>
+            <Physics gravity={[0, -20, 0]} paused={!gameFocused}>
               <StudioWorld
                 damageFlashUntil={damageFlashUntil}
                 onCoinCollect={() => setCoins((current) => current + 1)}
@@ -284,24 +319,29 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
       <GameHud
         completedSectionCount={completedSectionCount}
         health={health}
-        onShoot={shoot}
+        onShoot={fireFixShot}
         onOpenWebsite={onOpenWebsite}
         onRestart={handleManualRestart}
         points={coins}
         shootPressed={shootPressed}
-        setShootPressed={setShootPressed}
       />
-      <div className="aim-crosshair" aria-hidden="true" style={{ top: `${crosshairViewportY * 100}%` }}>
+      <div ref={crosshairRef} className="aim-crosshair" aria-hidden="true" style={{ top: `${crosshairViewportY * 100}%` }}>
         <span className="aim-crosshair__mark aim-crosshair__mark--top" />
         <span className="aim-crosshair__mark aim-crosshair__mark--right" />
         <span className="aim-crosshair__mark aim-crosshair__mark--bottom" />
         <span className="aim-crosshair__mark aim-crosshair__mark--left" />
       </div>
       <HubOverlay />
-      <div className={`game-focus-hint${gameFocused ? "" : " game-focus-hint--visible"}`}>
-        <strong>Click to Play</strong>
-        <span>Press ESC to exit</span>
-      </div>
+      {!gameFocused && (
+        <div className="game-pause-overlay">
+          <div className="game-pause-overlay__content">
+            <button type="button" onClick={focusGame} className="studio-button game-focus-hint" aria-describedby="game-pause-instructions">
+              Click to Play
+            </button>
+            <p id="game-pause-instructions">Press ESC to pause</p>
+          </div>
+        </div>
+      )}
       {shareScreenOpen && <ShareWebsiteScreen onClose={() => setShareScreenOpen(false)} />}
     </>
   );
@@ -372,5 +412,12 @@ function StartupProgress({
     };
   }, []);
 
+  return null;
+}
+
+function FixHitFeedback({ crosshairRef }: { crosshairRef: RefObject<HTMLDivElement> }) {
+  useGameFrame(() => {
+    crosshairRef.current?.classList.toggle("aim-crosshair--hit", gameNow() - lastFixHitAt < 180);
+  });
   return null;
 }

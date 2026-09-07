@@ -1,6 +1,8 @@
+import { isCompactVisualBudget } from "../visualQuality";
+import { useGameFrame } from "../../player/useGameFrame";
 import { useTexture } from "@react-three/drei";
-import { useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useRef } from "react";
+import { useThree } from "@react-three/fiber";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   BackSide,
   Color,
@@ -32,6 +34,15 @@ function configurePlanetTexture(texture: Texture) {
 }
 
 export function SpaceSky() {
+  const [segments] = useState(() => isCompactVisualBudget() ? 48 : 64);
+  const planetsRef = useRef<Group>(null);
+  const camera = useThree((state) => state.camera);
+  useLayoutEffect(() => {
+    const enabled = camera.layers.isEnabled(3);
+    camera.layers.enable(3);
+    planetsRef.current?.traverse((object) => object.layers.set(3));
+    return () => { if (!enabled) camera.layers.disable(3); };
+  }, [camera]);
   const cloudTexture = useTexture(cloudTexturePath);
   const moonTexture = useTexture(moonTexturePath);
   const venusTexture = useTexture(venusTexturePath);
@@ -62,7 +73,7 @@ export function SpaceSky() {
     };
   }, [cloudTexture, invalidate, moonTexture, scene, venusTexture]);
 
-  useFrame(({ camera }, delta) => {
+  useGameFrame(({ camera }, delta) => {
     const frameDelta = Math.min(delta, 1 / 30);
     if (skyGroupRef.current) {
       skyGroupRef.current.position.x = camera.position.x;
@@ -102,25 +113,26 @@ export function SpaceSky() {
         </sprite>
       </group>
 
-      <group name="CosmicPlanets">
+      <group ref={planetsRef} name="CosmicPlanets">
       <mesh position={[68, 42, -210]} rotation={[0.08, -0.48, 0]}>
-        <sphereGeometry args={[22, 24, 18]} />
+        <sphereGeometry args={[22, segments, 32]} />
         <meshStandardMaterial
           map={venusTexture}
           color="#e9b57f"
           emissive="#59311f"
           emissiveIntensity={0.025}
           fog={false}
+          envMapIntensity={0}
           metalness={0}
           roughness={0.9}
         />
       </mesh>
-      <mesh position={[68, 42, -210]} scale={[1.08, 1.08, 1.08]}>
-        <sphereGeometry args={[22, 24, 16]} />
+      <mesh position={[68, 42, -210]} scale={[1.015, 1.015, 1.015]}>
+        <sphereGeometry args={[22, segments, 32]} />
         <meshBasicMaterial
           color="#9a78aa"
           transparent
-          opacity={0.1}
+          opacity={0.035}
           depthWrite={false}
           side={BackSide}
           fog={false}
@@ -128,23 +140,24 @@ export function SpaceSky() {
       </mesh>
 
       <mesh position={[-135, 48, 165]} rotation={[0.08, 0.64, -0.06]}>
-        <sphereGeometry args={[17, 24, 18]} />
+        <sphereGeometry args={[17, segments, 32]} />
         <meshStandardMaterial
           map={moonTexture}
           color="#c8c5be"
           emissive="#26282b"
           emissiveIntensity={0.018}
           fog={false}
+          envMapIntensity={0}
           metalness={0}
           roughness={0.92}
         />
       </mesh>
-      <mesh position={[-135, 48, 165]} scale={[1.09, 1.09, 1.09]}>
-        <sphereGeometry args={[17, 24, 16]} />
+      <mesh position={[-135, 48, 165]} scale={[1.015, 1.015, 1.015]}>
+        <sphereGeometry args={[17, segments, 32]} />
         <meshBasicMaterial
           color="#aeb5bc"
           transparent
-          opacity={0.1}
+          opacity={0.035}
           depthWrite={false}
           side={BackSide}
           fog={false}

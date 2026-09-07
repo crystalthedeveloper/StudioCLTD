@@ -1,4 +1,7 @@
-import { useFrame, useThree } from "@react-three/fiber";
+import { lastFixShotAt } from "./fixShooter";
+import { gameNow } from "./gameFocus";
+import { useGameFrame } from "./useGameFrame";
+import { useThree } from "@react-three/fiber";
 import { MutableRefObject, useRef } from "react";
 import { MathUtils, Vector3 } from "three";
 import { RapierRigidBody } from "@react-three/rapier";
@@ -55,7 +58,7 @@ export function ThirdPersonCamera({
   const smoothedPitchRef = useRef(cameraSettings.pitch);
   const hasCameraStateRef = useRef(false);
 
-  useFrame((_, delta) => {
+  useGameFrame((_, delta) => {
     const body = targetRef.current;
     if (!body) return;
     const frameDelta = Math.min(delta, maxFrameDelta);
@@ -108,7 +111,8 @@ export function ThirdPersonCamera({
     const cameraPitch = Math.asin(MathUtils.clamp(lookDirection.y, -1, 1));
 
     camera.rotation.order = "YXZ";
-    camera.rotation.set(cameraPitch, cameraYaw, 0);
+    const recoil = Math.max(0, 1 - (gameNow() - lastFixShotAt) / 120);
+    camera.rotation.set(cameraPitch + recoil * 0.009, cameraYaw, 0);
 
     camera.rotation.z = 0;
     camera.updateMatrixWorld();

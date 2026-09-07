@@ -1,5 +1,5 @@
+import { useGameFrame } from "../player/useGameFrame";
 import { Text } from "@react-three/drei";
-import { useFrame } from "@react-three/fiber";
 import { ReactNode, useRef } from "react";
 import { Euler, Group, Quaternion, Vector3 } from "three";
 import { gameTextFont } from "./textFont";
@@ -29,7 +29,7 @@ export function BillboardLabel({
 }: BillboardLabelProps) {
   const groupRef = useRef<Group>(null);
 
-  useFrame(({ camera }) => {
+  useGameFrame(({ camera }) => {
     const group = groupRef.current;
     if (!group) return;
 

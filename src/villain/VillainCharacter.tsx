@@ -1,7 +1,8 @@
-import { useAnimations, useGLTF } from "@react-three/drei";
-import { useFrame } from "@react-three/fiber";
+import { useGameFrame } from "../player/useGameFrame";
+import { useGameAnimations } from "../player/useGameFrame";
+import { useGLTF } from "@react-three/drei";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { AnimationAction, Color, Group, LoopOnce, LoopRepeat, Material, MathUtils, Mesh, Object3D, Vector3 } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import {
@@ -61,7 +62,7 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
   const rootRef = useRef<Group>(null);
   const modelRef = useRef<Group>(null);
   const frozenDeathYawRef = useRef<number | null>(null);
-  const { actions } = useAnimations(model.animations, modelRef);
+  const { actions } = useGameAnimations(model.animations, modelRef, "idleV");
 
   useEffect(() => {
     applyCharacterMaterials(scene, model.materials, villainMaterialProfile);
@@ -78,7 +79,7 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
     enhanceVillainSuitMaterial(findVillainSuitMaterial(scene));
   }, [scene]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const action = actions[animationByStatus[villainStatus]];
     if (!action) return;
 
@@ -86,14 +87,15 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
     action.reset();
     action.clampWhenFinished = villainStatus === "dead";
     action.setLoop(villainStatus === "dead" ? LoopOnce : LoopRepeat, villainStatus === "dead" ? 1 : Infinity);
-    action.fadeIn(0.14).play();
+    if (villainStatus === "idle") action.setEffectiveWeight(1).play();
+    else action.fadeIn(0.14).play();
 
     return () => {
       action.fadeOut(0.14);
     };
   }, [actions, villainStatus]);
 
-  useFrame((_, delta) => {
+  useGameFrame((_, delta) => {
     const root = rootRef.current;
     const modelGroup = modelRef.current;
     if (!root || !modelGroup) return;
@@ -130,7 +132,7 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
     <RigidBody type="fixed" colliders={false} position={[basePosition.x, basePosition.y, basePosition.z]}>
       <CuboidCollider args={[0.5, 1.25, 0.5]} position={[0, 1.2, 0]} />
       <group ref={rootRef}>
-        <group ref={modelRef}>
+        <group ref={modelRef} position={[0, modelYOffset, 0]}>
           <DialogueBubble
             message={dialogue}
             persistent={dialogueVariant === "danger"}

@@ -1,3 +1,4 @@
+import { gameTimers } from "../player/gameFocus";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { hubSections } from "../world/hubSections";
 import { playerWorldState } from "../world/playerWorldState";
@@ -20,7 +21,7 @@ export function HubOverlay() {
   useEffect(() => {
     if (!enableMinimap) return undefined;
 
-    const interval = window.setInterval(() => {
+    const interval = gameTimers.setInterval(() => {
       const nextPoint = {
         x: 50 + (playerWorldState.position.x / 62) * 38,
         y: 50 + (playerWorldState.position.z / 62) * 38,
@@ -33,7 +34,7 @@ export function HubOverlay() {
       setPlayerPoint(nextPoint);
     }, 180);
 
-    return () => window.clearInterval(interval);
+    return () => gameTimers.clearInterval(interval);
   }, []);
 
   return (

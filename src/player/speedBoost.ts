@@ -1,3 +1,5 @@
+import { gameNow } from "./gameFocus";
+import { gameTimers } from "./gameFocus";
 import { useEffect, useState } from "react";
 
 export const speedBoostDurationMs = 10000;
@@ -10,7 +12,7 @@ function emitSpeedBoostChange() {
 }
 
 export function isSpeedBoostActive() {
-  return Date.now() < activeUntil;
+  return gameNow() < activeUntil;
 }
 
 export function subscribeSpeedBoostChange(subscriber: () => void) {
@@ -21,17 +23,17 @@ export function subscribeSpeedBoostChange(subscriber: () => void) {
 }
 
 export function getSpeedBoostRemainingMs() {
-  return Math.max(0, activeUntil - Date.now());
+  return Math.max(0, activeUntil - gameNow());
 }
 
 export function activateSpeedBoost() {
-  activeUntil = Date.now() + speedBoostDurationMs;
+  activeUntil = gameNow() + speedBoostDurationMs;
 
   if (endTimeout !== null) {
-    window.clearTimeout(endTimeout);
+    gameTimers.clearTimeout(endTimeout);
   }
 
-  endTimeout = window.setTimeout(() => {
+  endTimeout = gameTimers.setTimeout(() => {
     activeUntil = 0;
     endTimeout = null;
     emitSpeedBoostChange();
@@ -44,7 +46,7 @@ export function resetSpeedBoost() {
   activeUntil = 0;
 
   if (endTimeout !== null) {
-    window.clearTimeout(endTimeout);
+    gameTimers.clearTimeout(endTimeout);
     endTimeout = null;
   }
 
@@ -56,12 +58,12 @@ export function useSpeedBoostRemainingMs() {
 
   useEffect(() => {
     const update = () => setRemainingMs(getSpeedBoostRemainingMs());
-    const interval = window.setInterval(update, 100);
+    const interval = gameTimers.setInterval(update, 100);
     const unsubscribe = subscribeSpeedBoostChange(update);
     update();
 
     return () => {
-      window.clearInterval(interval);
+      gameTimers.clearInterval(interval);
       unsubscribe();
     };
   }, []);

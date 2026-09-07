@@ -49,7 +49,7 @@ export default function App() {
 function StudioLaunch({ loading = false, onLaunch }: { loading?: boolean; onLaunch: () => void }) {
   return (
     <div className="studio-launch">
-      <button type="button" className="studio-launch__button" disabled={loading} onClick={onLaunch}>
+      <button type="button" className="studio-button studio-launch__button" disabled={loading} onClick={onLaunch}>
         {loading ? "Loading StudioCLTD..." : "StudioCLTD"}
       </button>
     </div>

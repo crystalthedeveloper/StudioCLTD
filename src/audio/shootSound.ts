@@ -1,28 +1,9 @@
 import { getActiveGameAudioState } from "../player/footsteps";
 
-const activeSources = new Set<AudioScheduledSourceNode>();
-
-function trackSource(source: AudioScheduledSourceNode) {
-  activeSources.add(source);
-  source.addEventListener("ended", () => activeSources.delete(source), { once: true });
-}
-
-function stopPreviousBlast() {
-  activeSources.forEach((source) => {
-    try {
-      source.stop();
-    } catch {
-      // The source may already have completed between scheduling and cleanup.
-    }
-  });
-  activeSources.clear();
-}
-
 export function playEnergyBlastSound() {
   const state = getActiveGameAudioState();
   if (!state) return;
 
-  stopPreviousBlast();
   const { context, masterGain, noise } = state;
   const now = context.currentTime;
 
@@ -42,7 +23,6 @@ export function playEnergyBlastSound() {
   bassFilter.frequency.exponentialRampToValueAtTime(170, now + 0.3);
   bass.connect(bassFilter);
   bassFilter.connect(output);
-  trackSource(bass);
   bass.start(now);
   bass.stop(now + 0.32);
 
@@ -55,7 +35,6 @@ export function playEnergyBlastSound() {
   energyGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.23);
   energy.connect(energyGain);
   energyGain.connect(output);
-  trackSource(energy);
   energy.start(now);
   energy.stop(now + 0.24);
 
@@ -72,6 +51,5 @@ export function playEnergyBlastSound() {
   burst.connect(burstFilter);
   burstFilter.connect(burstGain);
   burstGain.connect(output);
-  trackSource(burst);
   burst.start(now);
 }

@@ -34,7 +34,7 @@ export function HomeBase() {
     <group name="HomeBase" position={homeBaseCenter}>
       <RigidBody type="fixed" colliders={false}>
         <CuboidCollider args={[13, 0.3, 13]} position={[0, -0.3, 0]} friction={0.35} />
-        <mesh geometry={resources.geometry} material={resources.material} position={[0, -0.3, 0]} receiveShadow />
+        <mesh geometry={resources.geometry} material={resources.material} position={[0, -0.3, 0]} castShadow receiveShadow />
       </RigidBody>
       <HomeBaseVideoScreen />
     </group>

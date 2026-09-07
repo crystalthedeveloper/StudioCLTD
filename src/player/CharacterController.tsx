@@ -1,5 +1,5 @@
+import { useGameFrame } from "./useGameFrame";
 import { CapsuleCollider, RigidBody, RapierRigidBody, useRapier } from "@react-three/rapier";
-import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import { MathUtils, Vector3 } from "three";
 import { PlayerCharacter } from "./PlayerCharacter";
@@ -14,7 +14,6 @@ import { installFootstepAudioUnlock, playConcreteFootstep } from "./footsteps";
 
 const moveDirection = new Vector3();
 const playerForward = new Vector3();
-const lockedVelocity = { x: 0, y: 0, z: 0 };
 const targetVelocity = { x: 0, z: 0 };
 const nextVelocity = { x: 0, y: 0, z: 0 };
 const baseRunSpeed = 13.2;
@@ -28,8 +27,6 @@ const groundedRayDistance = 1.16;
 type CharacterControllerProps = {
   damageFlashUntil: number;
   dialogue: DialogueMessage | null;
-  movementLocked: boolean;
-  onFixedAnimationComplete: () => void;
   restartKey: number;
   shootRequest: number;
   transportDestination: TransportDestination | null;
@@ -38,8 +35,6 @@ type CharacterControllerProps = {
 export function CharacterController({
   damageFlashUntil,
   dialogue,
-  movementLocked,
-  onFixedAnimationComplete,
   restartKey,
   shootRequest,
   transportDestination,
@@ -93,7 +88,7 @@ export function CharacterController({
     body.setAngvel({ x: 0, y: 0, z: 0 }, true);
   }, [transportDestination]);
 
-  useFrame(({ clock }, delta) => {
+  useGameFrame(({ clock }, delta) => {
     const body = bodyRef.current;
     if (!body) return;
     const frameDelta = Math.min(delta, maxFrameDelta);
@@ -103,22 +98,6 @@ export function CharacterController({
     const translation = body.translation();
     playerWorldState.position.set(translation.x, translation.y, translation.z);
     playerWorldState.yaw = yawRef.current;
-    if (movementLocked) {
-      forwardBackSpeedRef.current = 0;
-      movementDirectionRef.current.set(0, 0, 0);
-      lockedVelocity.y = velocity.y;
-      body.setLinvel(lockedVelocity, true);
-
-      if (translation.y < -10) {
-        body.setTranslation({ x: spawn[0], y: spawn[1], z: spawn[2] }, true);
-        body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-        body.setAngvel({ x: 0, y: 0, z: 0 }, true);
-      }
-
-      animationStateRef.current = controls.forward !== controls.backward ? "run" : "idle";
-      return;
-    }
-
     const hasForwardBackInput = controls.forward !== controls.backward;
     const turnInput = Number(controls.left) - Number(controls.right);
     const forwardBackSpeed = isSpeedBoostActive() ? boostedRunSpeed : baseRunSpeed;
@@ -223,7 +202,6 @@ export function CharacterController({
           animationStateRef={animationStateRef}
           damageFlashUntil={damageFlashUntil}
           dialogue={dialogue}
-          onShootAnimationComplete={onFixedAnimationComplete}
           shootRequest={shootRequest}
           yawRef={yawRef}
         />

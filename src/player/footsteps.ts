@@ -1,3 +1,4 @@
+import { isGameFocused, subscribeGameFocus } from "./gameFocus";
 import { isGameAudioEnabled, subscribeGameAudio } from "../audio/gameAudio";
 
 export type GameAudioState = {
@@ -25,6 +26,12 @@ function createAudioState() {
     samples[index] = (Math.random() * 2 - 1) * envelope * envelope;
   }
   audioState = { context, masterGain, noise };
+  const syncPlayback = () => {
+    if (isGameFocused()) void context.resume().catch(() => undefined);
+    else void context.suspend().catch(() => undefined);
+  };
+  subscribeGameFocus(syncPlayback);
+  syncPlayback();
   subscribeGameAudio(() => {
     if (!audioState) return;
     audioState.masterGain.gain.setValueAtTime(
@@ -41,7 +48,7 @@ export function installFootstepAudioUnlock() {
 
   const unlock = () => {
     const state = createAudioState();
-    if (state?.context.state === "suspended") void state.context.resume();
+    if (isGameFocused() && state?.context.state === "suspended") void state.context.resume();
   };
 
   window.addEventListener("pointerdown", unlock, { passive: true });
@@ -82,6 +89,6 @@ export function playConcreteFootstep(variation: number) {
 
 export function getActiveGameAudioState() {
   const state = audioState;
-  if (!state || state.context.state !== "running" || !isGameAudioEnabled()) return null;
+  if (!isGameFocused() || !state || state.context.state !== "running" || !isGameAudioEnabled()) return null;
   return state;
 }

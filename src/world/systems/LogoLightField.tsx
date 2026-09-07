@@ -1,5 +1,7 @@
+import { useGameFrame } from "../../player/useGameFrame";
+import { gameNow } from "../../player/gameFocus";
+import { gameTimers } from "../../player/gameFocus";
 import { useGLTF } from "@react-three/drei";
-import { useFrame } from "@react-three/fiber";
 import {
   BallCollider,
   IntersectionEnterPayload,
@@ -254,7 +256,7 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
     collectedHealthLogoIdsRef.current.add(logoId);
     if (collectedHealthLogoIdsRef.current.size < healthLogoCount || healthRespawnTimerRef.current !== null) return;
 
-    healthRespawnTimerRef.current = window.setTimeout(() => {
+    healthRespawnTimerRef.current = gameTimers.setTimeout(() => {
       healthRespawnTimerRef.current = null;
       collectedHealthLogoIdsRef.current.clear();
       setHealthRespawnGeneration((current) => current + 1);
@@ -263,13 +265,13 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
 
   useEffect(() => {
     if (healthRespawnTimerRef.current !== null) {
-      window.clearTimeout(healthRespawnTimerRef.current);
+      gameTimers.clearTimeout(healthRespawnTimerRef.current);
       healthRespawnTimerRef.current = null;
     }
     collectedHealthLogoIdsRef.current.clear();
 
     return () => {
-      if (healthRespawnTimerRef.current !== null) window.clearTimeout(healthRespawnTimerRef.current);
+      if (healthRespawnTimerRef.current !== null) gameTimers.clearTimeout(healthRespawnTimerRef.current);
     };
   }, [restartKey]);
 
@@ -319,8 +321,8 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
   const [contactCountdown, setContactCountdown] = useState(0);
 
   const clearContactTimers = useCallback(() => {
-    if (contactIntervalRef.current !== null) window.clearInterval(contactIntervalRef.current);
-    if (contactOpenTimerRef.current !== null) window.clearTimeout(contactOpenTimerRef.current);
+    if (contactIntervalRef.current !== null) gameTimers.clearInterval(contactIntervalRef.current);
+    if (contactOpenTimerRef.current !== null) gameTimers.clearTimeout(contactOpenTimerRef.current);
     contactIntervalRef.current = null;
     contactOpenTimerRef.current = null;
   }, []);
@@ -333,7 +335,7 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
   }, [clearContactTimers]);
 
   const startActionCountdown = useCallback(() => {
-    const now = performance.now();
+    const now = gameNow();
     if (contactActiveRef.current || now < contactCooldownUntilRef.current) return;
 
     clearContactTimers();
@@ -342,18 +344,18 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
     contactCooldownUntilRef.current = now + contactCooldownMs;
     playCollectibleSound("contact");
     setContactCountdown(3);
-    const startedAt = performance.now();
+    const startedAt = gameNow();
 
-    contactIntervalRef.current = window.setInterval(() => {
-      const remaining = Math.max(0, Math.ceil((contactCountdownMs - (performance.now() - startedAt)) / 1000));
+    contactIntervalRef.current = gameTimers.setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((contactCountdownMs - (gameNow() - startedAt)) / 1000));
       setContactCountdown(remaining);
     }, 180);
 
-    contactOpenTimerRef.current = window.setTimeout(() => {
+    contactOpenTimerRef.current = gameTimers.setTimeout(() => {
       if (!contactActiveRef.current || contactOpenedRef.current) return;
       contactOpenedRef.current = true;
       contactActiveRef.current = false;
-      contactCooldownUntilRef.current = performance.now() + contactCooldownMs;
+      contactCooldownUntilRef.current = gameNow() + contactCooldownMs;
       clearContactTimers();
       setContactCountdown(0);
       if (logo.kind === "share") {
@@ -366,7 +368,7 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
 
   useEffect(() => {
     if (respawnTimerRef.current !== null) {
-      window.clearTimeout(respawnTimerRef.current);
+      gameTimers.clearTimeout(respawnTimerRef.current);
       respawnTimerRef.current = null;
     }
     clearContactTimers();
@@ -381,7 +383,7 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
 
     return () => {
       if (respawnTimerRef.current !== null) {
-        window.clearTimeout(respawnTimerRef.current);
+        gameTimers.clearTimeout(respawnTimerRef.current);
         respawnTimerRef.current = null;
       }
       clearContactTimers();
@@ -397,7 +399,7 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
       setAvailable(false);
       reward();
 
-      respawnTimerRef.current = window.setTimeout(() => {
+      respawnTimerRef.current = gameTimers.setTimeout(() => {
         respawnTimerRef.current = null;
         collectedRef.current = false;
         availableRef.current = true;
@@ -527,7 +529,7 @@ function ContactLogoVisual({ glow = false, object, rotation, scale }: { glow?: b
   const logoWorldPosition = useMemo(() => new Vector3(), []);
   const playerWorldPosition = useMemo(() => new Vector3(), []);
 
-  useFrame(({ clock, scene }) => {
+  useGameFrame(({ clock, scene }) => {
     if (!groupRef.current || clock.elapsedTime - lastUpdateRef.current < 1 / 24) return;
     lastUpdateRef.current = clock.elapsedTime;
     groupRef.current.position.y = 0.1 + Math.sin(clock.elapsedTime * 0.85) * 0.08;

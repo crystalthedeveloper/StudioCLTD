@@ -1,3 +1,4 @@
+import { gameTimers } from "../player/gameFocus";
 import { Html } from "@react-three/drei";
 import { useEffect, useState } from "react";
 
@@ -36,17 +37,17 @@ export function DialogueBubble({
 
     if (persistent) return;
 
-    const fadeTimer = window.setTimeout(() => {
+    const fadeTimer = gameTimers.setTimeout(() => {
       setVisible(false);
     }, Math.max(0, durationMs - 320));
 
-    const hideTimer = window.setTimeout(() => {
+    const hideTimer = gameTimers.setTimeout(() => {
       setActiveMessage(null);
     }, durationMs);
 
     return () => {
-      window.clearTimeout(fadeTimer);
-      window.clearTimeout(hideTimer);
+      gameTimers.clearTimeout(fadeTimer);
+      gameTimers.clearTimeout(hideTimer);
     };
   }, [durationMs, message, persistent]);
 

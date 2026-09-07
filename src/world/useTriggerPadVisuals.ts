@@ -1,12 +1,12 @@
-import { useFrame } from "@react-three/fiber";
-import { RefObject, useEffect, useRef } from "react";
-import { MathUtils, Mesh, MeshBasicMaterial, RingGeometry, TorusGeometry } from "three";
-import { subscribeGameFocus } from "../player/gameFocus";
+import { createSquarePadGeometry } from "./squarePadGeometry";
+import { useGameFrame } from "../player/useGameFrame";
+import { useRef } from "react";
+import { MathUtils, Mesh, MeshBasicMaterial } from "three";
 
-export const portalRingGeometry = new TorusGeometry(1, 0.026, 8, 48);
-export const portalPulseGeometry = new RingGeometry(0.68, 1.05, 48);
-export const fixRingGeometry = new TorusGeometry(1.3, 0.03, 8, 64);
-export const fixPulseGeometry = new RingGeometry(0.86, 1.32, 64);
+export const portalRingGeometry = createSquarePadGeometry(0.974, 1.026);
+export const portalPulseGeometry = createSquarePadGeometry(0.68, 1.05);
+export const fixRingGeometry = createSquarePadGeometry(1.27, 1.33);
+export const fixPulseGeometry = createSquarePadGeometry(0.86, 1.32);
 
 type TriggerPadVisualConfig = {
   pulseBaseScale: number;
@@ -22,16 +22,7 @@ export function useTriggerPadVisuals(active: boolean, config: TriggerPadVisualCo
   const activeStartedAtRef = useRef(0);
   const wasActiveRef = useRef(active);
 
-  useEffect(() => subscribeGameFocus((focused) => {
-    if (focused) return;
-    activeStartedAtRef.current = Number.NEGATIVE_INFINITY;
-    wasActiveRef.current = active;
-    resetMeshScale(ringRef);
-    resetMeshScale(pulseRef);
-    if (pulseRef.current) pulseRef.current.visible = false;
-  }), [active]);
-
-  useFrame(({ clock }) => {
+  useGameFrame(({ clock }) => {
     if (!active && !wasActiveRef.current) return;
 
     if (active && !wasActiveRef.current) activeStartedAtRef.current = clock.elapsedTime;
@@ -67,8 +58,4 @@ export function useTriggerPadVisuals(active: boolean, config: TriggerPadVisualCo
   });
 
   return { pulseRef, ringRef };
-}
-
-function resetMeshScale(ref: RefObject<Mesh>) {
-  ref.current?.scale.set(1, 1, 1);
 }

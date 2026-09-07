@@ -1,6 +1,9 @@
+import { LocalLightSpill } from "./LocalLightSpill";
+import { createSquarePadGeometry } from "../squarePadGeometry";
+import { gameNow } from "../../player/gameFocus";
 import { CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload, RigidBody } from "@react-three/rapier";
 import { useEffect, useMemo, useRef } from "react";
-import { MeshStandardMaterial, RingGeometry, Vector3 } from "three";
+import { MeshStandardMaterial, ShapeGeometry, Vector3 } from "three";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { hubSections } from "../hubSections";
 import { isPlayerObject } from "../playerCollision";
@@ -52,7 +55,7 @@ export function TransportPads({ onTransport, restartKey }: TransportPadsProps) {
   const lastTransportAtRef = useRef(-Infinity);
   const transportIdRef = useRef(0);
   const resources = useMemo(() => {
-    const geometry = new RingGeometry(0.65, 0.8, 40);
+    const geometry = createSquarePadGeometry(0.65, 0.8);
     const material = new MeshStandardMaterial({
       color: padVisualStyle.color,
       emissive: padVisualStyle.color,
@@ -88,7 +91,7 @@ export function TransportPads({ onTransport, restartKey }: TransportPadsProps) {
   const transport = (section: (typeof hubSections)[number], event: IntersectionEnterPayload) => {
     if (!isPlayerObject(event.other.rigidBodyObject) && !isPlayerObject(event.other.colliderObject)) return;
 
-    const now = performance.now();
+    const now = gameNow();
     if (now - lastTransportAtRef.current < transportCooldownMs) return;
     lastTransportAtRef.current = now;
 
@@ -107,7 +110,7 @@ export function TransportPads({ onTransport, restartKey }: TransportPadsProps) {
 
   const transportDirect = (position: [number, number, number], yaw: number, event: IntersectionEnterPayload) => {
     if (!isPlayerObject(event.other.rigidBodyObject) && !isPlayerObject(event.other.colliderObject)) return;
-    const now = performance.now();
+    const now = gameNow();
     if (now - lastTransportAtRef.current < transportCooldownMs) return;
     lastTransportAtRef.current = now;
     transportIdRef.current += 1;
@@ -155,7 +158,7 @@ function TransportPad({
   onEnter,
   position,
 }: {
-  geometry: RingGeometry;
+  geometry: ShapeGeometry;
   label: string;
   material: MeshStandardMaterial;
   labelColor?: string;
@@ -186,8 +189,9 @@ function TransportPad({
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
+      <LocalLightSpill color={glowColor ?? padVisualStyle.color} intensity={glowColor ? 2.2 : 0.6} distance={4} />
       <mesh geometry={geometry} material={material} rotation-x={-Math.PI / 2} />
-      {glowColor ? <pointLight color={glowColor} intensity={2.2} distance={7} decay={2} position={[0, 0.35, 0]} /> : null}
+
       <BillboardLabel
         color={labelColor}
         fontSize={label === "Site Improvement" ? 0.2 : 0.24}

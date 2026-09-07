@@ -1,6 +1,10 @@
+import { LocalLightSpill } from "./LocalLightSpill";
+import { playGameMedia, registerGameMedia, stopGameMedia } from "../../audio/gameMedia";
+import { useGameFrame } from "../../player/useGameFrame";
+import { gameNow } from "../../player/gameFocus";
+import { gameTimers } from "../../player/gameFocus";
 import { Html, Text } from "@react-three/drei";
 import { CuboidCollider, CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload, RigidBody } from "@react-three/rapier";
-import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BoxGeometry,
@@ -127,7 +131,6 @@ const lazyTexturePromises = new Map<string, Promise<Texture>>();
 let lazyTextureRequestIndex = 0;
 let showcaseVideoElement: HTMLVideoElement | null = null;
 let showcaseVideoTexture: VideoTexture | null = null;
-let showcaseUnlockPromise: Promise<void> | null = null;
 let websiteVideoElement: HTMLVideoElement | null = null;
 let websiteVideoTexture: VideoTexture | null = null;
 const requiredScreenImagePaths = Array.from(
@@ -245,6 +248,7 @@ function useLazyScreenTexture(path: string | null, enabled: boolean, delayMs = 0
 function getShowcaseVideoElement() {
   if (!showcaseVideoElement) {
     const video = document.createElement("video");
+    registerGameMedia(video);
     const useMobileVideo = window.matchMedia("(max-width: 768px)").matches;
     video.src = useMobileVideo ? "/videos/showcase-mobile.mp4" : "/videos/showcase.mp4";
     video.crossOrigin = "anonymous";
@@ -263,31 +267,14 @@ function getShowcaseVideoElement() {
 }
 
 function pauseShowcaseVideo(video = getShowcaseVideoElement(), reset = false) {
-  video.pause();
+  stopGameMedia(video);
   if (reset) video.currentTime = 0;
 }
 
 function playShowcaseVideo(video = getShowcaseVideoElement(), restart = true) {
   if (restart) video.currentTime = 0;
 
-  return video.play().then(() => {
-    return true;
-  }).catch(() => {
-    return false;
-  });
-}
-
-export function unlockShowcaseVideoPlayback() {
-  if (showcaseUnlockPromise) return showcaseUnlockPromise;
-
-  const video = getShowcaseVideoElement();
-  showcaseUnlockPromise = video.play().then(() => {
-    pauseShowcaseVideo(video, true);
-  }).catch(() => {
-    showcaseUnlockPromise = null;
-  });
-
-  return showcaseUnlockPromise;
+  return playGameMedia(video);
 }
 
 function getShowcaseVideoTexture(video: HTMLVideoElement) {
@@ -307,6 +294,7 @@ function getShowcaseVideoTexture(video: HTMLVideoElement) {
 function getWebsiteVideoElement() {
   if (!websiteVideoElement) {
     const video = document.createElement("video");
+    registerGameMedia(video);
     const useMobileVideo = window.matchMedia("(max-width: 768px)").matches;
     video.src = useMobileVideo ? "/videos/myWebsite-mobile.mp4" : "/videos/myWebsite.mp4";
     video.crossOrigin = "anonymous";
@@ -324,13 +312,13 @@ function getWebsiteVideoElement() {
 }
 
 function pauseWebsiteVideo(video = getWebsiteVideoElement(), reset = false) {
-  video.pause();
+  stopGameMedia(video);
   if (reset) video.currentTime = 0;
 }
 
 function playWebsiteVideo(video = getWebsiteVideoElement(), restart = true) {
   if (restart) video.currentTime = 0;
-  return video.play().then(() => true).catch(() => false);
+  return playGameMedia(video);
 }
 
 function getWebsiteVideoTexture(video: HTMLVideoElement) {
@@ -372,24 +360,24 @@ export function HubSections({ activeServiceInfoId, onSectionTrigger, restartKey,
 
   useEffect(() => {
     return () => {
-      Object.values(displayTimersRef.current).forEach((timer) => window.clearTimeout(timer));
+      Object.values(displayTimersRef.current).forEach((timer) => gameTimers.clearTimeout(timer));
     };
   }, []);
 
   useEffect(() => {
     if (!selectedOfferId) return undefined;
 
-    const clearOfferTimer = window.setTimeout(() => {
+    const clearOfferTimer = gameTimers.setTimeout(() => {
       setSelectedOfferId(null);
     }, offerDisplayMs);
 
     return () => {
-      window.clearTimeout(clearOfferTimer);
+      gameTimers.clearTimeout(clearOfferTimer);
     };
   }, [selectedOfferId]);
 
   useEffect(() => {
-    Object.values(displayTimersRef.current).forEach((timer) => window.clearTimeout(timer));
+    Object.values(displayTimersRef.current).forEach((timer) => gameTimers.clearTimeout(timer));
     displayTimersRef.current = {};
     setVisibleSectionCount(2);
     setActiveSimpleDisplays({});
@@ -404,17 +392,17 @@ export function HubSections({ activeServiceInfoId, onSectionTrigger, restartKey,
   useEffect(() => {
     if (visibleSectionCount >= hubSections.length) return undefined;
 
-    const timeout = window.setTimeout(() => {
+    const timeout = gameTimers.setTimeout(() => {
       setVisibleSectionCount((current) => Math.min(hubSections.length, current + 2));
     }, 180);
 
-    return () => window.clearTimeout(timeout);
+    return () => gameTimers.clearTimeout(timeout);
   }, [visibleSectionCount]);
 
   const showSimpleDisplay = (sectionId: string, imagePath: string) => {
     onSectionTrigger(sectionId, imagePath);
     const existingTimer = displayTimersRef.current[sectionId];
-    if (existingTimer) window.clearTimeout(existingTimer);
+    if (existingTimer) gameTimers.clearTimeout(existingTimer);
 
     setActiveSimpleDisplays((current) => ({
       ...current,
@@ -423,7 +411,7 @@ export function HubSections({ activeServiceInfoId, onSectionTrigger, restartKey,
 
     if (sectionId === "tips") return;
 
-    displayTimersRef.current[sectionId] = window.setTimeout(() => {
+    displayTimersRef.current[sectionId] = gameTimers.setTimeout(() => {
       setActiveSimpleDisplays((current) =>
         Object.fromEntries(Object.entries(current).filter(([id]) => id !== sectionId)),
       );
@@ -561,7 +549,8 @@ function SectionBillboard({
         <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
       </RigidBody>
       <group name={`BillboardVisual:${section.id}`} position={[0, billboardYOffset, 0]} scale={billboardScale}>
-        <mesh geometry={tvFrameGeometry} position={[0, 0, -0.08]} dispose={null}>
+        <LocalLightSpill position={[0, -1.8, -0.8]} intensity={5} distance={10} />
+        <mesh castShadow receiveShadow geometry={tvFrameGeometry} position={[0, 0, -0.08]} dispose={null}>
           <meshStandardMaterial
             color="#101621"
             emissive="#000000"
@@ -570,7 +559,7 @@ function SectionBillboard({
             roughness={0.68}
           />
         </mesh>
-        <mesh geometry={tvBackingGeometry} position={[0, 0.1, -0.26]} dispose={null}>
+        <mesh castShadow receiveShadow geometry={tvBackingGeometry} position={[0, 0.1, -0.26]} dispose={null}>
           <meshStandardMaterial
             color="#111827"
             emissive="#ffffff"
@@ -797,7 +786,7 @@ function ShowcaseScreenContent({ isPlaying }: { isPlaying: boolean }) {
     });
   };
 
-  useFrame((_, delta) => {
+  useGameFrame((_, delta) => {
     const material = materialRef.current;
     if (!material) return;
     if (!isPlaying && screenOpacityRef.current <= 0.01) return;
@@ -827,7 +816,7 @@ function ShowcaseScreenContent({ isPlaying }: { isPlaying: boolean }) {
       </mesh>
       {isPlaying && showTapToPlay && (
         <Html center position={[0, -0.03, -0.42]} transform distanceFactor={8} zIndexRange={[50, 40]}>
-          <button className="showcase-play-fallback" type="button" onClick={handleTapToPlay}>
+          <button className="studio-button showcase-play-fallback" type="button" onClick={handleTapToPlay}>
             Tap to Play Video
           </button>
         </Html>
@@ -894,7 +883,7 @@ function WebsiteScreenContent({ isPlaying }: { isPlaying: boolean }) {
     });
   };
 
-  useFrame((_, delta) => {
+  useGameFrame((_, delta) => {
     const material = materialRef.current;
     if (!material) return;
     if (!isPlaying && screenOpacityRef.current <= 0.01) return;
@@ -923,7 +912,7 @@ function WebsiteScreenContent({ isPlaying }: { isPlaying: boolean }) {
       </mesh>
       {isPlaying && showTapToPlay && (
         <Html center position={[0, -0.03, -0.42]} transform distanceFactor={8} zIndexRange={[50, 40]}>
-          <button className="showcase-play-fallback" type="button" onClick={handleTapToPlay}>
+          <button className="studio-button showcase-play-fallback" type="button" onClick={handleTapToPlay}>
             Tap to Play Website Tour
           </button>
         </Html>
@@ -960,7 +949,8 @@ export function HomeBaseVideoScreen() {
           <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
         </RigidBody>
         <group position={[0, billboardYOffset, 0]} scale={billboardScale}>
-          <mesh geometry={tvFrameGeometry} position={[0, 0, -0.08]} dispose={null}>
+          <LocalLightSpill position={[0, -1.8, -0.8]} intensity={5} distance={10} />
+        <mesh castShadow receiveShadow geometry={tvFrameGeometry} position={[0, 0, -0.08]} dispose={null}>
             <meshStandardMaterial
               color="#101621"
               emissive="#000000"
@@ -969,7 +959,7 @@ export function HomeBaseVideoScreen() {
               roughness={0.68}
             />
           </mesh>
-          <mesh geometry={tvBackingGeometry} position={[0, 0.1, -0.26]} dispose={null}>
+          <mesh castShadow receiveShadow geometry={tvBackingGeometry} position={[0, 0.1, -0.26]} dispose={null}>
             <meshStandardMaterial color="#111827" emissive="#ffffff" emissiveIntensity={0.045} metalness={0.08} roughness={0.72} />
           </mesh>
           <Text
@@ -1016,8 +1006,8 @@ function OffersSelector({
   const pageOpenedRef = useRef(false);
 
   const clearCountdownTimers = () => {
-    window.clearInterval(countdownIntervalRef.current);
-    window.clearTimeout(offerOpenTimerRef.current);
+    gameTimers.clearInterval(countdownIntervalRef.current);
+    gameTimers.clearTimeout(offerOpenTimerRef.current);
     countdownIntervalRef.current = 0;
     offerOpenTimerRef.current = 0;
   };
@@ -1028,11 +1018,11 @@ function OffersSelector({
     setCountdownOfferId(offer.id);
     countdownSecondsRef.current = 3;
     setCountdownSeconds(3);
-    countdownStartedAtRef.current = performance.now();
+    countdownStartedAtRef.current = gameNow();
     pageOpenedRef.current = false;
 
-    countdownIntervalRef.current = window.setInterval(() => {
-      const elapsed = performance.now() - countdownStartedAtRef.current;
+    countdownIntervalRef.current = gameTimers.setInterval(() => {
+      const elapsed = gameNow() - countdownStartedAtRef.current;
       const remaining = Math.max(0, Math.ceil((offerCountdownMs - elapsed) / 1000));
       if (countdownSecondsRef.current === remaining) return;
 
@@ -1040,7 +1030,7 @@ function OffersSelector({
       setCountdownSeconds(remaining);
     }, 180);
 
-    offerOpenTimerRef.current = window.setTimeout(() => {
+    offerOpenTimerRef.current = gameTimers.setTimeout(() => {
       pageOpenedRef.current = true;
       clearCountdownTimers();
       setCountdownOfferId(null);
@@ -1173,7 +1163,7 @@ function OfferPortalPad({
     playerInsideRef.current = true;
     activatedThisEntryRef.current = false;
 
-    const now = performance.now();
+    const now = gameNow();
     if (now - lastActivatedAtRef.current < portalActivationCooldownMs) return;
     lastActivatedAtRef.current = now;
     activatedThisEntryRef.current = true;
@@ -1196,6 +1186,7 @@ function OfferPortalPad({
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
+      <LocalLightSpill intensity={active ? 2.2 : 0.6} distance={4} />
       <mesh ref={ringRef} geometry={portalRingGeometry} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.5} depthWrite={false} toneMapped={false} />
       </mesh>
@@ -1251,7 +1242,7 @@ function ShowcasePortalPad({
     playerInsideRef.current = true;
     activatedThisEntryRef.current = false;
 
-    const now = performance.now();
+    const now = gameNow();
     if (now - lastActivatedAtRef.current < portalActivationCooldownMs) return;
     lastActivatedAtRef.current = now;
     activatedThisEntryRef.current = true;
@@ -1284,6 +1275,7 @@ function ShowcasePortalPad({
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
+      <LocalLightSpill intensity={active ? 2.2 : 0.6} distance={4} />
       <mesh ref={ringRef} geometry={portalRingGeometry} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.52} depthWrite={false} toneMapped={false} />
       </mesh>

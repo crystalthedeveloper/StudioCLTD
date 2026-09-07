@@ -1,3 +1,4 @@
+import { playGameMedia, registerGameMedia, stopGameMedia } from "./gameMedia";
 import { isGameAudioEnabled, subscribeGameAudio } from "./gameAudio";
 
 const defeatAudioPath = "/audio/defeat.mp3";
@@ -40,6 +41,7 @@ function getAudio(path: string, volume: number) {
   if (cached) return cached;
 
   const audio = new Audio(path);
+  registerGameMedia(audio);
   audio.preload = "auto";
   audio.volume = volume;
   audio.muted = !isGameAudioEnabled();
@@ -60,17 +62,15 @@ function installAudioSubscription() {
 }
 
 function playFromStart(audio: HTMLAudioElement) {
-  audio.pause();
+  stopGameMedia(audio);
   audio.currentTime = 0;
   audio.muted = !isGameAudioEnabled();
-  void audio.play().catch(() => {
-    // Playback can be rejected until the player's first interaction.
-  });
+  void playGameMedia(audio);
 }
 
 function stopAndRewind(audio?: HTMLAudioElement) {
   if (!audio) return;
-  audio.pause();
+  stopGameMedia(audio);
   audio.currentTime = 0;
 }
 

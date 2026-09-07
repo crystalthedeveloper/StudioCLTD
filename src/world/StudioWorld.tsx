@@ -1,5 +1,5 @@
 import { Environment } from "@react-three/drei";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CharacterController } from "../player/CharacterController";
 import { resetSpeedBoost } from "../player/speedBoost";
 import { DialogueMessage } from "../ui/DialogueBubble";
@@ -41,17 +41,14 @@ export function StudioWorld({ damageFlashUntil, onBonusCollect, onCoinCollect, o
   const dialogueIdRef = useRef(0);
   const activatedSectionTriggersRef = useRef<Record<string, Set<string>>>({});
   const completedSectionsRef = useRef(new Set<string>());
-  const [movementLocked, setMovementLocked] = useState(false);
   const [activeServiceInfoId, setActiveServiceInfoId] = useState<string | null>(null);
   const [serviceResolutions, setServiceResolutions] = useState<Record<string, boolean>>({});
   const [playerDialogue, setPlayerDialogue] = useState<DialogueMessage | null>(null);
   const [transportDestination, setTransportDestination] = useState<TransportDestination | null>(null);
-  const handleShootAnimationComplete = useCallback(() => setMovementLocked(false), []);
 
   useEffect(() => {
     activatedSectionTriggersRef.current = {};
     completedSectionsRef.current.clear();
-    setMovementLocked(false);
     setActiveServiceInfoId(null);
     setServiceResolutions({});
     setPlayerDialogue(null);
@@ -59,9 +56,6 @@ export function StudioWorld({ damageFlashUntil, onBonusCollect, onCoinCollect, o
     resetSpeedBoost();
   }, [restartKey]);
 
-  useEffect(() => {
-    if (shootRequest > 0) setMovementLocked(true);
-  }, [shootRequest]);
 
   const recordSectionTrigger = (sectionId: string, triggerId: string) => {
     if (completedSectionsRef.current.has(sectionId)) return;
@@ -112,7 +106,6 @@ export function StudioWorld({ damageFlashUntil, onBonusCollect, onCoinCollect, o
         onInfoChange={setActiveServiceInfoId}
         onPlayerDamage={onPlayerDamage}
         restartKey={restartKey}
-        shootRequest={shootRequest}
         onSectionTrigger={recordSectionTrigger}
         onPlayerDialogue={(text) => setPlayerDialogue(createDialogue(text))}
         onSectionResolved={(sectionId) => {
@@ -126,8 +119,6 @@ export function StudioWorld({ damageFlashUntil, onBonusCollect, onCoinCollect, o
       <CharacterController
         damageFlashUntil={damageFlashUntil}
         dialogue={playerDialogue}
-        movementLocked={movementLocked}
-        onFixedAnimationComplete={handleShootAnimationComplete}
         restartKey={restartKey}
         shootRequest={shootRequest}
         transportDestination={transportDestination}

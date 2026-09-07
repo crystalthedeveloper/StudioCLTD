@@ -38,25 +38,25 @@ export function ShareWebsiteScreen({ onClose }: ShareWebsiteScreenProps) {
 
   return (
     <div className="share-screen" role="dialog" aria-modal="true" aria-labelledby="share-screen-title">
-      <button className="share-screen__backdrop" type="button" aria-label="Close share screen" onClick={onClose} />
+      <button className="studio-button studio-button--backdrop share-screen__backdrop" type="button" aria-label="Close share screen" onClick={onClose} />
       <section className="share-screen__card">
-        <button className="share-screen__close" type="button" aria-label="Close" onClick={onClose}>×</button>
+        <button className="studio-button share-screen__close" type="button" aria-label="Close" onClick={onClose}>×</button>
         <span className="share-screen__eyebrow">StudioCLTD</span>
         <h2 id="share-screen-title">Share Website</h2>
         <p>Share Crystal the Developer with someone who needs a better website.</p>
         <div className="share-screen__actions">
           {canUseNativeShare && (
-            <button className="share-screen__primary share-screen__native" type="button" onClick={nativeShare}>
+            <button className="studio-button share-screen__primary share-screen__native" type="button" onClick={nativeShare}>
               Share
             </button>
           )}
-          <button className="share-screen__primary" type="button" onClick={copyLink}>
+          <button className="studio-button share-screen__primary" type="button" onClick={copyLink}>
             {copied ? "Link Copied" : "Copy Link"}
           </button>
           <div className="share-screen__options" aria-label="Share options">
-            <a href={`mailto:?subject=${encodeURIComponent(shareTitle)}&body=${encodedText}%0A${encodedUrl}`}>Email</a>
-            <a href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`} target="_blank" rel="noreferrer">LinkedIn</a>
-            <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`} target="_blank" rel="noreferrer">Facebook</a>
+            <a className="studio-button" href={`mailto:?subject=${encodeURIComponent(shareTitle)}&body=${encodedText}%0A${encodedUrl}`}>Email</a>
+            <a className="studio-button" href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`} target="_blank" rel="noreferrer">LinkedIn</a>
+            <a className="studio-button" href={`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`} target="_blank" rel="noreferrer">Facebook</a>
           </div>
         </div>
       </section>

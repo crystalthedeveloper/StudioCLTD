@@ -1,3 +1,5 @@
+import { setFixHeld } from "../player/fixShooter";
+import { useGameFocus } from "../player/gameFocus";
 import { useSpeedBoostRemainingMs, speedBoostDurationMs } from "../player/speedBoost";
 import { setGameAudioEnabled, useGameAudioEnabled } from "../audio/gameAudio";
 import { getActiveVillainVoiceId, subscribeVillainVoice } from "../audio/villainAudio";
@@ -13,7 +15,6 @@ type GameHudProps = {
   onShoot: () => void;
   points: number;
   shootPressed: boolean;
-  setShootPressed: (pressed: boolean) => void;
 };
 
 const villainVoiceLabels: Record<string, string> = {
@@ -23,7 +24,8 @@ const villainVoiceLabels: Record<string, string> = {
   "site-improvement": "Site Improvement",
 };
 
-export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestart, onShoot, points, setShootPressed, shootPressed }: GameHudProps) {
+export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestart, onShoot, points, shootPressed }: GameHudProps) {
+  const gameFocused = useGameFocus();
   const [guideOpen, setGuideOpen] = useState(false);
   const audioEnabled = useGameAudioEnabled();
   const activeVillainVoiceId = useSyncExternalStore(
@@ -83,7 +85,7 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
         <div className="game-hud__actions">
           <button
             type="button"
-            className="game-hud__guide-button"
+            className="studio-button game-hud__guide-button"
             aria-label="Open game guide"
             aria-expanded={guideOpen}
             title="Game Guide"
@@ -97,7 +99,7 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
           </button>
           <button
             type="button"
-            className={activeVillainVoiceLabel ? "game-hud__sound-button game-hud__sound-button--speaking" : "game-hud__sound-button"}
+            className={activeVillainVoiceLabel ? "studio-button game-hud__sound-button game-hud__sound-button--speaking" : "studio-button game-hud__sound-button"}
             onClick={() => setGameAudioEnabled(!audioEnabled)}
             aria-label={audioEnabled ? "Mute game audio" : "Enable game audio"}
             aria-pressed={!audioEnabled}
@@ -107,13 +109,13 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
             {activeVillainVoiceLabel && <span className="game-hud__sound-label">{activeVillainVoiceLabel}</span>}
             <small className="game-hud__shortcut" aria-hidden="true">2</small>
           </button>
-          <button type="button" onClick={onRestart} aria-label="Restart world" title="Restart">
+          <button className="studio-button" type="button" onClick={onRestart} aria-label="Restart world" title="Restart">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7" />
             </svg>
             <small className="game-hud__shortcut" aria-hidden="true">3</small>
           </button>
-          <button type="button" onClick={onOpenWebsite} aria-label="Open My Site" title="My Site">
+          <button className="studio-button" type="button" onClick={onOpenWebsite} aria-label="Open My Site" title="My Site">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="9" />
               <path d="M3 12h18M12 3c2.4 2.45 3.65 5.45 3.65 9S14.4 18.55 12 21M12 3C9.6 5.45 8.35 8.45 8.35 12S9.6 18.55 12 21" />
@@ -147,33 +149,35 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
         </div>
       </div>
 
-      <div className="game-hud__bottom">
+      {gameFocused && <div className="game-hud__bottom">
         <DirectionControls />
         <button
           type="button"
-          className={`game-hud__shoot${shootPressed ? " game-hud__shoot--pressed" : ""}`}
+          className={`studio-button game-hud__shoot${shootPressed ? " game-hud__shoot--pressed" : ""}`}
           aria-label="Shoot to fix villain"
           aria-pressed={shootPressed}
           title="Shoot / Fix (Space)"
           onPointerDown={(event) => {
+            if (event.button !== 0) return;
             event.preventDefault();
-            setShootPressed(true);
-            onShoot();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setFixHeld(`pointer:${event.pointerId}`, true);
           }}
-          onPointerUp={() => setShootPressed(false)}
-          onPointerCancel={() => setShootPressed(false)}
-          onPointerLeave={() => setShootPressed(false)}
+          onPointerUp={(event) => setFixHeld(`pointer:${event.pointerId}`, false)}
+          onPointerCancel={(event) => setFixHeld(`pointer:${event.pointerId}`, false)}
+          onLostPointerCapture={(event) => setFixHeld(`pointer:${event.pointerId}`, false)}
+          onClick={(event) => { if (event.detail === 0) onShoot(); }}
         >
           <span aria-hidden="true">⚡</span>
           <small>FIX</small>
         </button>
-      </div>
+      </div>}
 
       {guideOpen && createPortal(
         <div className="game-guide" role="dialog" aria-modal="true" aria-labelledby="game-guide-title">
-          <button className="game-guide__backdrop" type="button" aria-label="Close game guide" onClick={() => setGuideOpen(false)} />
+          <button className="studio-button studio-button--backdrop game-guide__backdrop" type="button" aria-label="Close game guide" onClick={() => setGuideOpen(false)} />
           <section className="game-guide__panel">
-            <button className="game-guide__close" type="button" aria-label="Close game guide" onClick={() => setGuideOpen(false)}>×</button>
+            <button className="studio-button game-guide__close" type="button" aria-label="Close game guide" onClick={() => setGuideOpen(false)}>×</button>
             <h2 id="game-guide-title">Game Guide</h2>
             <h3>Controls</h3>
             <dl>

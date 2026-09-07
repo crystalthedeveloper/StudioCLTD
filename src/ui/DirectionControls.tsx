@@ -1,6 +1,6 @@
 import { PointerEvent, useEffect, useRef } from "react";
 import { setTouchCameraInputBlocked } from "../player/cameraInputGuard";
-import { setGameFocused } from "../player/gameFocus";
+import { isGameFocused, subscribeGameFocus } from "../player/gameFocus";
 import { MovementControls, setTouchControls, useKeyboardControls } from "../player/useKeyboardControls";
 
 type Direction = keyof MovementControls;
@@ -52,9 +52,11 @@ export function DirectionControls() {
     const handleVisibilityChange = () => {
       if (document.hidden) releaseAll();
     };
+    const unsubscribe = subscribeGameFocus((running) => { if (!running) releaseAll(); });
     window.addEventListener("blur", releaseAll);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
+      unsubscribe();
       window.removeEventListener("blur", releaseAll);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       releaseAll();
@@ -69,10 +71,9 @@ export function DirectionControls() {
 
   const pressDirection = (directions: readonly Direction[], event: PointerEvent<HTMLButtonElement>) => {
     blockGameInput(event);
+    if (!isGameFocused()) return;
     activePointersRef.current.set(event.pointerId, directions);
     event.currentTarget.setPointerCapture(event.pointerId);
-    setGameFocused(true);
-    document.exitPointerLock?.();
     publishControls();
   };
 
@@ -93,7 +94,7 @@ export function DirectionControls() {
         <button
           key={id}
           type="button"
-          className={`direction-controls__button direction-controls__button--${id}${active ? " direction-controls__button--pressed" : ""}`}
+          className={`studio-button direction-controls__button direction-controls__button--${id}${active ? " direction-controls__button--pressed" : ""}`}
           aria-label={label}
           aria-pressed={active}
           onContextMenu={(event) => event.preventDefault()}

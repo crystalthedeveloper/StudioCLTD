@@ -1,11 +1,28 @@
-import { useEffect, useRef } from "react";
-import { AmbientLight, DirectionalLight } from "three";
-import { hubSections } from "../hubSections";
+import { useEffect, useRef, useState } from "react";
+import { AmbientLight, DirectionalLight, Object3D } from "three";
+import { useGameFrame } from "../../player/useGameFrame";
+import { playerWorldState } from "../playerWorldState";
+import { sunlightOffset, isCompactVisualBudget } from "../visualQuality";
+import { LocalLightPool } from "./LocalLightSpill";
 
 const playerLightingLayer = 2;
 const villainLightingLayer = 1;
 
 export function WorldLights() {
+  const sunRef = useRef<DirectionalLight>(null);
+  const [sunTarget] = useState(() => new Object3D());
+  const [shadowSize] = useState(() => isCompactVisualBudget() ? 1024 : 2048);
+  useEffect(() => { sunRef.current?.layers.enable(3); }, []);
+  useGameFrame(() => {
+    const sun = sunRef.current;
+    if (!sun) return;
+    const texel = 64 / shadowSize;
+    const x = Math.round(playerWorldState.position.x / texel) * texel;
+    const z = Math.round(playerWorldState.position.z / texel) * texel;
+    sunTarget.position.set(x, playerWorldState.position.y, z);
+    sun.position.set(x + sunlightOffset[0], playerWorldState.position.y + sunlightOffset[1], z + sunlightOffset[2]);
+    sunTarget.updateMatrixWorld();
+  });
   const playerFillRef = useRef<AmbientLight>(null);
   const playerKeyRef = useRef<DirectionalLight>(null);
   const playerRimRef = useRef<DirectionalLight>(null);
@@ -24,19 +41,19 @@ export function WorldLights() {
 
   return (
     <>
-      <ambientLight intensity={0.92} color="#fffdf8" />
-      <hemisphereLight intensity={1.32} color="#eef7fc" groundColor="#85877f" />
-      <ambientLight ref={playerFillRef} intensity={0.68} color="#fffdf8" />
+      <ambientLight intensity={0.28} color="#fffdf8" />
+      <hemisphereLight intensity={0.55} color="#eef7fc" groundColor="#85877f" />
+      <ambientLight ref={playerFillRef} intensity={0.32} color="#fffdf8" />
       <directionalLight
         ref={playerKeyRef}
         color="#fff7ec"
-        intensity={2}
+        intensity={0.9}
         position={[8, 14, 10]}
       />
       <directionalLight
         ref={playerRimRef}
         color="#e2f2ff"
-        intensity={1.25}
+        intensity={0.65}
         position={[-12, 9, -14]}
       />
       <ambientLight ref={villainFillRef} intensity={0.12} color="#c7d6e2" />
@@ -52,30 +69,25 @@ export function WorldLights() {
         intensity={0.36}
         position={[-10, 8, -12]}
       />
-      {hubSections.map((section) => (
-        <pointLight
-          key={`platform-light:${section.id}`}
-          color="#b9d5e6"
-          decay={2}
-          distance={24}
-          intensity={12}
-          position={[section.position[0], section.position[1] + 8, section.position[2]]}
-        />
-      ))}
+      <LocalLightPool />
+      <primitive object={sunTarget} />
       <directionalLight
+        ref={sunRef}
+        target={sunTarget}
         castShadow
         color="#fff0d2"
-        intensity={2.12}
-        position={[-34, 52, 28]}
-        shadow-bias={-0.00025}
-        shadow-camera-bottom={-145}
-        shadow-camera-far={240}
-        shadow-camera-left={-145}
+        intensity={1.8}
+        position={[...sunlightOffset]}
+        shadow-bias={-0.0001}
+        shadow-normalBias={0.025}
+        shadow-camera-bottom={-32}
+        shadow-camera-far={180}
+        shadow-camera-left={-32}
         shadow-camera-near={1}
-        shadow-camera-right={145}
-        shadow-camera-top={145}
-        shadow-mapSize-height={1024}
-        shadow-mapSize-width={1024}
+        shadow-camera-right={32}
+        shadow-camera-top={32}
+        shadow-mapSize-height={shadowSize}
+        shadow-mapSize-width={shadowSize}
       />
       <directionalLight color="#afcde3" intensity={0.24} position={[20, 18, -16]} />
     </>

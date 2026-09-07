@@ -1,8 +1,8 @@
+import { RoundedBoxGeometry } from "three-stdlib";
 import { useTexture } from "@react-three/drei";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import { useEffect, useMemo } from "react";
 import {
-  BoxGeometry,
   BufferGeometry,
   LinearFilter,
   LinearMipmapLinearFilter,
@@ -26,7 +26,7 @@ export const concreteTexturePaths: string[] = [
   "/images/optimized/floor/world-weathered-concrete-roughness.webp",
   "/images/optimized/floor/world-weathered-concrete-normal.webp",
 ];
-const concreteNormalScale = new Vector2(0.82, 0.82);
+const concreteNormalScale = new Vector2(0.55, 0.55);
 const rampThickness = 0.36;
 // Box surfaces retain this shared world-space scale. The main ground plane uses
 // a tighter UV multiplier so its broad surface reads at the same visual density.
@@ -55,9 +55,9 @@ export function configureConcreteTextures(textures: ConcreteTextures) {
 }
 
 export function createConcreteMaterial(textures: ConcreteTextures, color: string) {
-  return new MeshStandardMaterial({
+  const material = new MeshStandardMaterial({
     bumpMap: textures[1],
-    bumpScale: 0.06,
+    bumpScale: 0.025,
     color,
     envMapIntensity: 0.22,
     map: textures[0],
@@ -67,6 +67,28 @@ export function createConcreteMaterial(textures: ConcreteTextures, color: string
     roughness: 1,
     roughnessMap: textures[2],
   });
+  // World-space joints and broad wear variation reuse the existing material:
+  // no decal meshes, texture downloads, colliders or extra draw calls.
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = "varying vec3 vConcretePosition; varying float vConcreteTop;\n" + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace("#include <worldpos_vertex>", `
+      #include <worldpos_vertex>
+      vConcretePosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
+      vConcreteTop = abs((modelMatrix * vec4(normal, 0.0)).y);
+    `);
+    shader.fragmentShader = "varying vec3 vConcretePosition; varying float vConcreteTop;\n" + shader.fragmentShader;
+    shader.fragmentShader = shader.fragmentShader.replace("#include <color_fragment>", `
+      #include <color_fragment>
+      vec2 jointDistance = abs(mod(vConcretePosition.xz + 3.5, 7.0) - 3.5);
+      vec2 aa = max(fwidth(vConcretePosition.xz), vec2(0.008));
+      vec2 joint = 1.0 - smoothstep(vec2(0.012), vec2(0.012) + aa, jointDistance);
+      float seam = max(joint.x, joint.y) * smoothstep(0.8, 0.98, vConcreteTop);
+      float wear = sin(vConcretePosition.x * 0.39) * sin(vConcretePosition.z * 0.27);
+      diffuseColor.rgb *= 1.0 - seam * 0.18 + wear * 0.025;
+    `);
+  };
+  material.customProgramCacheKey = () => "studio-concrete-joints-v1";
+  return material;
 }
 
 function applyWorldScaleBoxUvs(geometry: BufferGeometry, offsetX = 0, offsetZ = 0) {
@@ -96,7 +118,7 @@ function applyWorldScaleBoxUvs(geometry: BufferGeometry, offsetX = 0, offsetZ = 
 }
 
 export function createConcreteBoxGeometry(width: number, height: number, depth: number, offsetX = 0, offsetZ = 0) {
-  return applyWorldScaleBoxUvs(new BoxGeometry(width, height, depth), offsetX, offsetZ);
+  return applyWorldScaleBoxUvs(new RoundedBoxGeometry(width, height, depth, 1, Math.min(0.06, height / 6)), offsetX, offsetZ);
 }
 
 function createConcreteFloorGeometry(size: number) {
@@ -119,16 +141,16 @@ export function ModularTerrain({ radius }: ModularTerrainProps) {
   const concreteTextures = useTexture(concreteTexturePaths);
   const floorGeometry = useMemo(() => createConcreteFloorGeometry(platformSize), [platformSize]);
 
-  configureConcreteTextures(concreteTextures);
+  useMemo(() => configureConcreteTextures(concreteTextures), [concreteTextures]);
   const terrainMaterial = useMemo(
     () => createConcreteMaterial(concreteTextures, "#46515d"),
     [concreteTextures],
   );
   const floorMaterial = useMemo(() => {
-    const material = terrainMaterial.clone();
+    const material = createConcreteMaterial(concreteTextures, "#3f4953");
     material.color.set("#3f4953");
     return material;
-  }, [terrainMaterial]);
+  }, [concreteTextures]);
 
   useEffect(() => () => floorMaterial.dispose(), [floorMaterial]);
   useEffect(() => () => terrainMaterial.dispose(), [terrainMaterial]);
@@ -194,7 +216,7 @@ function DestinationPlatform({
           position={[x, height / 2, z]}
           friction={0.35}
         />
-        <mesh position={[x, height / 2, z]} material={material} receiveShadow>
+        <mesh position={[x, height / 2, z]} material={material} castShadow receiveShadow>
           <primitive object={platformGeometry} attach="geometry" />
         </mesh>
       </RigidBody>
@@ -207,6 +229,7 @@ function DestinationPlatform({
         <mesh
           material={material}
           receiveShadow
+          castShadow
           rotation-x={bridgeAngle}
         >
           <primitive object={rampGeometry} attach="geometry" />

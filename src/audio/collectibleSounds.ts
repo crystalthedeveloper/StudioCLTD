@@ -1,7 +1,7 @@
 import type { GameAudioState } from "../player/footsteps";
 import { getActiveGameAudioState } from "../player/footsteps";
 
-export type CollectibleSound = "coin" | "speed" | "penalty" | "contact" | "health";
+export type CollectibleSound = "ammo" | "coin" | "speed" | "penalty" | "contact" | "health";
 
 type ToneOptions = {
   delay?: number;
@@ -34,6 +34,12 @@ function playTone({ context, masterGain }: GameAudioState, options: ToneOptions)
 export function playCollectibleSound(sound: CollectibleSound) {
   const state = getActiveGameAudioState();
   if (!state) return;
+
+  if (sound === "ammo") {
+    playTone(state, { type: "triangle", startFrequency: 640, endFrequency: 960, duration: 0.1, gain: 0.025 });
+    playTone(state, { type: "sine", startFrequency: 960, endFrequency: 1440, duration: 0.12, gain: 0.022, delay: 0.07 });
+    return;
+  }
 
   if (sound === "coin") {
     playTone(state, { type: "sine", startFrequency: 720, endFrequency: 980, duration: 0.16, gain: 0.034 });

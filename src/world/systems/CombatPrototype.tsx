@@ -1,4 +1,4 @@
-import { recordFixHit, releaseFixShot, subscribeFixShot, maxFixShots } from "../../player/fixShooter";
+import { fixModes, type FixMode, recordFixHit, releaseFixShot, subscribeFixShot, maxFixShots } from "../../player/fixShooter";
 import { segmentEllipsoidHit } from "../projectileCollision";
 import { LocalLightSpill } from "./LocalLightSpill";
 import { useGameFrame } from "../../player/useGameFrame";
@@ -169,8 +169,7 @@ const bonusProjectileHitbox = {
 const energyBallRadius = 0.46;
 const mainVillainHitRadius = 1.45;
 const projectileMaxDistance = 48;
-const projectileSpeed = 140;
-const fixHitHandlers = new Map<string, (position: Vector3) => void>();
+const fixHitHandlers = new Map<string, (position: Vector3, damage: number) => void>();
 const resolvedTargets = new Set<string>();
 const crosshairNdc = new Vector2(0, crosshairNdcY);
 const bonusTargets = new Map<string, {
@@ -194,9 +193,12 @@ const tracerGlowMaterial = new MeshBasicMaterial({
   toneMapped: false,
   transparent: true,
 });
+const shotMaterials = Object.fromEntries(Object.entries(fixModes).map(([mode, config]) => {
+  const core = tracerMaterial.clone(); core.color.set(config.color);
+  const glow = tracerGlowMaterial.clone(); glow.color.set(config.glow);
+  return [mode, { core, glow }];
+})) as Record<FixMode, { core: MeshBasicMaterial; glow: MeshBasicMaterial }>;
 const effectSphereGeometry = new SphereGeometry(1, 8, 6);
-const effectCoreMaterial = new MeshBasicMaterial({ blending: AdditiveBlending, color: "#fffbe0", depthWrite: false, toneMapped: false, transparent: true });
-const effectGlowMaterial = new MeshBasicMaterial({ blending: AdditiveBlending, color: "#facc15", depthWrite: false, opacity: 0.28, toneMapped: false, transparent: true });
 
 type CombatPrototypeProps = {
   onBonusCollect: () => void;
@@ -304,6 +306,7 @@ function BonusVillain({
   const lastSpawnSpotRef = useRef(initialSpot);
   const targetSpotRef = useRef((initialSpot + 1) % bonusSpawnSpots.length);
   const aliveRef = useRef(true);
+  const healthRef = useRef(1);
   const chasingPlayerRef = useRef(false);
   const touchingPlayerRef = useRef(false);
   const respawnTimerRef = useRef(0);
@@ -342,8 +345,10 @@ function BonusVillain({
   }, [id]);
 
   useEffect(() => {
-    const hit = (position: Vector3) => {
+    const hit = (position: Vector3, damage: number) => {
     if (!aliveRef.current) return;
+    healthRef.current -= damage;
+    if (healthRef.current > 0) return;
     aliveRef.current = false;
     chasingPlayerRef.current = false;
     touchingPlayerRef.current = false;
@@ -370,6 +375,7 @@ function BonusVillain({
       chasingPlayerRef.current = false;
       groupRef.current?.position.copy(positionRef.current);
       aliveRef.current = true;
+      healthRef.current = 1;
       const respawnTarget = bonusTargets.get(id);
       if (respawnTarget) respawnTarget.alive = true;
       setAlive(true);
@@ -474,6 +480,7 @@ function BonusVillain({
 }
 
 type EnergyProjectile = {
+  mode: FixMode;
   obstacles: Object3D[];
   direction: Vector3;
   id: number;
@@ -482,6 +489,7 @@ type EnergyProjectile = {
 };
 
 type EnergyImpact = {
+  mode: FixMode;
   hit: boolean;
   id: number;
   position: Vector3;
@@ -504,7 +512,7 @@ function EnergyProjectileSystem() {
   const { camera, scene } = useThree();
 
   useEffect(() => {
-    const unsubscribe = subscribeFixShot((id) => {
+    const unsubscribe = subscribeFixShot((id, mode) => {
       if (activeIds.current.size >= maxFixShots) { releaseFixShot(id); return; }
       const playerYaw = playerWorldState.yaw;
       const forward = new Vector3(-Math.sin(playerYaw), 0, -Math.cos(playerYaw));
@@ -520,7 +528,7 @@ function EnergyProjectileSystem() {
       const direction = target.sub(position).normalize();
       activeIds.current.add(id);
       playEnergyBlastSound();
-      setProjectiles((current) => [...current, { direction, id, maxDistance: projectileMaxDistance, position, obstacles }]);
+      setProjectiles((current) => [...current, { direction, id, mode, maxDistance: projectileMaxDistance, position, obstacles }]);
     });
     return () => {
       unsubscribe();
@@ -536,12 +544,12 @@ function EnergyProjectileSystem() {
           if (!activeIds.current.delete(projectile.id)) return;
           releaseFixShot(projectile.id);
           setProjectiles((current) => current.filter(({ id }) => id !== projectile.id));
-          setImpacts((current) => [...current.slice(-(maxFixShots - 1)), { id: projectile.id, position, hit: Boolean(hitId) }]);
-          if (hitId) { recordFixHit(); fixHitHandlers.get(hitId)?.(position); }
+          setImpacts((current) => [...current.slice(-(maxFixShots - 1)), { id: projectile.id, mode: projectile.mode, position, hit: Boolean(hitId) }]);
+          if (hitId) { recordFixHit(projectile.mode); fixHitHandlers.get(hitId)?.(position, fixModes[projectile.mode].damage); }
         }} />
       ))}
       {impacts.map((impact) => (
-        <ImpactBurst key={impact.id} position={impact.position} hit={impact.hit}
+        <ImpactBurst key={impact.id} position={impact.position} hit={impact.hit} mode={impact.mode}
           onComplete={() => setImpacts((current) => current.filter(({ id }) => id !== impact.id))} />
       ))}
     </group>
@@ -576,12 +584,13 @@ function EnergyBall({ onComplete, projectile }: { onComplete: (hitId: string | u
   useGameFrame((_, delta) => {
     const group = groupRef.current;
     if (!group || completedRef.current) return;
-    const distance = Math.min(Math.max(0, delta) * projectileSpeed, projectile.maxDistance - travelledRef.current);
+    const distance = Math.min(Math.max(0, delta) * fixModes[projectile.mode].speed, projectile.maxDistance - travelledRef.current);
     const start = group.position.clone();
     const end = start.clone().addScaledVector(projectile.direction, distance);
     let earliest = 1;
     let hitId: string | undefined;
-    const radius = mainVillainHitRadius + energyBallRadius;
+    const shotRadius = energyBallRadius * fixModes[projectile.mode].size;
+    const radius = mainVillainHitRadius + shotRadius;
     for (const encounter of sectionEncounters) {
       if (!fixHitHandlers.has(encounter.id) || resolvedTargets.has(encounter.id)) continue;
       const center = encounter.villainPosition.clone(); center.y += 1.25;
@@ -591,7 +600,7 @@ function EnergyBall({ onComplete, projectile }: { onComplete: (hitId: string | u
     for (const [id, target] of bonusTargets) {
       if (!target.alive) continue;
       const center = target.position.clone(); center.y += target.hitbox.centerY;
-      const t = segmentEllipsoidHit(start, end, center, target.hitbox.horizontalRadius + energyBallRadius, target.hitbox.verticalRadius + energyBallRadius, target.hitbox.horizontalRadius + energyBallRadius);
+      const t = segmentEllipsoidHit(start, end, center, target.hitbox.horizontalRadius + shotRadius, target.hitbox.verticalRadius + shotRadius, target.hitbox.horizontalRadius + shotRadius);
       if (t !== null && t <= earliest) { earliest = t; hitId = id; }
     }
     const ray = collisionRay.current;
@@ -609,16 +618,16 @@ function EnergyBall({ onComplete, projectile }: { onComplete: (hitId: string | u
 
   return (
     <>
-      <MuzzleFlash position={projectile.position} />
-      <group ref={groupRef} position={projectile.position} quaternion={orientation}>
-        <mesh geometry={tracerGeometry} material={tracerMaterial} position={[0, -0.675, 0]} />
-        <mesh geometry={tracerGlowGeometry} material={tracerGlowMaterial} position={[0, -0.675, 0]} />
+      <MuzzleFlash position={projectile.position} mode={projectile.mode} />
+      <group ref={groupRef} position={projectile.position} quaternion={orientation} scale={fixModes[projectile.mode].size}>
+        <mesh geometry={tracerGeometry} material={shotMaterials[projectile.mode].core} position={[0, -0.675, 0]} />
+        <mesh geometry={tracerGlowGeometry} material={shotMaterials[projectile.mode].glow} position={[0, -0.675, 0]} />
       </group>
     </>
   );
 }
 
-function MuzzleFlash({ position }: { position: Vector3 }) {
+function MuzzleFlash({ position, mode }: { position: Vector3; mode: FixMode }) {
   const groupRef = useRef<Group>(null);
   const elapsedRef = useRef(0);
 
@@ -626,20 +635,20 @@ function MuzzleFlash({ position }: { position: Vector3 }) {
     elapsedRef.current += delta;
     const group = groupRef.current;
     if (!group) return;
-    const progress = Math.min(elapsedRef.current / 0.09, 1);
+    const progress = Math.min(elapsedRef.current / fixModes[mode].flashDuration, 1);
     group.visible = progress < 1;
-    group.scale.setScalar(0.18 + progress * 0.22);
+    group.scale.setScalar((0.18 + progress * 0.22) * fixModes[mode].size);
   });
 
   return (
     <group ref={groupRef} position={position}>
-      <mesh geometry={effectSphereGeometry} material={effectCoreMaterial} scale={[1, 0.65, 1]} />
-      <mesh geometry={effectSphereGeometry} material={effectGlowMaterial} scale={1.7} />
+      <mesh geometry={effectSphereGeometry} material={shotMaterials[mode].core} scale={[1, 0.65, 1]} />
+      <mesh geometry={effectSphereGeometry} material={shotMaterials[mode].glow} scale={1.7} />
     </group>
   );
 }
 
-function ImpactBurst({ onComplete, position, hit }: { onComplete: () => void; position: Vector3; hit: boolean }) {
+function ImpactBurst({ onComplete, position, hit, mode }: { onComplete: () => void; position: Vector3; hit: boolean; mode: FixMode }) {
   const groupRef = useRef<Group>(null);
   const elapsedRef = useRef(0);
   const sparkDirections = useMemo(() => [
@@ -651,10 +660,10 @@ function ImpactBurst({ onComplete, position, hit }: { onComplete: () => void; po
 
   useGameFrame((_, delta) => {
     elapsedRef.current += delta;
-    const progress = Math.min(elapsedRef.current / (hit ? 0.24 : 0.14), 1);
+    const progress = Math.min(elapsedRef.current / (hit ? fixModes[mode].impactDuration : fixModes[mode].impactDuration * 0.6), 1);
     const group = groupRef.current;
     if (group) {
-      group.scale.setScalar((hit ? 0.24 : 0.12) + progress * (hit ? 0.55 : 0.25));
+      group.scale.setScalar(((hit ? 0.24 : 0.12) + progress * (hit ? 0.55 : 0.25)) * fixModes[mode].size);
       group.children.forEach((child, index) => {
         if (index < 2) return;
         child.position.copy(sparkDirections[index - 2]).multiplyScalar(progress * 0.7);
@@ -665,10 +674,10 @@ function ImpactBurst({ onComplete, position, hit }: { onComplete: () => void; po
 
   return (
     <group ref={groupRef} position={position}>
-      <mesh geometry={effectSphereGeometry} material={effectCoreMaterial} />
-      <mesh geometry={effectSphereGeometry} material={effectGlowMaterial} scale={1.65} />
+      <mesh geometry={effectSphereGeometry} material={shotMaterials[mode].core} />
+      <mesh geometry={effectSphereGeometry} material={shotMaterials[mode].glow} scale={1.65} />
       {sparkDirections.map((_, index) => (
-        <mesh key={index} geometry={effectSphereGeometry} material={effectCoreMaterial} scale={0.12} />
+        <mesh key={index} geometry={effectSphereGeometry} material={shotMaterials[mode].core} scale={0.12} />
       ))}
     </group>
   );
@@ -701,6 +710,7 @@ function SectionPortalEncounter({
   const touchingPlayerRef = useRef(false);
   const sectionResolvedTimerRef = useRef(0);
   const defeatedRef = useRef(false);
+  const healthRef = useRef(1);
   useEffect(() => () => stopVillainVoice(encounter.id), [encounter.id]);
 
   useEffect(() => {
@@ -730,7 +740,11 @@ function SectionPortalEncounter({
   };
 
   useEffect(() => {
-    fixHitHandlers.set(encounter.id, activatePad);
+    fixHitHandlers.set(encounter.id, (_position, damage) => {
+      if (defeatedRef.current) return;
+      healthRef.current -= damage;
+      if (healthRef.current <= 0) activatePad();
+    });
     return () => { fixHitHandlers.delete(encounter.id); };
   });
   useEffect(() => () => { resolvedTargets.delete(encounter.id); }, [encounter.id]);

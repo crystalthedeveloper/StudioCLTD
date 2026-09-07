@@ -1,9 +1,9 @@
-import { setFixHeld } from "../player/fixShooter";
+import { type FixMode, selectFixWeapon, getFixReserves, fixAmmoRespawnMs, fixModes, getFixAmmo, getFixMode, subscribeFixInput, setFixHeld } from "../player/fixShooter";
 import { useGameFocus } from "../player/gameFocus";
 import { useSpeedBoostRemainingMs, speedBoostDurationMs } from "../player/speedBoost";
 import { setGameAudioEnabled, useGameAudioEnabled } from "../audio/gameAudio";
 import { getActiveVillainVoiceId, subscribeVillainVoice } from "../audio/villainAudio";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { DirectionControls } from "./DirectionControls";
 
@@ -26,6 +26,9 @@ const villainVoiceLabels: Record<string, string> = {
 
 export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestart, onShoot, points, shootPressed }: GameHudProps) {
   const gameFocused = useGameFocus();
+  const ammo = useSyncExternalStore(subscribeFixInput, getFixAmmo);
+  const reserves = useSyncExternalStore(subscribeFixInput, getFixReserves);
+  const mode = useSyncExternalStore(subscribeFixInput, getFixMode);
   const [guideOpen, setGuideOpen] = useState(false);
   const audioEnabled = useGameAudioEnabled();
   const activeVillainVoiceId = useSyncExternalStore(
@@ -149,6 +152,21 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
         </div>
       </div>
 
+      <div className="game-hud__weapons" role="group" aria-label="Fix weapons and ammo">
+        {(Object.keys(fixModes) as FixMode[]).map((weapon) => (
+          <button key={weapon} type="button" className="studio-button game-hud__weapon"
+            style={{ "--weapon-color": fixModes[weapon].color } as CSSProperties}
+            disabled={!gameFocused || reserves[weapon] === 0}
+            aria-pressed={mode === weapon && reserves[weapon] > 0}
+            aria-label={`Weapon ${fixModes[weapon].label}, AMMO ${reserves[weapon]}`}
+            onClick={() => selectFixWeapon(weapon)}>
+            <strong>{fixModes[weapon].label}</strong>
+            <span>AMMO {reserves[weapon]}</span>
+            <small className="game-hud__weapon-shortcut" aria-hidden="true">{fixModes[weapon].shortcut}</small>
+          </button>
+        ))}
+      </div>
+
       {gameFocused && <div className="game-hud__bottom">
         <DirectionControls />
         <button
@@ -156,7 +174,8 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
           className={`studio-button game-hud__shoot${shootPressed ? " game-hud__shoot--pressed" : ""}`}
           aria-label="Shoot to fix villain"
           aria-pressed={shootPressed}
-          title="Shoot / Fix (Space)"
+          title={ammo > 0 ? "Shoot / Fix (Space)" : "Collect yellow cubes for ammo"}
+          disabled={ammo === 0}
           onPointerDown={(event) => {
             if (event.button !== 0) return;
             event.preventDefault();
@@ -183,9 +202,9 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
             <dl>
               <div><dt>WASD / Arrow Keys</dt><dd>Move</dd></div>
               <div><dt>On-screen Arrows</dt><dd>Move</dd></div>
-              <div><dt>Space / Shoot button</dt><dd>Shoot/Fix</dd></div>
+              <div><dt>Space / Fix button</dt><dd>Shoot/Fix</dd></div>
             </dl>
-            <p className="game-guide__tip">Hold two directions together for diagonal movement.</p>
+            <p className="game-guide__tip">Hold Fix to repeat shots. Each shot uses one ammo. Yellow cubes add to separate reserves: {fixModes.standard.label} gives {fixModes.standard.ammo} shots, {fixModes.rapid.label} gives {fixModes.rapid.ammo}, and {fixModes.power.label} gives {fixModes.power.ammo}. Choose a numbered weapon box or use G / H / J on desktop. Empty weapons cannot be selected. Cubes return after {fixAmmoRespawnMs / 1000} seconds.</p>
             <h3>Logo Guide</h3>
             <ul className="game-guide__logos">
               <li><span>🟢</span> Green — Coin / Score</li>

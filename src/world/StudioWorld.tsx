@@ -1,3 +1,4 @@
+import { FixAmmoPickups } from "./systems/FixAmmoPickups";
 import { Environment } from "@react-three/drei";
 import { useEffect, useRef, useState } from "react";
 import { CharacterController } from "../player/CharacterController";
@@ -82,6 +83,7 @@ export function StudioWorld({ damageFlashUntil, onBonusCollect, onCoinCollect, o
   return (
     <>
       <WorldLights />
+      <FixAmmoPickups key={`ammo:${restartKey}`} />
       <SpaceSky />
       <Environment preset="warehouse" background={false} environmentIntensity={0.16} />
       <ModularTerrain radius={7} />

@@ -1,5 +1,5 @@
 import { useGameFrame } from "./player/useGameFrame";
-import { fireFixShot, isFixHeld, lastFixHitAt, resetFixShooter, setFixHeld, subscribeFixInput, subscribeFixShot } from "./player/fixShooter";
+import { fixModes, selectFixWeaponByKey, fireFixShot, isFixHeld, lastFixHitAt, lastFixHitMode, resetFixShooter, setFixHeld, subscribeFixInput, subscribeFixShot } from "./player/fixShooter";
 import { gameNow } from "./player/gameFocus";
 import { Canvas } from "@react-three/fiber";
 import { useProgress } from "@react-three/drei";
@@ -99,9 +99,12 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   useEffect(() => {
     resetFixShooter();
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.code !== "Space" || event.repeat || !isGameFocused()) return;
+      if (event.repeat || event.altKey || event.ctrlKey || event.metaKey || !isGameFocused() || window.matchMedia("(pointer: coarse)").matches) return;
+      if (!["Space", "KeyG", "KeyH", "KeyJ"].includes(event.code)) return;
       const target = event.target;
-      if (target instanceof HTMLElement && target.closest("input, textarea, [contenteditable=true], button:not(.game-hud__shoot)")) return;
+      if (target instanceof HTMLElement && target.closest("input, textarea, [contenteditable=true]")) return;
+      if (event.code !== "Space") { event.preventDefault(); selectFixWeaponByKey(event.code); return; }
+      if (target instanceof HTMLElement && target.closest("button:not(.game-hud__shoot)")) return;
       event.preventDefault();
       setFixHeld("keyboard", true);
     };
@@ -264,9 +267,6 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
           }}
           camera={{ position: [11, 7, 15], fov: 58, near: 0.1, far: 10000 }}
 
-          onPointerDown={(event) => {
-            if (event.button === 0) setFixHeld(`pointer:${event.pointerId}`, true);
-          }}
           onWheel={(event) => {
             event.stopPropagation();
             event.nativeEvent.preventDefault();
@@ -417,6 +417,7 @@ function StartupProgress({
 
 function FixHitFeedback({ crosshairRef }: { crosshairRef: RefObject<HTMLDivElement> }) {
   useGameFrame(() => {
+    crosshairRef.current?.style.setProperty("--hit-color", fixModes[lastFixHitMode].color);
     crosshairRef.current?.classList.toggle("aim-crosshair--hit", gameNow() - lastFixHitAt < 180);
   });
   return null;

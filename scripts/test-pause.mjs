@@ -261,3 +261,84 @@ shooter.resetFixShooter();
 assert.deepEqual(inventory(), { standard: 0, rapid: 0, power: 0 });
 stopInventoryShots();
 console.log('Inventory tests passed: separate/additive reserves, zero start/reset, G/H/J, no firing on selection, cooldown/hold isolation, empty weapons, automatic pickup selection and pause guards.');
+
+// Actual animation time, rather than contact entry or browser timers, controls damage.
+const combatModule = load('src/villain/villainCombat.ts', { three: THREE, '../player/gameFocus': focus });
+const actor = new THREE.Object3D();
+const actorMixer = new THREE.AnimationMixer(actor);
+const makeAction = (name, duration) => actorMixer.clipAction(new THREE.AnimationClip(name, duration, [new THREE.NumberKeyframeTrack('.position[x]', [0,duration], [0,0])]));
+const combatActions = { idleV: makeAction('idleV', 1), runV: makeAction('runV', 1), attackV: makeAction('attackV', 1.25), dieV: makeAction('dieV', 1) };
+const combat = combatModule.createVillainCombat(combatActions);
+let damage = 0;
+const impact = () => damage++;
+setGameFocused(true);
+combat.setMotion('idle');
+assert.equal(combat.updateAttack(true, true, impact), true);
+assert.equal(damage, 0, 'entering range does not immediately deal damage');
+actorMixer.update(0.57);
+combat.updateAttack(true, true, impact);
+assert.equal(damage, 0);
+actorMixer.update(0.02);
+combat.updateAttack(true, true, impact);
+assert.equal(damage, 1, 'damage occurs at the strike time');
+actorMixer.update(0.1);
+combat.updateAttack(true, true, impact);
+assert.equal(damage, 1, 'one attack cannot hit twice');
+setGameFocused(false);
+combat.updateAttack(true, true, impact);
+advance(5000);
+assert.equal(damage, 1, 'paused attacks do no damage');
+setGameFocused(true);
+actorMixer.update(0.7);
+combat.updateAttack(true, true, impact);
+combat.updateAttack(true, true, impact);
+assert.equal(combatActions.attackV.isRunning(), false, 'recovery cooldown prevents immediate restart');
+advance(450);
+combat.updateAttack(true, true, impact);
+actorMixer.update(0.3);
+assert.equal(combat.updateAttack(false, true, impact), false, 'leaving range immediately allows chasing');
+actorMixer.update(0.5);
+combat.updateAttack(false, true, impact);
+assert.equal(damage, 1, 'cancelled strike cannot deal late damage');
+advance(450);
+combat.updateAttack(true, true, impact);
+actorMixer.update(0.3);
+combat.updateAttack(true, false, impact);
+actorMixer.update(0.6);
+combat.updateAttack(true, false, impact);
+assert.equal(damage, 1, 'death interrupts the attack');
+setGameFocused(false);
+console.log('Villain combat tests passed: animation-timed impact, one hit per cycle, cooldown, range cancellation, death interruption and paused damage guard.');
+
+// Run navigation clearance and attack sight checks against real Rapier colliders.
+const rapierModule = await import('@dimforge/rapier3d-compat');
+const rapier = rapierModule.default;
+await rapier.init();
+const navigationWorld = new rapier.World({ x: 0, y: 0, z: 0 });
+const colliderStates = new Map();
+function addCollider(x, y, z, hx, hy, hz, name = '') {
+  const body = navigationWorld.createRigidBody(rapier.RigidBodyDesc.fixed().setTranslation(x,y,z));
+  const collider = navigationWorld.createCollider(rapier.ColliderDesc.cuboid(hx,hy,hz), body);
+  const object = new THREE.Object3D(); object.name = name;
+  colliderStates.set(collider.handle, { object });
+  return body;
+}
+addCollider(0,-0.25,0,14,0.25,14);
+addCollider(0,1.25,0,0.5,1.25,0.25,'Screen');
+addCollider(2,1,0,0.4,1,0.4,'StudioCLTDPlayer');
+const selfBody = addCollider(4,1.2,0,0.5,1.25,0.5,'Villain');
+navigationWorld.step();
+const navigationModule = load('src/villain/useVillainNavigation.ts', {
+  react: { useMemo: (factory) => factory() },
+  '@react-three/rapier': { useRapier: () => ({ world: navigationWorld, rapier, colliderStates }) },
+  three: THREE,
+  '../world/playerCollision': load('src/world/playerCollision.ts', { three: THREE }),
+});
+const navigation = navigationModule.useVillainNavigation();
+assert.equal(navigation.clear(0,0,0), false, 'screen blocks movement volume');
+assert.equal(navigation.clear(-2,0,0), true, 'standing above platform floor is allowed');
+assert.equal(navigation.clear(2,0,0), true, 'player collider does not trap chasing logic');
+assert.equal(navigation.clear(4,0,0,selfBody), true, 'villain excludes its own collider');
+assert.equal(navigation.sight(vector(-2),vector(2)), false, 'screen blocks attack line of sight');
+navigationWorld.free();
+console.log('Rapier navigation tests passed: screen blocking, floor clearance, player/self filtering and attack line of sight.');

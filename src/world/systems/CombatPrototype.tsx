@@ -1,3 +1,5 @@
+import { createVillainCombat, villainClips } from "../../villain/villainCombat";
+import { useVillainNavigation } from "../../villain/useVillainNavigation";
 import { fixModes, type FixMode, recordFixHit, releaseFixShot, subscribeFixShot, maxFixShots } from "../../player/fixShooter";
 import { segmentEllipsoidHit } from "../projectileCollision";
 import { LocalLightSpill } from "./LocalLightSpill";
@@ -8,8 +10,8 @@ import { gameTimers } from "../../player/gameFocus";
 import { useGLTF } from "@react-three/drei";
 import { CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload } from "@react-three/rapier";
 import { useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AdditiveBlending, CylinderGeometry, Group, InstancedMesh, LoopRepeat, Mesh, MeshBasicMaterial, Object3D, PointLight, Quaternion, Raycaster, SphereGeometry, Vector2, Vector3 } from "three";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { AdditiveBlending, CylinderGeometry, Group, InstancedMesh, Mesh, MeshBasicMaterial, Object3D, PointLight, Quaternion, Raycaster, SphereGeometry, Vector2, Vector3 } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import { applyCharacterMaterials, villainMaterialProfile } from "../../characters/characterMaterials";
 import { applyNaturalMaterials } from "../../characters/naturalMaterials";
@@ -43,7 +45,6 @@ const villainFrontOffset = 2.8;
 const villainSideOffset = 5.1;
 const triggerPadFrontOffset = 5.8;
 const triggerPadSideOffset = 3.6;
-const mainVillainContactRadiusSq = 1.2 * 1.2;
 const bonusVillainContactRadiusSq = 1 * 1;
 const bonusVillainDetectionRadiusSq = 8 * 8;
 const bonusVillainChaseReleaseRadiusSq = 11 * 11;
@@ -171,6 +172,7 @@ const mainVillainHitRadius = 1.45;
 const projectileMaxDistance = 48;
 const fixHitHandlers = new Map<string, (position: Vector3, damage: number) => void>();
 const resolvedTargets = new Set<string>();
+const mainVillainPositions = new Map<string, Vector3>();
 const crosshairNdc = new Vector2(0, crosshairNdcY);
 const bonusTargets = new Map<string, {
   alive: boolean;
@@ -308,13 +310,17 @@ function BonusVillain({
   const aliveRef = useRef(true);
   const healthRef = useRef(1);
   const chasingPlayerRef = useRef(false);
-  const touchingPlayerRef = useRef(false);
   const respawnTimerRef = useRef(0);
   const pointsTimerRef = useRef(0);
   const [alive, setAlive] = useState(true);
   const [showPoints, setShowPoints] = useState(false);
   const pointsPositionRef = useRef(new Vector3());
-  const { actions } = useGameAnimations(model.animations, groupRef, "idleV");
+  const clips = useMemo(() => villainClips(model.animations), [model.animations]);
+  const { actions } = useGameAnimations(clips, groupRef, "idleV");
+  const combat = useMemo(() => createVillainCombat(actions), [actions]);
+  const navigation = useVillainNavigation();
+  const deathTimer = useRef(0);
+  useLayoutEffect(() => { combat.setMotion("idle"); }, [combat]);
 
   useEffect(() => {
     applyCharacterMaterials(scene, model.materials, villainMaterialProfile);
@@ -327,17 +333,9 @@ function BonusVillain({
   }, [model.materials, scene]);
 
   useEffect(() => {
-    const action = actions.runV;
-    if (!action) return undefined;
-    action.reset().setLoop(LoopRepeat, Infinity).play();
-    return () => {
-      action.stop();
-    };
-  }, [actions]);
-
-  useEffect(() => {
     bonusTargets.set(id, { alive: true, hitbox: bonusProjectileHitbox, position: positionRef.current });
     return () => {
+      gameTimers.clearTimeout(deathTimer.current);
       gameTimers.clearTimeout(respawnTimerRef.current);
       gameTimers.clearTimeout(pointsTimerRef.current);
       bonusTargets.delete(id);
@@ -351,10 +349,10 @@ function BonusVillain({
     if (healthRef.current > 0) return;
     aliveRef.current = false;
     chasingPlayerRef.current = false;
-    touchingPlayerRef.current = false;
     const target = bonusTargets.get(id);
     if (target) target.alive = false;
-    setAlive(false);
+    combat.setMotion("dead");
+    deathTimer.current = gameTimers.setTimeout(() => setAlive(false), (actions.dieV?.getClip().duration ?? 1) * 1000);
     pointsPositionRef.current.copy(position);
     pointsPositionRef.current.y += 0.55;
     setShowPoints(true);
@@ -378,29 +376,34 @@ function BonusVillain({
       healthRef.current = 1;
       const respawnTarget = bonusTargets.get(id);
       if (respawnTarget) respawnTarget.alive = true;
+      combat.setMotion("idle");
       setAlive(true);
     }, delay);
     };
     fixHitHandlers.set(id, hit);
     return () => { fixHitHandlers.delete(id); };
-  }, [id, initialSpot, onDefeat]);
+  }, [id, initialSpot, onDefeat, combat, actions]);
 
   useGameFrame((_, delta) => {
     const group = groupRef.current;
     if (!group || !aliveRef.current) {
-      touchingPlayerRef.current = false;
-      return;
+        return;
     }
     const playerDx = playerWorldState.position.x - positionRef.current.x;
     const playerDz = playerWorldState.position.z - positionRef.current.z;
     const playerDistanceSq = playerDx * playerDx + playerDz * playerDz;
-    const touchingPlayer = playerDistanceSq <= bonusVillainContactRadiusSq;
-    if (touchingPlayer && !touchingPlayerRef.current) onPlayerDamage();
-    touchingPlayerRef.current = touchingPlayer;
+    const sameLevel = Math.abs(playerWorldState.position.y - (positionRef.current.y + 1)) < 1.5;
+    const inRange = sameLevel && playerDistanceSq <= bonusVillainContactRadiusSq && navigation.sight(positionRef.current, playerWorldState.position);
+    if (combat.updateAttack(inRange, true, onPlayerDamage)) {
+      group.rotation.y = Math.atan2(playerDx, playerDz);
+      return;
+    }
+    combat.setMotion("running");
+    if (!sameLevel) chasingPlayerRef.current = false;
 
     if (chasingPlayerRef.current) {
       if (playerDistanceSq > bonusVillainChaseReleaseRadiusSq) chasingPlayerRef.current = false;
-    } else if (playerDistanceSq <= bonusVillainDetectionRadiusSq) {
+    } else if (sameLevel && playerDistanceSq <= bonusVillainDetectionRadiusSq) {
       chasingPlayerRef.current = true;
     }
 
@@ -414,13 +417,14 @@ function BonusVillain({
       const playerHeading = Math.atan2(directionX, directionZ);
       const safeHeading = bonusVillainSteeringAngles
         .map((angle) => playerHeading + angle)
-        .find((candidateHeading) => canBonusVillainMove(
+        .find((candidateHeading) => navigation.clear(positionRef.current.x + Math.sin(candidateHeading) * step, positionRef.current.y, positionRef.current.z + Math.cos(candidateHeading) * step) && canBonusVillainMove(
           positionRef.current.x,
           positionRef.current.z,
           positionRef.current.x + Math.sin(candidateHeading) * step,
           positionRef.current.z + Math.cos(candidateHeading) * step,
         ));
 
+      if (safeHeading === undefined) combat.setMotion("idle");
       if (safeHeading !== undefined) {
         positionRef.current.x += Math.sin(safeHeading) * step;
         positionRef.current.z += Math.cos(safeHeading) * step;
@@ -449,7 +453,8 @@ function BonusVillain({
     const heading = Math.atan2(dx, dz);
     const nextX = positionRef.current.x + Math.sin(heading) * step;
     const nextZ = positionRef.current.z + Math.cos(heading) * step;
-    if (!canBonusVillainMove(positionRef.current.x, positionRef.current.z, nextX, nextZ)) {
+    if (!navigation.clear(nextX, positionRef.current.y, nextZ) || !canBonusVillainMove(positionRef.current.x, positionRef.current.z, nextX, nextZ)) {
+      combat.setMotion("idle");
       targetSpotRef.current = (targetSpotRef.current + 1 + initialSpot) % bonusSpawnSpots.length;
       return;
     }
@@ -593,7 +598,7 @@ function EnergyBall({ onComplete, projectile }: { onComplete: (hitId: string | u
     const radius = mainVillainHitRadius + shotRadius;
     for (const encounter of sectionEncounters) {
       if (!fixHitHandlers.has(encounter.id) || resolvedTargets.has(encounter.id)) continue;
-      const center = encounter.villainPosition.clone(); center.y += 1.25;
+      const center = (mainVillainPositions.get(encounter.id) ?? encounter.villainPosition).clone(); center.y += 1.25;
       const t = segmentEllipsoidHit(start, end, center, radius, radius, radius);
       if (t !== null && t <= earliest) { earliest = t; hitId = encounter.id; }
     }
@@ -698,6 +703,8 @@ function SectionPortalEncounter({
   onPlayerDamage: () => void;
   onSectionResolved: (sectionId: string) => void;
 }) {
+  const villainPosition = useMemo(() => encounter.villainPosition.clone(), [encounter]);
+  useEffect(() => { mainVillainPositions.set(encounter.id, villainPosition); return () => { mainVillainPositions.delete(encounter.id); }; }, [encounter.id, villainPosition]);
   const [villainStatus, setVillainStatus] = useState<VillainStatus>("idle");
   const [portalActive, setPortalActive] = useState(false);
   const [infoPortalActive, setInfoPortalActive] = useState(false);
@@ -707,7 +714,6 @@ function SectionPortalEncounter({
   const lastActivatedRef = useRef(-Infinity);
   const lastInfoActivatedRef = useRef(0);
   const wasOnVoicePlatformRef = useRef(false);
-  const touchingPlayerRef = useRef(false);
   const sectionResolvedTimerRef = useRef(0);
   const defeatedRef = useRef(false);
   const healthRef = useRef(1);
@@ -785,13 +791,6 @@ function SectionPortalEncounter({
   }, [smokeActive]);
 
   useGameFrame(() => {
-    const playerDeltaX = playerWorldState.position.x - encounter.villainPosition.x;
-    const playerDeltaZ = playerWorldState.position.z - encounter.villainPosition.z;
-    const touchingPlayer = !defeatedRef.current
-      && playerDeltaX * playerDeltaX + playerDeltaZ * playerDeltaZ <= mainVillainContactRadiusSq;
-    if (touchingPlayer && !touchingPlayerRef.current) onPlayerDamage();
-    touchingPlayerRef.current = touchingPlayer;
-
     const onVoicePlatform =
       voiceEnabled &&
       Math.abs(playerWorldState.position.x - encounter.platformPosition.x) <= destinationPlatformRadius &&
@@ -810,13 +809,15 @@ function SectionPortalEncounter({
       <TriggerPad label="More Info" position={encounter.infoPadPosition} active={infoPortalActive} onActivate={activateInfoPad} onDeactivate={deactivateInfoPad} />
       {smokeActive && (
         <>
-          <FireBurstEffect position={encounter.villainPosition} />
-          <SmokeDeathEffect position={encounter.villainPosition} />
+          <FireBurstEffect position={villainPosition} />
+          <SmokeDeathEffect position={villainPosition} />
         </>
       )}
       {villainVisible && (
         <VillainCharacter
-          basePosition={encounter.villainPosition}
+          basePosition={villainPosition}
+          platformPosition={encounter.platformPosition}
+          onPlayerDamage={() => { if (!defeatedRef.current) onPlayerDamage(); }}
           dialogue={null}
           villainStatus={villainStatus}
         />

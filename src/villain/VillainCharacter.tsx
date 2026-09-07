@@ -1,9 +1,12 @@
+import { createVillainCombat, villainClips } from "./villainCombat";
+import { useVillainNavigation } from "./useVillainNavigation";
+import { destinationPlatformRadius } from "../world/hubSections";
 import { useGameFrame } from "../player/useGameFrame";
 import { useGameAnimations } from "../player/useGameFrame";
 import { useGLTF } from "@react-three/drei";
-import { CuboidCollider, RigidBody } from "@react-three/rapier";
+import { CuboidCollider, RigidBody, type RapierRigidBody } from "@react-three/rapier";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
-import { AnimationAction, Color, Group, LoopOnce, LoopRepeat, Material, MathUtils, Mesh, Object3D, Vector3 } from "three";
+import { Color, Group, Material, MathUtils, Mesh, Object3D, Vector3 } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import {
   applyCharacterMaterials,
@@ -19,16 +22,13 @@ export type VillainStatus = "idle" | "running" | "dead";
 
 type VillainCharacterProps = {
   basePosition: Vector3;
+  platformPosition: Vector3;
+  onPlayerDamage: () => void;
   dialogue: DialogueMessage | null;
   dialogueVariant?: "default" | "danger";
   villainStatus: VillainStatus;
 };
 
-const animationByStatus: Record<VillainStatus, string> = {
-  idle: "idleV",
-  running: "runV",
-  dead: "dieV",
-};
 const lookDirection = new Vector3();
 const rotationDamping = 5.5;
 const modelFacingOffset = 0;
@@ -44,15 +44,7 @@ type HighlightableMaterial = Material & {
   roughness?: number;
 };
 
-function fadeOutOtherActions(actions: Record<string, AnimationAction | null>, activeAction: AnimationAction) {
-  Object.values(actions).forEach((action) => {
-    if (!action || action === activeAction) return;
-
-    action.fadeOut(0.08);
-  });
-}
-
-export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "danger", villainStatus }: VillainCharacterProps) {
+export function VillainCharacter({ basePosition, platformPosition, onPlayerDamage, dialogue, dialogueVariant = "danger", villainStatus }: VillainCharacterProps) {
   const model = useGLTF("/characters/char-optimized.glb", false, true);
   const scene = useMemo(() => {
     const villainScene = SkeletonUtils.clone(model.scene);
@@ -62,7 +54,14 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
   const rootRef = useRef<Group>(null);
   const modelRef = useRef<Group>(null);
   const frozenDeathYawRef = useRef<number | null>(null);
-  const { actions } = useGameAnimations(model.animations, modelRef, "idleV");
+  const clips = useMemo(() => villainClips(model.animations), [model.animations]);
+  const { actions } = useGameAnimations(clips, modelRef, "idleV");
+  const combat = useMemo(() => createVillainCombat(actions), [actions]);
+  const bodyRef = useRef<RapierRigidBody>(null);
+  const home = useMemo(() => basePosition.clone(), []);
+  const navigation = useVillainNavigation();
+  const destination = useMemo(() => new Vector3(), []);
+  useLayoutEffect(() => { combat.setMotion("idle"); }, [combat]);
 
   useEffect(() => {
     applyCharacterMaterials(scene, model.materials, villainMaterialProfile);
@@ -79,22 +78,6 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
     enhanceVillainSuitMaterial(findVillainSuitMaterial(scene));
   }, [scene]);
 
-  useLayoutEffect(() => {
-    const action = actions[animationByStatus[villainStatus]];
-    if (!action) return;
-
-    fadeOutOtherActions(actions, action);
-    action.reset();
-    action.clampWhenFinished = villainStatus === "dead";
-    action.setLoop(villainStatus === "dead" ? LoopOnce : LoopRepeat, villainStatus === "dead" ? 1 : Infinity);
-    if (villainStatus === "idle") action.setEffectiveWeight(1).play();
-    else action.fadeIn(0.14).play();
-
-    return () => {
-      action.fadeOut(0.14);
-    };
-  }, [actions, villainStatus]);
-
   useGameFrame((_, delta) => {
     const root = rootRef.current;
     const modelGroup = modelRef.current;
@@ -106,6 +89,7 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
     root.rotation.z = 0;
 
     if (villainStatus === "dead") {
+      combat.setMotion("dead");
       if (frozenDeathYawRef.current === null) {
         frozenDeathYawRef.current = root.rotation.y;
       }
@@ -114,22 +98,59 @@ export function VillainCharacter({ basePosition, dialogue, dialogueVariant = "da
     }
 
     frozenDeathYawRef.current = null;
+    const player = playerWorldState.position;
+    const onPlatform = Math.abs(player.x - platformPosition.x) <= destinationPlatformRadius
+      && Math.abs(player.z - platformPosition.z) <= destinationPlatformRadius
+      && Math.abs(player.y - (platformPosition.y + 1)) < 1.6;
+    const distance = Math.hypot(player.x - basePosition.x, player.z - basePosition.z);
+    const chasing = onPlatform;
+    const inRange = chasing && distance <= 1.2 && navigation.sight(basePosition, player, bodyRef.current);
+    const attacking = combat.updateAttack(inRange, true, onPlayerDamage);
+    if (attacking) destination.copy(player);
+    else {
+      if (chasing) destination.copy(player);
+      else {
+        destination.copy(home);
+        // Once home, remain at the exact original position instead of patrolling.
+        if (basePosition.distanceToSquared(home) <= 0.0001) {
+          basePosition.copy(home);
+          bodyRef.current?.setNextKinematicTranslation(home);
+          combat.setMotion("idle");
+          return;
+        }
+      }
+      const heading = Math.atan2(destination.x - basePosition.x, destination.z - basePosition.z);
+      const step = Math.min(Math.hypot(destination.x - basePosition.x, destination.z - basePosition.z), Math.min(delta, 1 / 30) * 2.1);
+      const limit = destinationPlatformRadius - 0.8;
+      const safe = [0, 0.5, -0.5, 1, -1, 1.57, -1.57].map((angle) => heading + angle).find((angle) => {
+        const x = basePosition.x + Math.sin(angle) * step, z = basePosition.z + Math.cos(angle) * step;
+        return Math.abs(x - platformPosition.x) <= limit && Math.abs(z - platformPosition.z) <= limit && navigation.clear(x, platformPosition.y, z, bodyRef.current);
+      });
+      if (safe !== undefined && step > 0.005) {
+        basePosition.x += Math.sin(safe) * step;
+        basePosition.z += Math.cos(safe) * step;
+        basePosition.y = platformPosition.y;
+        bodyRef.current?.setNextKinematicTranslation(basePosition);
+        destination.set(basePosition.x + Math.sin(safe), basePosition.y, basePosition.z + Math.cos(safe));
+        combat.setMotion("running");
+      } else combat.setMotion("idle");
+    }
 
-    lookDirection.subVectors(playerWorldState.position, basePosition);
+    lookDirection.subVectors(destination, basePosition);
     lookDirection.y = 0;
     if (lookDirection.lengthSq() < 0.0001) return;
 
     const targetYaw = Math.atan2(lookDirection.x, lookDirection.z) + modelFacingOffset;
     root.rotation.y = MathUtils.damp(
       root.rotation.y,
-      targetYaw,
+      root.rotation.y + Math.atan2(Math.sin(targetYaw - root.rotation.y), Math.cos(targetYaw - root.rotation.y)),
       rotationDamping,
       Math.min(delta, 1 / 30)
     );
   });
 
   return (
-    <RigidBody type="fixed" colliders={false} position={[basePosition.x, basePosition.y, basePosition.z]}>
+    <RigidBody ref={bodyRef} type="kinematicPosition" colliders={false} position={[basePosition.x, basePosition.y, basePosition.z]}>
       <CuboidCollider args={[0.5, 1.25, 0.5]} position={[0, 1.2, 0]} />
       <group ref={rootRef}>
         <group ref={modelRef} position={[0, modelYOffset, 0]}>

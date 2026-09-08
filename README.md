@@ -6,8 +6,8 @@ StudioCLTD is a lightweight third-person React Three Fiber game world for explor
 
 - Eight interactive sections tracked independently from `0/8`: Tips, Offers, Value, Quick Fix, Urgent Fix, Performance, Site Improvement, and Showcase.
 - Third-person movement with WASD, keyboard arrows, and multi-touch on-screen arrows.
-- Shoot/Fix mechanic using the one-shot `shoot` animation and a large yellow energy projectile.
-- Movement locks during shooting, then crossfades directly into idle or run.
+- Collectible contact powers: blue 01 for 6 seconds, yellow 02 for 10 seconds with increased speed, and red 03 for 15 seconds.
+- Select with G or a power box; activate with Space or ⚡ Fix. Active powers defeat villains on contact and prevent villain contact damage.
 - Main villains advance section Progress through the existing Fix logic.
 - Two roaming bonus villains award `+3` Points and respawn after 8–10 seconds without affecting Progress.
 - Green Coin, yellow Speed, red Penalty, blue Contact, purple Share, and decorative black/white logos.
@@ -38,7 +38,8 @@ Home Base contains Contact and Share, a responsive `crystalthedeveloper.ca` vide
 | Move forward/backward | `W` / `S`, ↑ / ↓, or on-screen arrows |
 | Turn left/right | `A` / `D`, ← / →, or on-screen arrows |
 | Combined movement | Hold forward/backward with left/right |
-| Shoot/Fix | `Space` or **FIX** |
+| Select a collected power | `G` or a numbered power box |
+| Activate selected power | `Space` or **⚡ FIX** |
 | Game Guide | `1` or Info |
 | Toggle sound | `2` or Sound |
 | Full restart | `3` or Restart |
@@ -46,7 +47,7 @@ Home Base contains Contact and Share, a responsive `crystalthedeveloper.ca` vide
 | Enter game focus | Click/tap **Play** |
 | Release pointer lock | `Esc` |
 
-The centered crosshair indicates the firing direction. Held movement input resumes as soon as shooting finishes.
+Power boxes show EMPTY, READY, SELECTED, or ACTIVE. Collecting a matching active power immediately restarts its full POWER timer without storing an extra charge. The active-colour bar drains smoothly and pauses with gameplay. At zero, the aura and contact protection end.
 
 ## Logo Guide
 
@@ -88,7 +89,7 @@ public/
 
 The player and villains share `public/characters/char-optimized.glb`, optimized to approximately 1.7 MB.
 
-- Player: `idleH`, `runH`, `shoot`
+- Player: `idleH`, `runH`
 - Villain: `idleV`, `runV`, `dieV`, `fixedH`
 
 ## Development
@@ -111,7 +112,7 @@ The production build runs TypeScript before Vite and writes deployable files to 
 
 - Preserve the eight section IDs and required-trigger mappings.
 - Keep bonus-villain Points separate from section Progress.
-- Reuse shared projectile, collectible, trigger, material, and audio systems.
+- Reuse shared power, collectible, trigger, material, and audio systems.
 - Keep Contact and Share exclusively on Home Base.
 - Clean up timers, listeners, video/audio playback, and Three.js resources on unmount.
 - Avoid creating reusable Three.js objects inside `useFrame`.

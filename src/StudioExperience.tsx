@@ -1,10 +1,9 @@
-import { useGameFrame } from "./player/useGameFrame";
-import { fixModes, selectFixWeaponByKey, fireFixShot, isFixHeld, lastFixHitAt, lastFixHitMode, resetFixShooter, setFixHeld, subscribeFixInput, subscribeFixShot } from "./player/fixShooter";
+import { handlePowerShortcut, resetTemporaryPowers } from "./player/temporaryPowers";
 import { gameNow } from "./player/gameFocus";
 import { Canvas } from "@react-three/fiber";
 import { useProgress } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
-import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ACESFilmicToneMapping, MathUtils, PCFSoftShadowMap, SRGBColorSpace } from "three";
 import { isTouchControlsCameraInputBlocked } from "./player/cameraInputGuard";
 import { isGameFocused, subscribeGameFocus, setGameFocused, useGameFocus } from "./player/gameFocus";
@@ -15,7 +14,6 @@ import { triggerTrophyHaptic } from "./ui/haptics";
 import { StudioWorld } from "./world/StudioWorld";
 import { preloadScreenTextures } from "./world/systems/HubSections";
 import { distanceFog } from "./world/distanceFog";
-import { crosshairViewportY } from "./world/aiming";
 
 type StudioExperienceProps = {
   onOpenWebsite: () => void;
@@ -28,7 +26,6 @@ type StudioExperienceProps = {
 export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRestart, restartKey }: StudioExperienceProps) {
   const gameFocused = useGameFocus();
   const playRequestedRef = useRef(false);
-  const crosshairRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previousCompletedSectionCountRef = useRef(0);
   const damageCooldownUntilRef = useRef(0);
@@ -40,8 +37,6 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   const [screenAssetProgress, setScreenAssetProgress] = useState(0);
   const [screenAssetsReady, setScreenAssetsReady] = useState(false);
   const [shareScreenOpen, setShareScreenOpen] = useState(false);
-  const shootPressed = useSyncExternalStore(subscribeFixInput, isFixHeld);
-  const [shootRequest, setShootRequest] = useState(0);
 
   useEffect(() => {
     const unsubscribe = subscribeGameFocus((running) => {
@@ -60,8 +55,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
     setHealth(3);
     healthRef.current = 3;
     setDamageFlashUntil(0);
-    resetFixShooter();
-    setShootRequest(0);
+    resetTemporaryPowers();
     setShareScreenOpen(false);
     onRestart();
   }, [onRestart]);
@@ -95,33 +89,21 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
     return true;
   }, []);
 
-  useEffect(() => subscribeFixShot(() => setShootRequest((current) => current + 1)), []);
   useEffect(() => {
-    resetFixShooter();
+    resetTemporaryPowers();
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat || event.altKey || event.ctrlKey || event.metaKey || !isGameFocused() || window.matchMedia("(pointer: coarse)").matches) return;
-      if (!["Space", "KeyG", "KeyH", "KeyJ"].includes(event.code)) return;
+      if (event.repeat || event.altKey || event.ctrlKey || event.metaKey || !isGameFocused()) return;
+      if (!["Space", "KeyG"].includes(event.code)) return;
       const target = event.target;
       if (target instanceof HTMLElement && target.closest("input, textarea, [contenteditable=true]")) return;
-      if (event.code !== "Space") { event.preventDefault(); selectFixWeaponByKey(event.code); return; }
-      if (target instanceof HTMLElement && target.closest("button:not(.game-hud__shoot)")) return;
+      if (event.code === "Space" && target instanceof HTMLElement && target.closest("button:not(.game-hud__fix):not(.game-hud__power)")) return;
       event.preventDefault();
-      setFixHeld("keyboard", true);
+      handlePowerShortcut(event.code);
     };
-    const handleKeyUp = (event: KeyboardEvent) => {
-      if (event.code === "Space") { event.preventDefault(); setFixHeld("keyboard", false); }
-    };
-    const releasePointer = (event: PointerEvent) => setFixHeld(`pointer:${event.pointerId}`, false);
     window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-    window.addEventListener("pointerup", releasePointer);
-    window.addEventListener("pointercancel", releasePointer);
     return () => {
-      resetFixShooter();
+      resetTemporaryPowers();
       window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-      window.removeEventListener("pointerup", releasePointer);
-      window.removeEventListener("pointercancel", releasePointer);
     };
   }, []);
 
@@ -285,7 +267,6 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
             gl.shadowMap.type = PCFSoftShadowMap;
           }}
         >
-          <FixHitFeedback crosshairRef={crosshairRef} />
           <color attach="background" args={["#01030a"]} />
           <fog attach="fog" args={[distanceFog.color, distanceFog.near, distanceFog.far]} />
           <Suspense fallback={null}>
@@ -304,7 +285,6 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
                 onReset={handleManualRestart}
                 onSectionComplete={() => setCompletedSectionCount((current) => Math.min(8, current + 1))}
                 restartKey={restartKey}
-                shootRequest={shootRequest}
               />
             </Physics>
           </Suspense>
@@ -319,18 +299,10 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
       <GameHud
         completedSectionCount={completedSectionCount}
         health={health}
-        onShoot={fireFixShot}
         onOpenWebsite={onOpenWebsite}
         onRestart={handleManualRestart}
         points={coins}
-        shootPressed={shootPressed}
       />
-      <div ref={crosshairRef} className="aim-crosshair" aria-hidden="true" style={{ top: `${crosshairViewportY * 100}%` }}>
-        <span className="aim-crosshair__mark aim-crosshair__mark--top" />
-        <span className="aim-crosshair__mark aim-crosshair__mark--right" />
-        <span className="aim-crosshair__mark aim-crosshair__mark--bottom" />
-        <span className="aim-crosshair__mark aim-crosshair__mark--left" />
-      </div>
       <HubOverlay />
       {!gameFocused && (
         <div className="game-pause-overlay">
@@ -412,13 +384,5 @@ function StartupProgress({
     };
   }, []);
 
-  return null;
-}
-
-function FixHitFeedback({ crosshairRef }: { crosshairRef: RefObject<HTMLDivElement> }) {
-  useGameFrame(() => {
-    crosshairRef.current?.style.setProperty("--hit-color", fixModes[lastFixHitMode].color);
-    crosshairRef.current?.classList.toggle("aim-crosshair--hit", gameNow() - lastFixHitAt < 180);
-  });
   return null;
 }

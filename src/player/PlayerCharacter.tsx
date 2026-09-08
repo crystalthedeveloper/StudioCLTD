@@ -1,10 +1,10 @@
+import { ActivePowerAura } from "./ActivePowerAura";
 import { useGameFrame } from "./useGameFrame";
 import { useGameAnimations } from "./useGameFrame";
 import { gameNow } from "./gameFocus";
-import { gameTimers } from "./gameFocus";
 import { useGLTF } from "@react-three/drei";
 import { MutableRefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AnimationAction, Group, LoopOnce, LoopRepeat, Material, Mesh, Object3D, PointLight } from "three";
+import { AnimationAction, Group, LoopRepeat, Material, Mesh, Object3D, PointLight } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import {
   applyCharacterMaterials,
@@ -20,7 +20,6 @@ type PlayerCharacterProps = {
   animationStateRef: MutableRefObject<CharacterAnimationState>;
   damageFlashUntil: number;
   dialogue: DialogueMessage | null;
-  shootRequest: number;
   yawRef: MutableRefObject<number>;
 };
 
@@ -49,7 +48,6 @@ export function PlayerCharacter({
   animationStateRef,
   damageFlashUntil,
   dialogue,
-  shootRequest,
   yawRef,
 }: PlayerCharacterProps) {
   const model = useGLTF("/characters/char-optimized.glb", false, true);
@@ -57,8 +55,6 @@ export function PlayerCharacter({
   const group = useRef<Group>(null);
   const playerFillLightRef = useRef<PointLight>(null);
   const { actions } = useGameAnimations(model.animations, group, "idleH");
-  const shootActionRef = useRef<AnimationAction | null>(null);
-  const shootRequestRef = useRef(0);
   const activeLocomotionStateRef = useRef<CharacterAnimationState | null>(null);
   const materialSlotsRef = useRef<PlayerMaterialSlot[]>([]);
   const poweredBodyMaterialRef = useRef<Material | null>(null);
@@ -126,7 +122,7 @@ export function PlayerCharacter({
   };
 
   const restoreDefaultMaterialIfIdle = () => {
-    if (speedBoostActiveRef.current || shootActionRef.current || activeMaterialModeRef.current === "default") return;
+    if (speedBoostActiveRef.current || activeMaterialModeRef.current === "default") return;
 
     materialSlotsRef.current.forEach((slot) => {
       if (slot.index === null) {
@@ -141,7 +137,7 @@ export function PlayerCharacter({
   };
 
   const playLocomotionAction = (nextState: CharacterAnimationState) => {
-    if (shootActionRef.current || activeLocomotionStateRef.current === nextState) return;
+    if (activeLocomotionStateRef.current === nextState) return;
 
     const action = actions[playerAnimationByState[nextState]];
     if (!action) return;
@@ -159,58 +155,6 @@ export function PlayerCharacter({
     activeLocomotionStateRef.current = "idle";
     idle.reset().setLoop(LoopRepeat, Infinity).setEffectiveWeight(1).play();
   }, [actions]);
-
-  useEffect(() => {
-    if (shootRequest === shootRequestRef.current) return;
-    shootRequestRef.current = shootRequest;
-
-    const action = actions.shoot;
-    if (!action) {
-      return;
-    }
-
-    shootActionRef.current = action;
-    fadeOutOtherActions(actions, action);
-    action.reset();
-    action.enabled = true;
-    action.clampWhenFinished = true;
-    action.setLoop(LoopOnce, 1);
-    action.fadeIn(0.06).play();
-
-    const mixer = action.getMixer();
-    let completed = false;
-    const completeShoot = () => {
-      if (completed) return;
-      completed = true;
-      const nextState = animationStateRef.current;
-      const nextAction = actions[playerAnimationByState[nextState]];
-
-      if (nextAction) {
-        activeLocomotionStateRef.current = nextState;
-        nextAction.enabled = true;
-        nextAction.clampWhenFinished = false;
-        nextAction.setLoop(LoopRepeat, Infinity);
-        nextAction.reset().setEffectiveWeight(1).play();
-        nextAction.crossFadeFrom(action, 0.14, true);
-      }
-
-      shootActionRef.current = null;
-      if (!nextAction) {
-        activeLocomotionStateRef.current = null;
-        playLocomotionAction(nextState);
-      }
-      mixer.removeEventListener("finished", handleFinished);
-    };
-    const handleFinished = (event: { action: AnimationAction }) => {
-      if (event.action === action) completeShoot();
-    };
-    mixer.addEventListener("finished", handleFinished);
-    const fallbackTimer = gameTimers.setTimeout(completeShoot, 140);
-    return () => {
-      mixer.removeEventListener("finished", handleFinished);
-      gameTimers.clearTimeout(fallbackTimer);
-    };
-  }, [actions, shootRequest]);
 
   useGameFrame(() => {
     if (!group.current) return;
@@ -238,6 +182,7 @@ export function PlayerCharacter({
         decay={2}
         position={[1.6, 3, 2.3]}
       />
+      <ActivePowerAura />
       <DialogueBubble message={dialogue} position={[0, 2.65, 0]} />
       <primitive object={scene} rotation-y={Math.PI} scale={1.05} />
     </group>

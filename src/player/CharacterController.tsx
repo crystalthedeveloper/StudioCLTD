@@ -1,3 +1,4 @@
+import { hasPowerSpeedBoost } from "./temporaryPowers";
 import { useGameFrame } from "./useGameFrame";
 import { CapsuleCollider, RigidBody, RapierRigidBody, useRapier } from "@react-three/rapier";
 import { useEffect, useMemo, useRef } from "react";
@@ -28,7 +29,6 @@ type CharacterControllerProps = {
   damageFlashUntil: number;
   dialogue: DialogueMessage | null;
   restartKey: number;
-  shootRequest: number;
   transportDestination: TransportDestination | null;
 };
 
@@ -36,7 +36,6 @@ export function CharacterController({
   damageFlashUntil,
   dialogue,
   restartKey,
-  shootRequest,
   transportDestination,
 }: CharacterControllerProps) {
   const bodyRef = useRef<RapierRigidBody | null>(null);
@@ -97,10 +96,9 @@ export function CharacterController({
     const velocity = body.linvel();
     const translation = body.translation();
     playerWorldState.position.set(translation.x, translation.y, translation.z);
-    playerWorldState.yaw = yawRef.current;
     const hasForwardBackInput = controls.forward !== controls.backward;
     const turnInput = Number(controls.left) - Number(controls.right);
-    const forwardBackSpeed = isSpeedBoostActive() ? boostedRunSpeed : baseRunSpeed;
+    const forwardBackSpeed = (isSpeedBoostActive() || hasPowerSpeedBoost()) ? boostedRunSpeed : baseRunSpeed;
 
     if (turnInput !== 0) {
       yawRef.current += turnInput * turnSpeed * frameDelta;
@@ -202,7 +200,6 @@ export function CharacterController({
           animationStateRef={animationStateRef}
           damageFlashUntil={damageFlashUntil}
           dialogue={dialogue}
-          shootRequest={shootRequest}
           yawRef={yawRef}
         />
       </RigidBody>

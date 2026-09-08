@@ -1,4 +1,5 @@
-import { type FixMode, selectFixWeapon, getFixReserves, fixAmmoRespawnMs, fixModes, getFixAmmo, getFixMode, subscribeFixInput, setFixHeld } from "../player/fixShooter";
+import { PowerMeter } from "./PowerMeter";
+import { powerModes, type PowerMode, activateSelectedPower, canActivatePower, getActivePower, getFixCharges, getSelectedPower, getPowerStatus, selectFixPower, subscribePowers, fixPowerRespawnMs } from "../player/temporaryPowers";
 import { useGameFocus } from "../player/gameFocus";
 import { useSpeedBoostRemainingMs, speedBoostDurationMs } from "../player/speedBoost";
 import { setGameAudioEnabled, useGameAudioEnabled } from "../audio/gameAudio";
@@ -12,9 +13,7 @@ type GameHudProps = {
   health: number;
   onOpenWebsite: () => void;
   onRestart: () => void;
-  onShoot: () => void;
   points: number;
-  shootPressed: boolean;
 };
 
 const villainVoiceLabels: Record<string, string> = {
@@ -24,11 +23,12 @@ const villainVoiceLabels: Record<string, string> = {
   "site-improvement": "Site Improvement",
 };
 
-export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestart, onShoot, points, shootPressed }: GameHudProps) {
+export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestart, points }: GameHudProps) {
   const gameFocused = useGameFocus();
-  const ammo = useSyncExternalStore(subscribeFixInput, getFixAmmo);
-  const reserves = useSyncExternalStore(subscribeFixInput, getFixReserves);
-  const mode = useSyncExternalStore(subscribeFixInput, getFixMode);
+  const charges = useSyncExternalStore(subscribePowers, getFixCharges);
+  const mode = useSyncExternalStore(subscribePowers, getSelectedPower);
+  const activePower = useSyncExternalStore(subscribePowers, getActivePower);
+  const activationReady = useSyncExternalStore(subscribePowers, canActivatePower);
   const [guideOpen, setGuideOpen] = useState(false);
   const audioEnabled = useGameAudioEnabled();
   const activeVillainVoiceId = useSyncExternalStore(
@@ -152,40 +152,32 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
         </div>
       </div>
 
-      <div className="game-hud__weapons" role="group" aria-label="Fix weapons and ammo">
-        {(Object.keys(fixModes) as FixMode[]).map((weapon) => (
-          <button key={weapon} type="button" className="studio-button game-hud__weapon"
-            style={{ "--weapon-color": fixModes[weapon].color } as CSSProperties}
-            disabled={!gameFocused || reserves[weapon] === 0}
-            aria-pressed={mode === weapon && reserves[weapon] > 0}
-            aria-label={`Weapon ${fixModes[weapon].label}, AMMO ${reserves[weapon]}`}
-            onClick={() => selectFixWeapon(weapon)}>
-            <strong>{fixModes[weapon].label}</strong>
-            <span>AMMO {reserves[weapon]}</span>
-            <small className="game-hud__weapon-shortcut" aria-hidden="true">{fixModes[weapon].shortcut}</small>
+      <div className="game-hud__powers" role="group" aria-label="Temporary powers. G selects; Space or Fix activates.">
+        {(Object.keys(powerModes) as PowerMode[]).map((weapon) => (
+          <button key={weapon} type="button" className="studio-button game-hud__power"
+            style={{ "--power-color": powerModes[weapon].color } as CSSProperties}
+            disabled={!gameFocused || !charges[weapon]}
+            aria-pressed={mode === weapon && charges[weapon]}
+            data-active={activePower === weapon}
+            aria-label={`Power ${powerModes[weapon].label} ${powerModes[weapon].name}, ${getPowerStatus(weapon)}`}
+            onClick={() => selectFixPower(weapon)}>
+            <strong>{powerModes[weapon].label}</strong>
+            <span>{getPowerStatus(weapon)}</span>
+            <small className="game-hud__power-shortcut" aria-hidden="true">G</small>
           </button>
         ))}
+        <PowerMeter />
       </div>
 
       {gameFocused && <div className="game-hud__bottom">
         <DirectionControls />
         <button
           type="button"
-          className={`studio-button game-hud__shoot${shootPressed ? " game-hud__shoot--pressed" : ""}`}
-          aria-label="Shoot to fix villain"
-          aria-pressed={shootPressed}
-          title={ammo > 0 ? "Shoot / Fix (Space)" : "Collect yellow cubes for ammo"}
-          disabled={ammo === 0}
-          onPointerDown={(event) => {
-            if (event.button !== 0) return;
-            event.preventDefault();
-            event.currentTarget.setPointerCapture(event.pointerId);
-            setFixHeld(`pointer:${event.pointerId}`, true);
-          }}
-          onPointerUp={(event) => setFixHeld(`pointer:${event.pointerId}`, false)}
-          onPointerCancel={(event) => setFixHeld(`pointer:${event.pointerId}`, false)}
-          onLostPointerCapture={(event) => setFixHeld(`pointer:${event.pointerId}`, false)}
-          onClick={(event) => { if (event.detail === 0) onShoot(); }}
+          className="studio-button game-hud__fix"
+          aria-label="Activate selected power"
+          title={activePower ? "Power active — collect a matching pickup to refill" : "Activate selected power (Space)"}
+          disabled={!activationReady}
+          onClick={activateSelectedPower}
         >
           <span aria-hidden="true">⚡</span>
           <small>FIX</small>
@@ -202,9 +194,10 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
             <dl>
               <div><dt>WASD / Arrow Keys</dt><dd>Move</dd></div>
               <div><dt>On-screen Arrows</dt><dd>Move</dd></div>
-              <div><dt>Space / Fix button</dt><dd>Shoot/Fix</dd></div>
+              <div><dt>G / Power boxes</dt><dd>Select a collected power</dd></div>
+              <div><dt>Space / ⚡ Fix</dt><dd>Activate selected power</dd></div>
             </dl>
-            <p className="game-guide__tip">Hold Fix to repeat shots. Each shot uses one ammo. Yellow cubes add to separate reserves: {fixModes.standard.label} gives {fixModes.standard.ammo} shots, {fixModes.rapid.label} gives {fixModes.rapid.ammo}, and {fixModes.power.label} gives {fixModes.power.ammo}. Choose a numbered weapon box or use G / H / J on desktop. Empty weapons cannot be selected. Cubes return after {fixAmmoRespawnMs / 1000} seconds.</p>
+            <p className="game-guide__tip">Collect one of each power: 01 Blue lasts 6 seconds, 02 Yellow lasts 10 seconds and increases speed, and 03 Red lasts 15 seconds with the strongest contact impact. G or a power box selects; Space or ⚡ Fix consumes the selected charge and starts its aura and POWER timer. Touch villains to defeat them without taking contact damage while powered. Collecting the active power again immediately refills its timer. Only one power can be active at a time. At zero, the aura and power end. The timer pauses with the game. Pickups return after {fixPowerRespawnMs / 1000} seconds.</p>
             <h3>Logo Guide</h3>
             <ul className="game-guide__logos">
               <li><span>🟢</span> Green — Coin / Score</li>

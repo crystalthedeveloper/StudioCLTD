@@ -1,8 +1,8 @@
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { useLayoutEffect, useMemo, useRef } from "react";
-import { Group, InstancedMesh, Object3D } from "three";
+import { Color, Group, InstancedMesh, Object3D } from "three";
 import { playCollectibleSound } from "../../audio/collectibleSounds";
-import { collectFixAmmo, fixModes, fixAmmoRespawnMs, type FixMode } from "../../player/fixShooter";
+import { powerModes, type PowerMode, collectFixPower, fixPowerRespawnMs } from "../../player/temporaryPowers";
 import { gameNow } from "../../player/gameFocus";
 import { useGameFrame } from "../../player/useGameFrame";
 import { hubSections } from "../hubSections";
@@ -18,10 +18,10 @@ const locations: [number, number, number][] = [
   [homeBaseCenter[0] + 5, homeBaseCenter[1], homeBaseCenter[2]],
 ];
 
-const pickupModes: FixMode[] = ["standard", "rapid", "power"];
+const pickupModes: PowerMode[] = ["standard", "rapid", "power"];
 
 /** Two instanced draws for all cubes; no physics bodies or extra light sources. */
-export function FixAmmoPickups() {
+export function FixPowerPickups() {
   const labels = useRef<(Group | null)[]>([]);
   const cubes = useRef<InstancedMesh>(null);
   const outlines = useRef<InstancedMesh>(null);
@@ -34,18 +34,18 @@ export function FixAmmoPickups() {
     locations.forEach(([x, y, z], index) => {
       const state = states[index];
       let elapsed = now - state.collectedAt;
-      if (elapsed >= fixAmmoRespawnMs && Math.hypot(player.x - x, player.z - z) < 1.15 && Math.abs(player.y - (y + 0.9)) < 1.5) {
-        if (collectFixAmmo(pickupModes[index % pickupModes.length])) {
+      if (elapsed >= fixPowerRespawnMs && Math.hypot(player.x - x, player.z - z) < 1.15 && Math.abs(player.y - (y + 0.9)) < 1.5) {
+        if (collectFixPower(pickupModes[index % pickupModes.length])) {
           state.collectedAt = now;
           elapsed = 0;
-          playCollectibleSound("ammo");
+          playCollectibleSound("power");
         }
       }
-      const available = elapsed >= fixAmmoRespawnMs;
+      const available = elapsed >= fixPowerRespawnMs;
       const label = labels.current[index];
       if (label) label.visible = available && Math.hypot(player.x - x, player.z - z) < 14;
       const pickupProgress = Math.min(elapsed / 300, 1);
-      const baseSize = fixModes[pickupModes[index % pickupModes.length]].pickupSize;
+      const baseSize = powerModes[pickupModes[index % pickupModes.length]].pickupSize;
       const size = available ? baseSize : baseSize * (1 - pickupProgress);
       transform.position.set(x, y + 0.65 + (available ? Math.sin(now / 500 + index) * 0.08 : pickupProgress * 0.9), z);
       transform.rotation.set(0.15, now / 1100 + index, 0.1);
@@ -65,29 +65,31 @@ export function FixAmmoPickups() {
     locations.forEach(([x, y, z], index) => {
       transform.position.set(x, y + 0.65, z);
       transform.rotation.set(0.15, index, 0.1);
-      transform.scale.setScalar(fixModes[pickupModes[index % pickupModes.length]].pickupSize * (outline ? 1.4 : 1));
+      transform.scale.setScalar(powerModes[pickupModes[index % pickupModes.length]].pickupSize * (outline ? 1.4 : 1));
       transform.updateMatrix();
       mesh.setMatrixAt(index, transform.matrix);
+      mesh.setColorAt(index, new Color(powerModes[pickupModes[index % pickupModes.length]].color));
     });
     mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   };
   useLayoutEffect(() => { initialize(cubes.current, false); initialize(outlines.current, true); }, [transform]);
-  return <group name="FixAmmoPickups">
+  return <group name="FixPowerPickups">
     {locations.map(([x, y, z], index) => (
       <group key={index} ref={(group) => { labels.current[index] = group; }} position={[x, y + 1.25, z]}
         visible={Math.hypot(playerWorldState.position.x - x, playerWorldState.position.z - z) < 14}>
-        <BillboardLabel position={[0, 0, 0]} color="#FFD60A" fontSize={0.18} maxWidth={1.7}>
-          {fixModes[pickupModes[index % pickupModes.length]].label}
+        <BillboardLabel position={[0, 0, 0]} color={powerModes[pickupModes[index % pickupModes.length]].color} fontSize={0.18} maxWidth={1.7}>
+          {powerModes[pickupModes[index % pickupModes.length]].label}
         </BillboardLabel>
       </group>
     ))}
     <instancedMesh ref={cubes} args={[undefined, undefined, locations.length]} frustumCulled={false}>
       <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color="#FFD60A" emissive="#FFD60A" emissiveIntensity={1.4} roughness={0.35} toneMapped={false} />
+      <meshBasicMaterial color="#ffffff" toneMapped={false} />
     </instancedMesh>
     <instancedMesh ref={outlines} args={[undefined, undefined, locations.length]} frustumCulled={false}>
       <boxGeometry args={[1, 1, 1]} />
-      <meshBasicMaterial color="#FFD60A" wireframe transparent opacity={0.35} depthWrite={false} toneMapped={false} />
+      <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.35} depthWrite={false} toneMapped={false} />
     </instancedMesh>
   </group>;
 }

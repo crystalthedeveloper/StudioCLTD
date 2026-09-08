@@ -33,7 +33,7 @@ export function useGameAnimations(clips: AnimationClip[], root: RefObject<Object
     const syncPause = () => {
       if (isGameFocused()) {
         // stop restores the exact pose captured before preview, without resetting
-        // gameplay action times, fades, shooting, or death animation state.
+        // gameplay action times, fades, or death animation state.
         preview.stopAllAction();
       } else if (idle) {
         preview.clipAction(idle).reset().setEffectiveWeight(1).play();

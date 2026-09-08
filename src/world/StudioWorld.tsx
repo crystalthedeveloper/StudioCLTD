@@ -1,4 +1,4 @@
-import { FixAmmoPickups } from "./systems/FixAmmoPickups";
+import { FixPowerPickups } from "./systems/FixPowerPickups";
 import { Environment } from "@react-three/drei";
 import { useEffect, useRef, useState } from "react";
 import { CharacterController } from "../player/CharacterController";
@@ -24,7 +24,6 @@ type StudioWorldProps = {
   onReset: () => void;
   onSectionComplete: () => void;
   restartKey: number;
-  shootRequest: number;
 };
 
 const requiredSectionTriggers: Record<string, number> = {
@@ -38,7 +37,7 @@ const requiredSectionTriggers: Record<string, number> = {
   showcase: 1,
 };
 
-export function StudioWorld({ damageFlashUntil, onBonusCollect, onCoinCollect, onHealthCollect, onOpenShare, onPlayerDamage, onReset, onSectionComplete, restartKey, shootRequest }: StudioWorldProps) {
+export function StudioWorld({ damageFlashUntil, onBonusCollect, onCoinCollect, onHealthCollect, onOpenShare, onPlayerDamage, onReset, onSectionComplete, restartKey }: StudioWorldProps) {
   const dialogueIdRef = useRef(0);
   const activatedSectionTriggersRef = useRef<Record<string, Set<string>>>({});
   const completedSectionsRef = useRef(new Set<string>());
@@ -83,7 +82,7 @@ export function StudioWorld({ damageFlashUntil, onBonusCollect, onCoinCollect, o
   return (
     <>
       <WorldLights />
-      <FixAmmoPickups key={`ammo:${restartKey}`} />
+      <FixPowerPickups key={`powers:${restartKey}`} />
       <SpaceSky />
       <Environment preset="warehouse" background={false} environmentIntensity={0.16} />
       <ModularTerrain radius={7} />
@@ -122,7 +121,6 @@ export function StudioWorld({ damageFlashUntil, onBonusCollect, onCoinCollect, o
         damageFlashUntil={damageFlashUntil}
         dialogue={playerDialogue}
         restartKey={restartKey}
-        shootRequest={shootRequest}
         transportDestination={transportDestination}
       />
     </>

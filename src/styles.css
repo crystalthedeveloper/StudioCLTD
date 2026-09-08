@@ -52,7 +52,6 @@ body {
   .game-guide,
   .game-focus-hint,
   .hub-minimap,
-  .aim-crosshair,
   .loading-screen,
   .studio-launch,
   .share-screen
@@ -63,7 +62,6 @@ body {
   .game-guide,
   .game-focus-hint,
   .hub-minimap,
-  .aim-crosshair,
   .loading-screen,
   .studio-launch,
   .share-screen
@@ -672,16 +670,16 @@ canvas {
   padding: 8px;
 }
 
-.game-hud__shoot {
+.game-hud__fix {
   display: flex !important;
   gap: 3px;
 }
 
-.game-hud__shoot span {
+.game-hud__fix span {
   font-size: 17px;
 }
 
-.game-hud__shoot small {
+.game-hud__fix small {
   font-size: 8px;
   font-weight: 900;
 }
@@ -739,58 +737,7 @@ canvas {
   pointer-events: none;
 }
 
-.aim-crosshair {
-  position: fixed;
-  left: 50%;
-  z-index: 55;
-  width: 7px;
-  height: 7px;
-  box-sizing: border-box;
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  border-radius: 50%;
-  box-shadow: 0 0 4px rgba(250, 204, 21, 0.2);
-  opacity: 0.78;
-  pointer-events: none;
-  transform: translate(-50%, -50%);
-}
 
-.aim-crosshair::after {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 2px;
-  height: 2px;
-  border-radius: 50%;
-  background: rgba(250, 204, 21, 0.9);
-  content: "";
-  transform: translate(-50%, -50%);
-}
-
-.aim-crosshair__mark {
-  position: absolute;
-  display: block;
-  background: rgba(255, 255, 255, 0.68);
-}
-
-.aim-crosshair__mark--top,
-.aim-crosshair__mark--bottom {
-  left: 2px;
-  width: 1px;
-  height: 3px;
-}
-
-.aim-crosshair__mark--top { bottom: 8px; }
-.aim-crosshair__mark--bottom { top: 8px; }
-
-.aim-crosshair__mark--left,
-.aim-crosshair__mark--right {
-  top: 2px;
-  width: 3px;
-  height: 1px;
-}
-
-.aim-crosshair__mark--left { right: 8px; }
-.aim-crosshair__mark--right { left: 8px; }
 
 /* Left-side action toolbar, top-right status row, and bottom-center gameplay controls */
 body aside.game-hud {
@@ -984,7 +931,7 @@ body aside.game-hud .game-hud__bottom .direction-controls__button {
   padding: 0;
 }
 
-body aside.game-hud .game-hud__bottom .game-hud__shoot {
+body aside.game-hud .game-hud__bottom .game-hud__fix {
   position: absolute;
   bottom: 0;
   left: calc(100% + clamp(2px, 1vw, 10px));
@@ -1035,7 +982,7 @@ body aside.game-hud .game-hud__bottom .game-hud__shoot {
     --direction-row-size: clamp(39px, 11vw, 48px);
   }
 
-  body aside.game-hud .game-hud__bottom .game-hud__shoot {
+  body aside.game-hud .game-hud__bottom .game-hud__fix {
     width: 92px;
     min-width: 92px;
     height: 42px;
@@ -1115,75 +1062,62 @@ body aside.game-hud .game-hud__bottom .game-hud__shoot {
 }
 
 /* A brief confirmation at the existing aim point; simulation time freezes it on pause. */
-.aim-crosshair--hit {
-  border-color: var(--hit-color, #FFFFFF);
-  box-shadow: 0 0 8px var(--hit-color, #FFFFFF);
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1.6);
-}
-.aim-crosshair--hit .aim-crosshair__mark {
-  background: var(--hit-color, #FFFFFF);
-}
-
-/* Independent anchor: never participates in the arrows/Fix flex layout. */
-.game-hud__weapons {
-  --ammo-arrow-half-width: 75px;
-  --ammo-control-gap: 8px;
-  --ammo-available-width: calc(50vw - var(--ammo-arrow-half-width) - var(--ammo-control-gap) - max(8px, env(safe-area-inset-left)));
+/* Equal compact square power boxes beside the movement controls. */
+.game-hud__powers {
+  --power-arrow-half-width: 75px;
   position: fixed;
   bottom: max(10px, env(safe-area-inset-bottom));
-  right: calc(50% + var(--ammo-arrow-half-width) + var(--ammo-control-gap));
-  width: min(190px, var(--ammo-available-width));
+  right: calc(50% + var(--power-arrow-half-width) + 8px);
+  width: 134px;
   z-index: 60;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 5px;
+  grid-template-columns: repeat(3, 42px);
+  gap: 4px;
   pointer-events: auto;
 }
-.game-hud .studio-button.game-hud__weapon {
+.game-hud .studio-button.game-hud__power {
   position: relative;
-  width: 100%;
-  min-width: 0;
-  height: 48px;
-  padding: 5px;
-  gap: 3px;
-  border-color: #333333;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 3px 1px;
+  gap: 2px;
+  border-radius: 0;
+  border-color: #333;
   color: #b8b8b8;
-  font-size: 12px;
+  font-size: 11px;
 }
-.game-hud__weapon span { font-size: 8px; white-space: nowrap; }
-.game-hud .studio-button.game-hud__weapon[aria-pressed="true"]:not(:disabled),
-.game-hud .studio-button.game-hud__weapon:not(:disabled):hover {
+.game-hud__power span { font-size: 7px; white-space: nowrap; }
+.game-hud .studio-button.game-hud__power[aria-pressed="true"]:not(:disabled),
+.game-hud .studio-button.game-hud__power:not(:disabled):hover,
+.game-hud .studio-button.game-hud__power[data-active="true"] {
+  opacity: 1;
   background: #101010;
-  border-color: var(--weapon-color);
-  color: var(--weapon-color);
-  box-shadow: inset 0 -2px var(--weapon-color);
+  border-color: var(--power-color);
+  color: var(--power-color);
+  box-shadow: inset 0 -2px var(--power-color);
 }
-.game-hud__weapon-shortcut {
-  position: absolute;
-  top: 3px;
-  right: 4px;
-  font-size: 7px;
+.game-hud__power-shortcut { position: absolute; top: 2px; right: 3px; font-size: 6px; }
+.game-hud__power-meter { grid-column: 1 / -1; color: var(--power-color); font-size: 9px; }
+.game-hud__power-meter .game-hud__meter-track { width: 100%; margin-top: 4px; border-radius: 0; }
+.game-hud__power-meter i {
+  width: 100%;
+  background: var(--power-color);
+  transform-origin: left center;
+  transition: none;
+  border-radius: 0;
 }
 @media (pointer: coarse), (max-width: 768px) {
-  .game-hud__weapon-shortcut { display: none; }
+  .game-hud__power-shortcut { display: none; }
 }
 @media (max-width: 700px) {
-  .game-hud__weapons {
-    --ammo-arrow-half-width: calc(clamp(39px, 11vw, 48px) * 1.5 + 6px);
-    bottom: max(6px, env(safe-area-inset-bottom));
-  }
+  .game-hud__powers { --power-arrow-half-width: calc(clamp(39px, 11vw, 48px) * 1.5 + 6px); }
 }
-@media (max-width: 600px) {
-  .game-hud__weapons {
-    width: min(60px, var(--ammo-available-width));
-    grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
-  }
-  .game-hud .studio-button.game-hud__weapon {
-    height: 44px;
-    min-height: 44px;
-    padding: 3px 2px;
-    gap: 2px;
+@media (max-width: 520px) {
+  .game-hud__powers {
+    right: auto;
+    left: max(8px, env(safe-area-inset-left));
+    bottom: calc(150px + env(safe-area-inset-bottom));
   }
 }

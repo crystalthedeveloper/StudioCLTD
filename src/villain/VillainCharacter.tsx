@@ -1,3 +1,4 @@
+import { useVillainHitReaction } from "./useVillainHitReaction";
 import { createVillainCombat, villainClips } from "./villainCombat";
 import { useVillainNavigation } from "./useVillainNavigation";
 import { destinationPlatformRadius } from "../world/hubSections";
@@ -21,9 +22,11 @@ import { hideVillainMask } from "./hideVillainMask";
 export type VillainStatus = "idle" | "running" | "dead";
 
 type VillainCharacterProps = {
+  id: string;
   basePosition: Vector3;
   platformPosition: Vector3;
   onPlayerDamage: () => void;
+  onPowerContact: () => boolean;
   dialogue: DialogueMessage | null;
   dialogueVariant?: "default" | "danger";
   villainStatus: VillainStatus;
@@ -44,7 +47,7 @@ type HighlightableMaterial = Material & {
   roughness?: number;
 };
 
-export function VillainCharacter({ basePosition, platformPosition, onPlayerDamage, dialogue, dialogueVariant = "danger", villainStatus }: VillainCharacterProps) {
+export function VillainCharacter({ id, basePosition, platformPosition, onPlayerDamage, onPowerContact, dialogue, dialogueVariant = "danger", villainStatus }: VillainCharacterProps) {
   const model = useGLTF("/characters/char-optimized.glb", false, true);
   const scene = useMemo(() => {
     const villainScene = SkeletonUtils.clone(model.scene);
@@ -78,6 +81,8 @@ export function VillainCharacter({ basePosition, platformPosition, onPlayerDamag
     enhanceVillainSuitMaterial(findVillainSuitMaterial(scene));
   }, [scene]);
 
+  const reaction = useVillainHitReaction(id, scene);
+
   useGameFrame((_, delta) => {
     const root = rootRef.current;
     const modelGroup = modelRef.current;
@@ -87,6 +92,8 @@ export function VillainCharacter({ basePosition, platformPosition, onPlayerDamag
     modelGroup.rotation.set(0, 0, 0);
     root.rotation.x = 0;
     root.rotation.z = 0;
+
+    if (reaction.active()) { combat.setMotion("idle"); return; }
 
     if (villainStatus === "dead") {
       combat.setMotion("dead");
@@ -105,6 +112,7 @@ export function VillainCharacter({ basePosition, platformPosition, onPlayerDamag
     const distance = Math.hypot(player.x - basePosition.x, player.z - basePosition.z);
     const chasing = onPlatform;
     const inRange = chasing && distance <= 1.2 && navigation.sight(basePosition, player, bodyRef.current);
+    if (inRange && onPowerContact()) return;
     const attacking = combat.updateAttack(inRange, true, onPlayerDamage);
     if (attacking) destination.copy(player);
     else {
@@ -160,7 +168,7 @@ export function VillainCharacter({ basePosition, platformPosition, onPlayerDamag
             position={dialogueVariant === "danger" ? [0, 3.75, 0] : [0, 3.25, 0]}
             variant={dialogueVariant}
           />
-          <primitive object={scene} scale={1.16} />
+          <group ref={reaction.group}><primitive object={scene} scale={1.16} /></group>
         </group>
       </group>
     </RigidBody>

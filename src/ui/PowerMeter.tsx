@@ -1,17 +1,17 @@
 import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { isGameFocused, subscribeGameFocus } from "../player/gameFocus";
-import { getActivePower, getPowerRemainingMs, powerDurations, powerModes, subscribePowers } from "../player/temporaryPowers";
+import { getActivePower, getSelectedPower, getPowerRemainingMs, powerDurations, powerModes, subscribePowers } from "../player/temporaryPowers";
 
 /** Update only the meter each animation frame. Pausing stops rendering work as well as game time. */
 export function PowerMeter() {
-  const active = useSyncExternalStore(subscribePowers, getActivePower);
-  const [remaining, setRemaining] = useState(getPowerRemainingMs);
+  const selected = useSyncExternalStore(subscribePowers, getSelectedPower);
+  const [remaining, setRemaining] = useState(() => getPowerRemainingMs(getSelectedPower()));
   useEffect(() => {
     let frame: number | undefined;
     const update = () => {
       frame = undefined;
-      setRemaining(getPowerRemainingMs());
-      if (isGameFocused() && getActivePower()) frame = window.requestAnimationFrame(update);
+      setRemaining(getPowerRemainingMs(getSelectedPower()));
+      if (isGameFocused() && getSelectedPower() !== null && getActivePower() === getSelectedPower()) frame = window.requestAnimationFrame(update);
     };
     const sync = () => {
       if (frame !== undefined) window.cancelAnimationFrame(frame);
@@ -26,11 +26,11 @@ export function PowerMeter() {
       unsubscribeFocus();
     };
   }, []);
-  const progress = active ? Math.min(1, remaining / powerDurations[active]) : 0;
+  const progress = selected ? Math.min(1, remaining / powerDurations[selected]) : 0;
   return (
-    <div className="game-hud__power-meter" style={{ "--power-color": active ? powerModes[active].color : "#777" } as CSSProperties}>
-      <span>POWER {active ? `${Math.ceil(remaining / 1000)}s` : ""}</span>
-      <div className="game-hud__meter-track" role="progressbar" aria-label="Active power time remaining"
+    <div className="game-hud__power-meter" style={{ "--power-color": selected ? powerModes[selected].color : "#777" } as CSSProperties}>
+      <span>POWER {selected ? `${Math.ceil(remaining / 1000)}s` : ""}</span>
+      <div className="game-hud__meter-track" role="progressbar" aria-label="Selected power time remaining"
         aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
         <i style={{ transform: `scaleX(${progress})` }} />
       </div>

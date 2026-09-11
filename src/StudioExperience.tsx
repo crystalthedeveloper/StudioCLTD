@@ -1,3 +1,4 @@
+import { createGuidePauseSession } from "./player/guidePauseSession";
 import { handlePowerShortcut, resetTemporaryPowers } from "./player/temporaryPowers";
 import { gameNow } from "./player/gameFocus";
 import { Canvas } from "@react-three/fiber";
@@ -26,6 +27,8 @@ type StudioExperienceProps = {
 export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRestart, restartKey }: StudioExperienceProps) {
   const gameFocused = useGameFocus();
   const playRequestedRef = useRef(false);
+  const [guideSession] = useState(createGuidePauseSession);
+  const [guideOpen, setGuideOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previousCompletedSectionCountRef = useRef(0);
   const damageCooldownUntilRef = useRef(0);
@@ -181,12 +184,17 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
 
     const handlePointerLockChange = () => {
       const locked = document.pointerLockElement === canvasRef.current;
+      if (guideSession.isOpen()) {
+        setGameFocused(false);
+        if (locked) document.exitPointerLock?.();
+        return;
+      }
       if (locked && !playRequestedRef.current) { document.exitPointerLock?.(); return; }
       if (!locked) playRequestedRef.current = false;
       setGameFocused(locked);
     };
 
-    const handleBlur = () => { playRequestedRef.current = false; setGameFocused(false); document.exitPointerLock?.(); };
+    const handleBlur = () => { guideSession.cancelResume(); playRequestedRef.current = false; setGameFocused(false); document.exitPointerLock?.(); };
     const handleVisibility = () => { if (document.hidden) handleBlur(); };
     document.addEventListener("visibilitychange", handleVisibility);
     const handleWheel = (event: WheelEvent) => {
@@ -209,10 +217,10 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
     };
   }, [gameFocused]);
 
-  const focusGame = () => {
+  const focusGame = useCallback(() => {
     if (isTouchControlsCameraInputBlocked()) return;
 
-    if (shareScreenOpen) return;
+    if (shareScreenOpen || guideSession.isOpen()) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -232,7 +240,20 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         // Older browsers may throw synchronously instead of returning a promise.
       }
     }
-  };
+  }, [shareScreenOpen, guideSession]);
+
+  const openGuide = useCallback(() => {
+    if (!guideSession.open()) return;
+    playRequestedRef.current = false;
+    setGameFocused(false);
+    document.exitPointerLock?.();
+    setGuideOpen(true);
+  }, [guideSession]);
+  const closeGuide = useCallback(() => {
+    const shouldResume = guideSession.close();
+    setGuideOpen(false);
+    if (shouldResume && !document.hidden) focusGame();
+  }, [focusGame, guideSession]);
 
   return (
     <>
@@ -297,6 +318,9 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         screenAssetsReady={screenAssetsReady}
       />
       <GameHud
+        guideOpen={guideOpen}
+        onOpenGuide={openGuide}
+        onCloseGuide={closeGuide}
         completedSectionCount={completedSectionCount}
         health={health}
         onOpenWebsite={onOpenWebsite}
@@ -304,7 +328,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         points={coins}
       />
       <HubOverlay />
-      {!gameFocused && (
+      {!gameFocused && !guideOpen && (
         <div className="game-pause-overlay">
           <div className="game-pause-overlay__content">
             <button type="button" onClick={focusGame} className="studio-button game-focus-hint" aria-describedby="game-pause-instructions">

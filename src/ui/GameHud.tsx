@@ -1,15 +1,19 @@
+import { GameGuide } from "./GameGuide";
+import { powerIcons } from "../player/powerIcons";
 import { PowerMeter } from "./PowerMeter";
-import { powerModes, type PowerMode, activateSelectedPower, canActivatePower, getActivePower, getFixCharges, getSelectedPower, getPowerStatus, selectFixPower, subscribePowers, fixPowerRespawnMs } from "../player/temporaryPowers";
+import { powerModes, type PowerMode, activateSelectedPower, canActivatePower, getActivePower, getFixCharges, getSelectedPower, getPowerStatus, selectFixPower, subscribePowers } from "../player/temporaryPowers";
 import { useGameFocus } from "../player/gameFocus";
 import { useSpeedBoostRemainingMs, speedBoostDurationMs } from "../player/speedBoost";
 import { setGameAudioEnabled, useGameAudioEnabled } from "../audio/gameAudio";
 import { getActiveVillainVoiceId, subscribeVillainVoice } from "../audio/villainAudio";
-import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useSyncExternalStore, type CSSProperties } from "react";
 import { DirectionControls } from "./DirectionControls";
 
 type GameHudProps = {
   completedSectionCount: number;
+  guideOpen: boolean;
+  onOpenGuide: () => void;
+  onCloseGuide: () => void;
   health: number;
   onOpenWebsite: () => void;
   onRestart: () => void;
@@ -23,13 +27,12 @@ const villainVoiceLabels: Record<string, string> = {
   "site-improvement": "Site Improvement",
 };
 
-export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestart, points }: GameHudProps) {
+export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onCloseGuide, health, onOpenWebsite, onRestart, points }: GameHudProps) {
   const gameFocused = useGameFocus();
   const charges = useSyncExternalStore(subscribePowers, getFixCharges);
   const mode = useSyncExternalStore(subscribePowers, getSelectedPower);
   const activePower = useSyncExternalStore(subscribePowers, getActivePower);
   const activationReady = useSyncExternalStore(subscribePowers, canActivatePower);
-  const [guideOpen, setGuideOpen] = useState(false);
   const audioEnabled = useGameAudioEnabled();
   const activeVillainVoiceId = useSyncExternalStore(
     subscribeVillainVoice,
@@ -55,11 +58,10 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
       if (!shortcut) return;
 
       event.preventDefault();
+      if (guideOpen && shortcut !== 1) return;
       if (shortcut === 1) {
-        setGuideOpen((open) => {
-          if (!open) document.exitPointerLock?.();
-          return !open;
-        });
+        if (guideOpen) onCloseGuide();
+        else onOpenGuide();
       } else if (shortcut === 2) {
         setGameAudioEnabled(!audioEnabled);
       } else if (shortcut === 3) {
@@ -71,16 +73,7 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
 
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [audioEnabled, onOpenWebsite, onRestart]);
-
-  useEffect(() => {
-    if (!guideOpen) return undefined;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setGuideOpen(false);
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [guideOpen]);
+  }, [audioEnabled, guideOpen, onOpenGuide, onCloseGuide, onOpenWebsite, onRestart]);
 
   return (
     <aside className="game-hud" aria-label="Game controls and status">
@@ -92,10 +85,7 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
             aria-label="Open game guide"
             aria-expanded={guideOpen}
             title="Game Guide"
-            onClick={() => {
-              document.exitPointerLock?.();
-              setGuideOpen(true);
-            }}
+            onClick={onOpenGuide}
           >
             <span aria-hidden="true">ⓘ</span>
             <small className="game-hud__shortcut" aria-hidden="true">1</small>
@@ -108,7 +98,10 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
             aria-pressed={!audioEnabled}
             title={audioEnabled ? "Sound On" : "Sound Off"}
           >
-            <span className="game-hud__sound-icon" aria-hidden="true">{audioEnabled ? "🔊" : "🔇"}</span>
+            <svg className="game-hud__sound-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M11 4 6 8H3v8h3l5 4Z" />
+              {audioEnabled ? <path d="M15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14" /> : <path d="m16 9 6 6m0-6-6 6" />}
+            </svg>
             {activeVillainVoiceLabel && <span className="game-hud__sound-label">{activeVillainVoiceLabel}</span>}
             <small className="game-hud__shortcut" aria-hidden="true">2</small>
           </button>
@@ -130,7 +123,7 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
         <section className="game-hud__health" aria-label={`${health} of 3 hearts`} aria-live="polite">
           <span className="game-hud__stat-label">Health</span>
           <strong aria-hidden="true">
-            {Array.from({ length: 3 }, (_, index) => index < health ? "❤️" : "♡").join(" ")}
+            {Array.from({ length: 3 }, (_, index) => <img key={index} src="/images/pickups/heart.svg" alt="" className={index < health ? "game-hud__heart" : "game-hud__heart game-hud__heart--empty"} />)}
           </strong>
         </section>
 
@@ -159,9 +152,9 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
             disabled={!gameFocused || !charges[weapon]}
             aria-pressed={mode === weapon && charges[weapon]}
             data-active={activePower === weapon}
-            aria-label={`Power ${powerModes[weapon].label} ${powerModes[weapon].name}, ${getPowerStatus(weapon)}`}
+            aria-label={`${powerIcons[weapon].name} power, ${getPowerStatus(weapon)}`}
             onClick={() => selectFixPower(weapon)}>
-            <strong>{powerModes[weapon].label}</strong>
+            <img className="game-hud__power-icon" src={powerIcons[weapon].src} alt="" aria-hidden="true" draggable={false} />
             <span>{getPowerStatus(weapon)}</span>
             <small className="game-hud__power-shortcut" aria-hidden="true">G</small>
           </button>
@@ -175,43 +168,16 @@ export function GameHud({ completedSectionCount, health, onOpenWebsite, onRestar
           type="button"
           className="studio-button game-hud__fix"
           aria-label="Activate selected power"
-          title={activePower ? "Power active — collect a matching pickup to refill" : "Activate selected power (Space)"}
+          title={activePower ? "Power active — G switches and pauses; matching pickups refill" : "Activate selected power (Space)"}
           disabled={!activationReady}
           onClick={activateSelectedPower}
         >
-          <span aria-hidden="true">⚡</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 2-10 12h7l-1 8L21 9h-8Z" /></svg>
           <small>FIX</small>
         </button>
       </div>}
 
-      {guideOpen && createPortal(
-        <div className="game-guide" role="dialog" aria-modal="true" aria-labelledby="game-guide-title">
-          <button className="studio-button studio-button--backdrop game-guide__backdrop" type="button" aria-label="Close game guide" onClick={() => setGuideOpen(false)} />
-          <section className="game-guide__panel">
-            <button className="studio-button game-guide__close" type="button" aria-label="Close game guide" onClick={() => setGuideOpen(false)}>×</button>
-            <h2 id="game-guide-title">Game Guide</h2>
-            <h3>Controls</h3>
-            <dl>
-              <div><dt>WASD / Arrow Keys</dt><dd>Move</dd></div>
-              <div><dt>On-screen Arrows</dt><dd>Move</dd></div>
-              <div><dt>G / Power boxes</dt><dd>Select a collected power</dd></div>
-              <div><dt>Space / ⚡ Fix</dt><dd>Activate selected power</dd></div>
-            </dl>
-            <p className="game-guide__tip">Collect one of each power: 01 Blue lasts 6 seconds, 02 Yellow lasts 10 seconds and increases speed, and 03 Red lasts 15 seconds with the strongest contact impact. G or a power box selects; Space or ⚡ Fix consumes the selected charge and starts its aura and POWER timer. Touch villains to defeat them without taking contact damage while powered. Collecting the active power again immediately refills its timer. Only one power can be active at a time. At zero, the aura and power end. The timer pauses with the game. Pickups return after {fixPowerRespawnMs / 1000} seconds.</p>
-            <h3>Logo Guide</h3>
-            <ul className="game-guide__logos">
-              <li><span>🟢</span> Green — Coin / Score</li>
-              <li><span>🟡</span> Yellow — Speed Boost</li>
-              <li><span>🔴</span> Red — Penalty</li>
-              <li><span>🔵</span> Blue — Contact</li>
-              <li><span>🟣</span> Purple — Share</li>
-              <li><span>⚪</span> White — Decorative</li>
-              <li><span>⚫</span> Black — Health</li>
-            </ul>
-          </section>
-        </div>,
-        document.body,
-      )}
+      {guideOpen && <GameGuide onClose={onCloseGuide} />}
     </aside>
   );
 }

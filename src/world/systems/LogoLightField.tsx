@@ -1,7 +1,8 @@
 import { useGameFrame } from "../../player/useGameFrame";
 import { gameNow } from "../../player/gameFocus";
 import { gameTimers } from "../../player/gameFocus";
-import { useGLTF } from "@react-three/drei";
+import { useGLTF, useTexture } from "@react-three/drei";
+import { useThree } from "@react-three/fiber";
 import {
   BallCollider,
   IntersectionEnterPayload,
@@ -9,8 +10,8 @@ import {
   RapierCollider,
   RigidBody,
 } from "@react-three/rapier";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Color, Group, Mesh, MeshStandardMaterial, Object3D, PointLight, Vector3 } from "three";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Color, DoubleSide, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PlaneGeometry, PointLight, SRGBColorSpace, Vector3 } from "three";
 import { activateSpeedBoost } from "../../player/speedBoost";
 import { playCollectibleSound } from "../../audio/collectibleSounds";
 import { BillboardLabel } from "../../ui/BillboardLabel";
@@ -214,32 +215,47 @@ type LogoLightFieldProps = {
 
 export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, onReset, restartKey }: LogoLightFieldProps) {
   const { scene } = useGLTF(logoPath);
+  const pickupTextures = useTexture(["/images/pickups/dollar.svg", "/images/pickups/heart.svg"]);
+  const pickupVisuals = useMemo(() => pickupTextures.map((texture) => {
+    texture.colorSpace = SRGBColorSpace;
+    texture.needsUpdate = true;
+    const geometry = new PlaneGeometry(0.675, 0.675);
+    const material = new MeshBasicMaterial({ map: texture, transparent: true,
+      alphaTest: 0.005, depthWrite: false, side: DoubleSide, toneMapped: false });
+    const template = new Group();
+    const mesh = new Mesh(geometry, material);
+    mesh.raycast = () => {};
+    template.add(mesh);
+    return { geometry, material, template };
+  }), [pickupTextures]);
+  useEffect(() => () => pickupVisuals.forEach(({ geometry, material }) => {
+    geometry.dispose();
+    material.dispose();
+  }), [pickupVisuals]);
   const collectedHealthLogoIdsRef = useRef(new Set<string>());
   const healthRespawnTimerRef = useRef<number | null>(null);
   const [healthRespawnGeneration, setHealthRespawnGeneration] = useState(0);
   const materials = useMemo(
     () => ({
-      coin: createSharedMaterial("coin"),
       speed: createSharedMaterial("speed"),
       penalty: createSharedMaterial("penalty"),
       contact: createSharedMaterial("contact"),
       share: createSharedMaterial("share"),
       light: createSharedMaterial("light"),
-      dark: createSharedMaterial("dark"),
     }),
     [],
   );
   const templates = useMemo(
     () => ({
-      coin: createLogoTemplate(scene, materials.coin),
+      coin: pickupVisuals[0].template,
       speed: createLogoTemplate(scene, materials.speed),
       penalty: createLogoTemplate(scene, materials.penalty),
       contact: createLogoTemplate(scene, materials.contact),
       share: createLogoTemplate(scene, materials.share),
       light: createLogoTemplate(scene, materials.light),
-      dark: createLogoTemplate(scene, materials.dark),
+      dark: pickupVisuals[1].template,
     }),
-    [materials, scene],
+    [materials, scene, pickupVisuals],
   );
 
   const logos = useMemo(
@@ -482,7 +498,10 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
   );
   const visual = (
     <>
-      {logo.kind === "contact" || logo.kind === "share" || logo.kind === "dark" ? (
+      {logo.kind === "coin" || logo.kind === "dark" ? (
+        <PickupIconVisual object={logo.object} phase={logo.position[0] + logo.position[1]}
+          scale={logo.scaleMultiplier ?? 1} />
+      ) : logo.kind === "contact" || logo.kind === "share" ? (
         <ContactLogoVisual
           glow={logo.kind === "share"}
           object={logo.object}
@@ -520,6 +539,24 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
       )}
     </RigidBody>
   );
+}
+
+/** Score and health pickups use this visual; their fixed sensors remain untouched. */
+function PickupIconVisual({ object, phase, scale }: { object: Object3D; phase: number; scale: number }) {
+  const group = useRef<Group>(null);
+  const camera = useThree((state) => state.camera);
+  const update = () => {
+    if (!group.current) return;
+    const seconds = gameNow() / 1000;
+    group.current.position.y = 0.85 + Math.sin(seconds * 1.2 + phase) * 0.08;
+    group.current.quaternion.copy(camera.quaternion);
+    // Keep the dollar upright and fully camera-facing from every viewing angle.
+  };
+  useLayoutEffect(update, [camera, phase]);
+  useGameFrame(update);
+  return <group ref={group} name="PickupIcon" scale={scale}>
+    <primitive object={object} dispose={null} />
+  </group>;
 }
 
 function ContactLogoVisual({ glow = false, object, rotation, scale }: { glow?: boolean; object: Object3D; rotation: number; scale: number }) {

@@ -6,7 +6,7 @@ StudioCLTD is a lightweight third-person React Three Fiber game world for explor
 
 - Eight interactive sections tracked independently from `0/8`: Tips, Offers, Value, Quick Fix, Urgent Fix, Performance, Site Improvement, and Showcase.
 - Third-person movement with WASD, keyboard arrows, and multi-touch on-screen arrows.
-- Collectible contact powers: blue 01 for 6 seconds, yellow 02 for 10 seconds with increased speed, and red 03 for 15 seconds.
+- Collectible contact powers: blue Wind for 6 seconds, yellow Lightning for 10 seconds with increased speed, and red Fire for 15 seconds.
 - Select with G or a power box; activate with Space or ⚡ Fix. Active powers defeat villains on contact and prevent villain contact damage.
 - Main villains advance section Progress through the existing Fix logic.
 - Two roaming bonus villains award `+3` Points and respawn after 8–10 seconds without affecting Progress.
@@ -38,7 +38,7 @@ Home Base contains Contact and Share, a responsive `crystalthedeveloper.ca` vide
 | Move forward/backward | `W` / `S`, ↑ / ↓, or on-screen arrows |
 | Turn left/right | `A` / `D`, ← / →, or on-screen arrows |
 | Combined movement | Hold forward/backward with left/right |
-| Select a collected power | `G` or a numbered power box |
+| Select a collected power | `G` or a power icon box |
 | Activate selected power | `Space` or **⚡ FIX** |
 | Game Guide | `1` or Info |
 | Toggle sound | `2` or Sound |
@@ -47,7 +47,7 @@ Home Base contains Contact and Share, a responsive `crystalthedeveloper.ca` vide
 | Enter game focus | Click/tap **Play** |
 | Release pointer lock | `Esc` |
 
-Power boxes show EMPTY, READY, SELECTED, or ACTIVE. Collecting a matching active power immediately restarts its full POWER timer without storing an extra charge. The active-colour bar drains smoothly and pauses with gameplay. At zero, the aura and contact protection end.
+Power boxes show EMPTY, READY, SELECTED, ACTIVE, or PAUSED. G cycles every collected power, including previously active powers. Switching immediately stops the old effect and saves its exact remaining time; Space or Fix explicitly starts or resumes the selection. A selected paused power remains labelled PAUSED, with its button pressed to indicate selection. The POWER bar uses the selected power’s colour and remaining amount: full when ready, frozen when paused, draining only when active, and empty at zero. Only one power can be active. Collecting the same power in any state refills its original duration. Active powers stay active; paused powers stay paused, even when selected. Refills never auto-activate or stack durations. Global game pause freezes all timers.
 
 ## Logo Guide
 
@@ -81,13 +81,12 @@ public/
 ├── audio/          Voice, collectible, and defeat audio
 ├── characters/     Optimized shared player/villain GLB
 ├── images/         Screen, planet, logo, and environment assets
-├── textures/       Home Base marble material maps
 └── videos/         Responsive Showcase and website videos
 ```
 
 ## Character Asset and Animations
 
-The player and villains share `public/characters/char-optimized.glb`, optimized to approximately 1.7 MB.
+The player and villains share `public/characters/char-optimized.glb`, losslessly optimized to approximately 11.0 MB with Meshopt and embedded WebP textures.
 
 - Player: `idleH`, `runH`
 - Villain: `idleV`, `runV`, `dieV`, `fixedH`
@@ -124,3 +123,26 @@ The production build runs TypeScript before Vite and writes deployable files to 
 - The 3D experience is lazy-loaded separately from the launch screen.
 - Responsive videos and compressed WebP textures reduce mobile bandwidth.
 - The Three.js renderer bundle can exceed Vite's default chunk-size advisory; this does not prevent a successful build.
+
+### Winter theme
+
+Set `WINTER_THEME_ENABLED` in `src/world/winterTheme.ts` to `false` to disable
+snowfall, terrain frost, ground haze, and cool world lighting together.
+Snow uses a single GPU particle draw (650 desktop / 220 small or touch devices),
+recycled within 24 units of the player. It pauses with gameplay, fades near the
+camera, does not receive pointer events, and adds no colliders or shadows.
+Frost and faint distance-based ground mist are shaded on existing concrete
+surfaces, preserving terrain geometry, paths, and gameplay overlays. The black
+sky, clouds, and planets retain their existing appearance.
+
+### Asset size and deployment
+
+Run `npm run audit:assets` after `npm run build` to check public asset references,
+missing files, duplicate content, and duplicate copies in the production output.
+Vercel is configured to build this Vite project and serve only `dist/`; local Git
+history, dependencies, and old builds are excluded from CLI uploads.
+See [ASSET_AUDIT.md](ASSET_AUDIT.md) for measured sizes, optimizations, and validation.
+
+The Game Guide has four exclusive accordion sections and opens on How to Play.
+Opening it pauses simulation and timers; closing resumes only if the game was
+playing before the guide opened and the browser has not lost focus.

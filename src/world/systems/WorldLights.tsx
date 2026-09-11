@@ -1,3 +1,4 @@
+import { WINTER_THEME_ENABLED } from "../winterTheme";
 import { useEffect, useRef, useState } from "react";
 import { AmbientLight, DirectionalLight, Object3D } from "three";
 import { useGameFrame } from "../../player/useGameFrame";
@@ -41,8 +42,8 @@ export function WorldLights() {
 
   return (
     <>
-      <ambientLight intensity={0.28} color="#fffdf8" />
-      <hemisphereLight intensity={0.55} color="#eef7fc" groundColor="#85877f" />
+      <ambientLight intensity={0.28} color={WINTER_THEME_ENABLED ? "#bacddd" : "#fffdf8"} />
+      <hemisphereLight intensity={0.55} color={WINTER_THEME_ENABLED ? "#c2d6eb" : "#eef7fc"} groundColor={WINTER_THEME_ENABLED ? "#6d7c8d" : "#85877f"} />
       <ambientLight ref={playerFillRef} intensity={0.32} color="#fffdf8" />
       <directionalLight
         ref={playerKeyRef}
@@ -75,7 +76,7 @@ export function WorldLights() {
         ref={sunRef}
         target={sunTarget}
         castShadow
-        color="#fff0d2"
+        color={WINTER_THEME_ENABLED ? "#ccdef0" : "#fff0d2"}
         intensity={1.8}
         position={[...sunlightOffset]}
         shadow-bias={-0.0001}

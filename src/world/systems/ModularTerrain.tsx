@@ -1,3 +1,4 @@
+import { WINTER_THEME_ENABLED } from "../winterTheme";
 import { RoundedBoxGeometry } from "three-stdlib";
 import { useTexture } from "@react-three/drei";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
@@ -74,7 +75,7 @@ export function createConcreteMaterial(textures: ConcreteTextures, color: string
     shader.vertexShader = shader.vertexShader.replace("#include <worldpos_vertex>", `
       #include <worldpos_vertex>
       vConcretePosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
-      vConcreteTop = abs((modelMatrix * vec4(normal, 0.0)).y);
+      vConcreteTop = normalize(mat3(modelMatrix) * normal).y;
     `);
     shader.fragmentShader = "varying vec3 vConcretePosition; varying float vConcreteTop;\n" + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace("#include <color_fragment>", `
@@ -87,7 +88,67 @@ export function createConcreteMaterial(textures: ConcreteTextures, color: string
       diffuseColor.rgb *= 1.0 - seam * 0.18 + wear * 0.025;
     `);
   };
-  material.customProgramCacheKey = () => "studio-concrete-joints-v1";
+  if (WINTER_THEME_ENABLED) {
+    const concreteShader = material.onBeforeCompile;
+    material.onBeforeCompile = (shader, renderer) => {
+      concreteShader(shader, renderer);
+      shader.fragmentShader = `
+        // Smooth, deterministic world-space texture: no additional texture assets.
+        float snowHash(vec2 p) {
+          vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+          p3 += dot(p3, p3.yzx + 33.33);
+          return fract((p3.x + p3.y) * p3.z);
+        }
+        float snowNoise(vec2 p) {
+          vec2 cell = floor(p);
+          vec2 f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(snowHash(cell), snowHash(cell + vec2(1.0, 0.0)), f.x),
+                     mix(snowHash(cell + vec2(0.0, 1.0)), snowHash(cell + 1.0), f.x), f.y);
+        }
+      ` + shader.fragmentShader;
+      shader.fragmentShader = shader.fragmentShader.replace("#include <roughnessmap_fragment>", `
+        #include <roughnessmap_fragment>
+        // Irregular exposed patches, denser fresh drifts, and darker packed snow.
+        vec2 snowUv = vConcretePosition.xz;
+        float drift = snowNoise(snowUv * 0.24);
+        float clumps = snowNoise(snowUv * 1.8 + vec2(13.2, 7.9));
+        float grain = snowNoise(snowUv * 24.0);
+        // Fade subpixel grain to prevent shimmering on distant/mobile surfaces.
+        float grainVisible = 1.0 - smoothstep(0.35, 1.2, length(fwidth(snowUv * 24.0)));
+        grain = mix(0.5, grain, grainVisible);
+        float snowCoverage = smoothstep(0.23, 0.43, drift + (clumps - 0.5) * 0.22)
+          * smoothstep(0.72, 0.96, vConcreteTop);
+        float fresh = smoothstep(0.38, 0.76, drift * 0.7 + clumps * 0.3);
+        vec3 snowColor = mix(vec3(0.19, 0.235, 0.285), vec3(0.36, 0.405, 0.45), fresh);
+        // Soft tonal occlusion between clumps; existing lights/shadows still apply.
+        snowColor *= 0.88 + 0.12 * clumps;
+        snowColor += (grain - 0.5) * 0.035;
+        diffuseColor.rgb = mix(diffuseColor.rgb, snowColor, snowCoverage * 0.96);
+        roughnessFactor = mix(roughnessFactor, mix(0.86, 0.98, fresh), snowCoverage);
+        float snowHeight = snowCoverage * (clumps * 0.018 + grain * 0.0025);
+      `);
+      shader.fragmentShader = shader.fragmentShader.replace("#include <normal_fragment_maps>", `
+        #include <normal_fragment_maps>
+        // Screen derivatives give the procedural texture actual light-responsive relief.
+        vec3 snowDx = dFdx(-vViewPosition);
+        vec3 snowDy = dFdy(-vViewPosition);
+        vec3 snowR1 = cross(snowDy, normal);
+        vec3 snowR2 = cross(normal, snowDx);
+        float snowDet = dot(snowDx, snowR1);
+        vec3 snowGradient = sign(snowDet) * (dFdx(snowHeight) * snowR1 + dFdy(snowHeight) * snowR2);
+        normal = normalize(max(abs(snowDet), 0.000001) * normal - snowGradient);
+      `);
+      shader.fragmentShader = shader.fragmentShader.replace("#include <fog_fragment>", `
+        #include <fog_fragment>
+        // Subtle surface haze builds with viewing distance, never across labels or sky.
+        float mist = (1.0 - exp(-length(vViewPosition) * 0.012)) * 0.12;
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.36, 0.44, 0.53), mist * smoothstep(0.72, 0.96, vConcreteTop));
+      `);
+    };
+    material.envMapIntensity = 0.12;
+  }
+  material.customProgramCacheKey = () => `studio-concrete-joints-v3-textured-winter-${WINTER_THEME_ENABLED}`;
   return material;
 }
 

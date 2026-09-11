@@ -1,8 +1,10 @@
-import { BillboardLabel } from "../../ui/BillboardLabel";
+import { useTexture } from "@react-three/drei";
+import { useThree } from "@react-three/fiber";
+import { powerIcons } from "../../player/powerIcons";
 import { useLayoutEffect, useMemo, useRef } from "react";
-import { Color, Group, InstancedMesh, Object3D } from "three";
+import { DoubleSide, InstancedMesh, Object3D, SRGBColorSpace } from "three";
 import { playCollectibleSound } from "../../audio/collectibleSounds";
-import { powerModes, type PowerMode, collectFixPower, fixPowerRespawnMs } from "../../player/temporaryPowers";
+import { type PowerMode, collectFixPower, fixPowerRespawnMs } from "../../player/temporaryPowers";
 import { gameNow } from "../../player/gameFocus";
 import { useGameFrame } from "../../player/useGameFrame";
 import { hubSections } from "../hubSections";
@@ -20,15 +22,28 @@ const locations: [number, number, number][] = [
 
 const pickupModes: PowerMode[] = ["standard", "rapid", "power"];
 
-/** Two instanced draws for all cubes; no physics bodies or extra light sources. */
+const ignoreRaycast = () => {};
+
+/** Three instanced SVG draws, with baked icon-shaped glow and no extra lights. */
 export function FixPowerPickups() {
-  const labels = useRef<(Group | null)[]>([]);
-  const cubes = useRef<InstancedMesh>(null);
-  const outlines = useRef<InstancedMesh>(null);
+  const camera = useThree((state) => state.camera);
+  const textures = useTexture(pickupModes.map((mode) => powerIcons[mode].worldSrc));
+  const icons = useRef<(InstancedMesh | null)[]>([]);
   const states = useMemo(() => locations.map(() => ({ collectedAt: -Infinity })), []);
   const transform = useMemo(() => new Object3D(), []);
+  const updateVisual = (index: number, now: number, elapsed: number) => {
+    const [x, y, z] = locations[index];
+    const available = elapsed >= fixPowerRespawnMs;
+    const pickupProgress = Math.min(elapsed / 300, 1);
+    const size = available ? 0.7125 : 0.7125 * (1 - pickupProgress);
+    transform.position.set(x, y + 0.65 + (available ? Math.sin(now / 850 + index) * 0.06 : pickupProgress * 0.9), z);
+    // Gentle bobbing only: keep the SVG fully camera-facing and upright.
+    transform.quaternion.copy(camera.quaternion);
+    transform.scale.setScalar(size);
+    transform.updateMatrix();
+    icons.current[index % pickupModes.length]?.setMatrixAt(Math.floor(index / pickupModes.length), transform.matrix);
+  };
   useGameFrame(() => {
-    if (!cubes.current || !outlines.current) return;
     const now = gameNow();
     const player = playerWorldState.position;
     locations.forEach(([x, y, z], index) => {
@@ -41,55 +56,27 @@ export function FixPowerPickups() {
           playCollectibleSound("power");
         }
       }
-      const available = elapsed >= fixPowerRespawnMs;
-      const label = labels.current[index];
-      if (label) label.visible = available && Math.hypot(player.x - x, player.z - z) < 14;
-      const pickupProgress = Math.min(elapsed / 300, 1);
-      const baseSize = powerModes[pickupModes[index % pickupModes.length]].pickupSize;
-      const size = available ? baseSize : baseSize * (1 - pickupProgress);
-      transform.position.set(x, y + 0.65 + (available ? Math.sin(now / 500 + index) * 0.08 : pickupProgress * 0.9), z);
-      transform.rotation.set(0.15, now / 1100 + index, 0.1);
-      transform.scale.setScalar(size);
-      transform.updateMatrix();
-      cubes.current!.setMatrixAt(index, transform.matrix);
-      transform.scale.setScalar(size * (available ? 1.4 : 2.5));
-      transform.updateMatrix();
-      outlines.current!.setMatrixAt(index, transform.matrix);
+      updateVisual(index, now, elapsed);
     });
-    cubes.current.instanceMatrix.needsUpdate = true;
-    outlines.current.instanceMatrix.needsUpdate = true;
+    icons.current.forEach((mesh) => { if (mesh) mesh.instanceMatrix.needsUpdate = true; });
   });
-  // Initialize positions before the first paused render, without advancing time.
-  const initialize = (mesh: InstancedMesh | null, outline: boolean) => {
-    if (!mesh) return;
-    locations.forEach(([x, y, z], index) => {
-      transform.position.set(x, y + 0.65, z);
-      transform.rotation.set(0.15, index, 0.1);
-      transform.scale.setScalar(powerModes[pickupModes[index % pickupModes.length]].pickupSize * (outline ? 1.4 : 1));
-      transform.updateMatrix();
-      mesh.setMatrixAt(index, transform.matrix);
-      mesh.setColorAt(index, new Color(powerModes[pickupModes[index % pickupModes.length]].color));
-    });
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  };
-  useLayoutEffect(() => { initialize(cubes.current, false); initialize(outlines.current, true); }, [transform]);
+  // Initialize the paused first render without collecting or advancing timers.
+  useLayoutEffect(() => {
+    textures.forEach((texture) => { texture.colorSpace = SRGBColorSpace; texture.needsUpdate = true; });
+    const now = gameNow();
+    locations.forEach((_, index) => updateVisual(index, now, now - states[index].collectedAt));
+    icons.current.forEach((mesh) => { if (mesh) mesh.instanceMatrix.needsUpdate = true; });
+  }, [textures, camera, states, transform]);
   return <group name="FixPowerPickups">
-    {locations.map(([x, y, z], index) => (
-      <group key={index} ref={(group) => { labels.current[index] = group; }} position={[x, y + 1.25, z]}
-        visible={Math.hypot(playerWorldState.position.x - x, playerWorldState.position.z - z) < 14}>
-        <BillboardLabel position={[0, 0, 0]} color={powerModes[pickupModes[index % pickupModes.length]].color} fontSize={0.18} maxWidth={1.7}>
-          {powerModes[pickupModes[index % pickupModes.length]].label}
-        </BillboardLabel>
-      </group>
+    {pickupModes.map((mode, index) => (
+      <instancedMesh key={mode} name={`PowerIcon:${powerIcons[mode].name}`}
+        ref={(mesh) => { icons.current[index] = mesh; }}
+        args={[undefined, undefined, Math.ceil((locations.length - index) / pickupModes.length)]}
+        frustumCulled={false} raycast={ignoreRaycast}>
+        <planeGeometry args={[1, 1]} />
+        <meshBasicMaterial map={textures[index]} transparent alphaTest={0.005}
+          side={DoubleSide} depthWrite={false} toneMapped={false} />
+      </instancedMesh>
     ))}
-    <instancedMesh ref={cubes} args={[undefined, undefined, locations.length]} frustumCulled={false}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshBasicMaterial color="#ffffff" toneMapped={false} />
-    </instancedMesh>
-    <instancedMesh ref={outlines} args={[undefined, undefined, locations.length]} frustumCulled={false}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.35} depthWrite={false} toneMapped={false} />
-    </instancedMesh>
   </group>;
 }

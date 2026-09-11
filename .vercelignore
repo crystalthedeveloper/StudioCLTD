@@ -1,0 +1,9 @@
+# Build from source; do not upload local installs, history, or generated output.
+.git/
+node_modules/
+dist/
+.next/
+.vite/
+coverage/
+.DS_Store
+npm-debug.log*

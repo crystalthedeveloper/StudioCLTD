@@ -1,3 +1,6 @@
+import { NearbyAsset } from "../NearbyAsset";
+import { isCompactVisualBudget } from "../visualQuality";
+import { assetForDevice } from "../mobileAssets";
 import { WINTER_THEME_ENABLED } from "../winterTheme";
 import { RoundedBoxGeometry } from "three-stdlib";
 import { useTexture } from "@react-three/drei";
@@ -41,7 +44,7 @@ function configureFloorTexture(texture: Texture, repeat: number) {
   texture.minFilter = LinearMipmapLinearFilter;
   texture.magFilter = LinearFilter;
   texture.generateMipmaps = true;
-  texture.anisotropy = 4;
+  texture.anisotropy = isCompactVisualBudget() ? 1 : 4;
   texture.needsUpdate = true;
 }
 
@@ -199,7 +202,7 @@ function createConcreteFloorGeometry(size: number) {
 
 export function ModularTerrain({ radius }: ModularTerrainProps) {
   const platformSize = radius * 20 + 10;
-  const concreteTextures = useTexture(concreteTexturePaths);
+  const concreteTextures = useTexture(concreteTexturePaths.map(assetForDevice));
   const floorGeometry = useMemo(() => createConcreteFloorGeometry(platformSize), [platformSize]);
 
   useMemo(() => configureConcreteTextures(concreteTextures), [concreteTextures]);
@@ -257,17 +260,6 @@ function DestinationPlatform({
   const bridgeX = x + directionX * bridgeCenterOffset;
   const bridgeZ = z + directionZ * bridgeCenterOffset;
   const yaw = Math.atan2(directionX, directionZ);
-  const platformGeometry = useMemo(
-    () => createConcreteBoxGeometry(destinationPlatformRadius * 2, height, destinationPlatformRadius * 2, x, z),
-    [height, x, z],
-  );
-  const rampGeometry = useMemo(
-    () => createConcreteBoxGeometry(sectionRampWidth, rampThickness, bridgeLength, bridgeX, bridgeZ),
-    [bridgeLength, bridgeX, bridgeZ],
-  );
-
-  useEffect(() => () => platformGeometry.dispose(), [platformGeometry]);
-  useEffect(() => () => rampGeometry.dispose(), [rampGeometry]);
 
   return (
     <group name={`DestinationPlatform:${section.id}`}>
@@ -277,9 +269,10 @@ function DestinationPlatform({
           position={[x, height / 2, z]}
           friction={0.35}
         />
-        <mesh position={[x, height / 2, z]} material={material} castShadow receiveShadow>
-          <primitive object={platformGeometry} attach="geometry" />
-        </mesh>
+        <NearbyAsset position={section.position}>
+          <PlatformVisual material={material} size={[destinationPlatformRadius * 2, height, destinationPlatformRadius * 2]}
+            origin={[x, z]} position={[x, height / 2, z]} />
+        </NearbyAsset>
       </RigidBody>
       <RigidBody type="fixed" colliders={false} position={[bridgeX, bridgeCenterY, bridgeZ]} rotation={[0, yaw, 0]}>
         <CuboidCollider
@@ -287,15 +280,22 @@ function DestinationPlatform({
           rotation={[bridgeAngle, 0, 0]}
           friction={0.35}
         />
-        <mesh
-          material={material}
-          receiveShadow
-          castShadow
-          rotation-x={bridgeAngle}
-        >
-          <primitive object={rampGeometry} attach="geometry" />
-        </mesh>
+        <NearbyAsset position={section.position}>
+          <PlatformVisual material={material} size={[sectionRampWidth, rampThickness, bridgeLength]}
+            origin={[bridgeX, bridgeZ]} rotation={bridgeAngle} />
+        </NearbyAsset>
       </RigidBody>
     </group>
   );
+}
+
+function PlatformVisual({ material, size: [width, height, depth], origin: [x, z], position, rotation = 0 }: {
+  material: MeshStandardMaterial; size: [number, number, number]; origin: [number, number];
+  position?: [number, number, number]; rotation?: number;
+}) {
+  const geometry = useMemo(() => createConcreteBoxGeometry(width, height, depth, x, z), [width, height, depth, x, z]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return <mesh position={position} rotation-x={rotation} material={material} castShadow receiveShadow>
+    <primitive object={geometry} attach="geometry" />
+  </mesh>;
 }

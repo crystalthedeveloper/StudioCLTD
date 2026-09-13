@@ -9,10 +9,10 @@ StudioCLTD is a lightweight third-person React Three Fiber game world for explor
 - Collectible contact powers: blue Wind for 6 seconds, yellow Lightning for 10 seconds with increased speed, and red Fire for 15 seconds.
 - Select with G or a power box; activate with Space or ⚡ Fix. Active powers defeat villains on contact and prevent villain contact damage.
 - Main villains advance section Progress through the existing Fix logic.
-- Two roaming bonus villains award `+3` Points and respawn after 8–10 seconds without affecting Progress.
+- Two roaming bonus villains award `+$3` Cash and respawn after 8–10 seconds without affecting Progress.
 - Green Coin, yellow Speed, red Penalty, blue Contact, purple Share, and decorative black/white logos.
 - Responsive Showcase and Home Base website-video screens.
-- Compact responsive HUD with Progress, Points, Speed, D-pad, Fix, sound, guide, restart, and website controls.
+- Compact responsive HUD with Progress, Cash, Speed, D-pad, Fix, sound, guide, restart, and website controls.
 - Full-page restart for a completely fresh game state.
 
 ## World Layout
@@ -53,7 +53,7 @@ Power boxes show EMPTY, READY, SELECTED, ACTIVE, or PAUSED. G cycles every colle
 
 | Color | Purpose |
 | --- | --- |
-| Green `#3F7D3A` | Coin / Points |
+| Green `#3F7D3A` | Coin / Cash |
 | Yellow `#FACC15` | Speed Boost |
 | Red | Penalty |
 | Blue `#2583E8` | Contact |
@@ -110,7 +110,7 @@ The production build runs TypeScript before Vite and writes deployable files to 
 ## Maintenance Guidelines
 
 - Preserve the eight section IDs and required-trigger mappings.
-- Keep bonus-villain Points separate from section Progress.
+- Keep bonus-villain Cash separate from section Progress.
 - Reuse shared power, collectible, trigger, material, and audio systems.
 - Keep Contact and Share exclusively on Home Base.
 - Clean up timers, listeners, video/audio playback, and Three.js resources on unmount.
@@ -146,3 +146,9 @@ See [ASSET_AUDIT.md](ASSET_AUDIT.md) for measured sizes, optimizations, and vali
 The Game Guide has four exclusive accordion sections and opens on How to Play.
 Opening it pauses simulation and timers; closing resumes only if the game was
 playing before the guide opened and the browser has not lost focus.
+
+## Mobile performance
+
+See [MOBILE_PERFORMANCE.md](MOBILE_PERFORMANCE.md) for device-specific asset generation, rendering budgets, measured build sizes, validation results and outstanding browser benchmarks.
+
+Cash uses the existing in-session total, formatted as whole US dollars. Green $ pickups still add 1 and bonus villains add 3; restart/death still resets the session. There is no persisted gameplay total or storage key to migrate (only the audio preference is stored).

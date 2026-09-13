@@ -12,7 +12,7 @@ const villainLightingLayer = 1;
 export function WorldLights() {
   const sunRef = useRef<DirectionalLight>(null);
   const [sunTarget] = useState(() => new Object3D());
-  const [shadowSize] = useState(() => isCompactVisualBudget() ? 1024 : 2048);
+  const [shadowSize] = useState(() => isCompactVisualBudget() ? 512 : 2048);
   useEffect(() => { sunRef.current?.layers.enable(3); }, []);
   useGameFrame(() => {
     const sun = sunRef.current;

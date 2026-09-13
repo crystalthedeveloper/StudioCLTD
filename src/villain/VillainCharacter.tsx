@@ -1,3 +1,6 @@
+import { createVillainContact } from "./villainContact";
+import { isPlayerObject } from "../world/playerCollision";
+import { assetForDevice } from "../world/mobileAssets";
 import { useVillainHitReaction } from "./useVillainHitReaction";
 import { createVillainCombat, villainClips } from "./villainCombat";
 import { useVillainNavigation } from "./useVillainNavigation";
@@ -48,7 +51,7 @@ type HighlightableMaterial = Material & {
 };
 
 export function VillainCharacter({ id, basePosition, platformPosition, onPlayerDamage, onPowerContact, dialogue, dialogueVariant = "danger", villainStatus }: VillainCharacterProps) {
-  const model = useGLTF("/characters/char-optimized.glb", false, true);
+  const model = useGLTF(assetForDevice("/characters/char-optimized.glb"), false, true);
   const scene = useMemo(() => {
     const villainScene = SkeletonUtils.clone(model.scene);
     hideVillainMask(villainScene);
@@ -82,6 +85,11 @@ export function VillainCharacter({ id, basePosition, platformPosition, onPlayerD
   }, [scene]);
 
   const reaction = useVillainHitReaction(id, scene);
+  const contact = useMemo(createVillainContact, []);
+  const handleContact = () => {
+    if (villainStatus === "dead" || onPowerContact()) return;
+    onPlayerDamage();
+  };
 
   useGameFrame((_, delta) => {
     const root = rootRef.current;
@@ -93,6 +101,7 @@ export function VillainCharacter({ id, basePosition, platformPosition, onPlayerD
     root.rotation.x = 0;
     root.rotation.z = 0;
 
+    contact.update(handleContact);
     if (reaction.active()) { combat.setMotion("idle"); return; }
 
     if (villainStatus === "dead") {
@@ -113,7 +122,7 @@ export function VillainCharacter({ id, basePosition, platformPosition, onPlayerD
     const chasing = onPlatform;
     const inRange = chasing && distance <= 1.2 && navigation.sight(basePosition, player, bodyRef.current);
     if (inRange && onPowerContact()) return;
-    const attacking = combat.updateAttack(inRange, true, onPlayerDamage);
+    const attacking = combat.updateAttack(contact.touching(), true);
     if (attacking) destination.copy(player);
     else {
       if (chasing) destination.copy(player);
@@ -159,7 +168,14 @@ export function VillainCharacter({ id, basePosition, platformPosition, onPlayerD
 
   return (
     <RigidBody ref={bodyRef} type="kinematicPosition" colliders={false} position={[basePosition.x, basePosition.y, basePosition.z]}>
-      <CuboidCollider args={[0.5, 1.25, 0.5]} position={[0, 1.2, 0]} />
+      <CuboidCollider args={[0.5, 1.25, 0.5]} position={[0, 1.2, 0]}
+        onCollisionEnter={({ other }) => {
+          if (isPlayerObject(other.rigidBodyObject) || isPlayerObject(other.colliderObject)) {
+            contact.enter(other.collider.handle, handleContact);
+          }
+        }}
+        onCollisionExit={({ other }) => contact.exit(other.collider.handle)}
+      />
       <group ref={rootRef}>
         <group ref={modelRef} position={[0, modelYOffset, 0]}>
           <DialogueBubble

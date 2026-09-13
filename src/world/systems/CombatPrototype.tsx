@@ -1,3 +1,6 @@
+import { isCompactVisualBudget } from "../visualQuality";
+import { NearbyAsset } from "../NearbyAsset";
+import { assetForDevice } from "../mobileAssets";
 import { powerModes, type PowerMode, isPowerActive, resolvePowerContact } from "../../player/temporaryPowers";
 import { createVillainCombat, villainClips } from "../../villain/villainCombat";
 import { useVillainNavigation } from "../../villain/useVillainNavigation";
@@ -195,7 +198,7 @@ export function CombatPrototype({
   const [visibleEncounterCount, setVisibleEncounterCount] = useState(1);
 
   useEffect(() => {
-    preloadVillainAudio();
+    if (!isCompactVisualBudget()) preloadVillainAudio();
     return stopAllVillainAudio;
   }, []);
 
@@ -225,18 +228,19 @@ export function CombatPrototype({
         onPlayerDamage={contactDamage}
       />
       {sectionEncounters.slice(0, visibleEncounterCount).map((encounter) => (
-        <SectionPortalEncounter
-          key={`${encounter.id}:${restartKey}`}
-          encounter={encounter}
-          onInfoClose={() => onInfoChange(null)}
-          onInfoOpen={() => {
-            onInfoChange(encounter.id);
-            onSectionTrigger(encounter.id, "info");
-          }}
-          onPlayerDialogue={onPlayerDialogue}
-          onPlayerDamage={contactDamage}
-          onSectionResolved={onSectionResolved}
-        />
+        <NearbyAsset key={`${encounter.id}:${restartKey}`} position={encounter.platformPosition.toArray()}>
+          <SectionPortalEncounter
+            encounter={encounter}
+            onInfoClose={() => onInfoChange(null)}
+            onInfoOpen={() => {
+              onInfoChange(encounter.id);
+              onSectionTrigger(encounter.id, "info");
+            }}
+            onPlayerDialogue={onPlayerDialogue}
+            onPlayerDamage={contactDamage}
+            onSectionResolved={onSectionResolved}
+          />
+        </NearbyAsset>
       ))}
     </group>
   );
@@ -268,7 +272,7 @@ function BonusVillain({
   onDefeat: () => void;
   onPlayerDamage: () => void;
 }) {
-  const model = useGLTF("/characters/char-optimized.glb", false, true);
+  const model = useGLTF(assetForDevice("/characters/char-optimized.glb"), false, true);
   const scene = useMemo(() => {
     const villainScene = SkeletonUtils.clone(model.scene);
     hideVillainMask(villainScene);
@@ -281,10 +285,10 @@ function BonusVillain({
   const aliveRef = useRef(true);
   const chasingPlayerRef = useRef(false);
   const respawnTimerRef = useRef(0);
-  const pointsTimerRef = useRef(0);
+  const cashPopupTimerRef = useRef(0);
   const [alive, setAlive] = useState(true);
-  const [showPoints, setShowPoints] = useState(false);
-  const pointsPositionRef = useRef(new Vector3());
+  const [showCashPopup, setShowCashPopup] = useState(false);
+  const cashPopupPositionRef = useRef(new Vector3());
   const clips = useMemo(() => villainClips(model.animations), [model.animations]);
   const { actions } = useGameAnimations(clips, groupRef, "idleV");
   const combat = useMemo(() => createVillainCombat(actions), [actions]);
@@ -306,7 +310,7 @@ function BonusVillain({
     return () => {
       gameTimers.clearTimeout(deathTimer.current);
       gameTimers.clearTimeout(respawnTimerRef.current);
-      gameTimers.clearTimeout(pointsTimerRef.current);
+      gameTimers.clearTimeout(cashPopupTimerRef.current);
     };
   }, [id]);
 
@@ -318,11 +322,11 @@ function BonusVillain({
       combat.setMotion("dead");
       deathTimer.current = gameTimers.setTimeout(() => setAlive(false), (actions.dieV?.getClip().duration ?? 1) * 1000);
       const bounds = new Box3().setFromObject(scene, true);
-      bounds.getCenter(pointsPositionRef.current);
-      pointsPositionRef.current.y = bounds.max.y + 0.4;
-      setShowPoints(true);
+      bounds.getCenter(cashPopupPositionRef.current);
+      cashPopupPositionRef.current.y = bounds.max.y + 0.4;
+      setShowCashPopup(true);
       onDefeat();
-      pointsTimerRef.current = gameTimers.setTimeout(() => setShowPoints(false), 1100);
+      cashPopupTimerRef.current = gameTimers.setTimeout(() => setShowCashPopup(false), 1100);
 
       const delay = 8000 + Math.random() * 2000;
       respawnTimerRef.current = gameTimers.setTimeout(() => {
@@ -353,14 +357,15 @@ function BonusVillain({
     if (!group || !aliveRef.current) {
         return;
     }
-    if (reaction.active()) { combat.setMotion("idle"); return; }
     const playerDx = playerWorldState.position.x - positionRef.current.x;
     const playerDz = playerWorldState.position.z - positionRef.current.z;
     const playerDistanceSq = playerDx * playerDx + playerDz * playerDz;
     const sameLevel = Math.abs(playerWorldState.position.y - (positionRef.current.y + 1)) < 1.5;
     const inRange = sameLevel && playerDistanceSq <= bonusVillainContactRadiusSq && navigation.sight(positionRef.current, playerWorldState.position);
     if (inRange && poweredContact(id, positionRef.current)) return;
-    if (combat.updateAttack(inRange, true, onPlayerDamage)) {
+    if (inRange) onPlayerDamage();
+    if (reaction.active()) { combat.setMotion("idle"); return; }
+    if (combat.updateAttack(inRange, true)) {
       group.rotation.y = Math.atan2(playerDx, playerDz);
       return;
     }
@@ -436,14 +441,14 @@ function BonusVillain({
       <group ref={groupRef} position={positionRef.current} visible={alive}>
         <group ref={reaction.group}><primitive object={scene} scale={0.68} position={[0, 0.18, 0]} /></group>
       </group>
-      {showPoints && (
+      {showCashPopup && (
         <BillboardLabel
           color="#3f7d3a"
           fontSize={0.38}
-          position={[pointsPositionRef.current.x, pointsPositionRef.current.y, pointsPositionRef.current.z]}
+          position={[cashPopupPositionRef.current.x, cashPopupPositionRef.current.y, cashPopupPositionRef.current.z]}
           maxWidth={2}
         >
-          +3
+          +$3
         </BillboardLabel>
       )}
     </>

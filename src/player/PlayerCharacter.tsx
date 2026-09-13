@@ -1,3 +1,4 @@
+import { assetForDevice } from "../world/mobileAssets";
 import { ActivePowerAura } from "./ActivePowerAura";
 import { useGameFrame } from "./useGameFrame";
 import { useGameAnimations } from "./useGameFrame";
@@ -50,7 +51,7 @@ export function PlayerCharacter({
   dialogue,
   yawRef,
 }: PlayerCharacterProps) {
-  const model = useGLTF("/characters/char-optimized.glb", false, true);
+  const model = useGLTF(assetForDevice("/characters/char-optimized.glb"), false, true);
   const scene = useMemo(() => SkeletonUtils.clone(model.scene), [model.scene]);
   const group = useRef<Group>(null);
   const playerFillLightRef = useRef<PointLight>(null);

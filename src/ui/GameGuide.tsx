@@ -58,7 +58,7 @@ export function GameGuide({ onClose }: { onClose: () => void }) {
                 <li>Explore the world and collect powers.</li>
                 <li>Activate a power before touching a villain.</li>
                 <li>Defeat all 8 villains to complete the game.</li>
-                <li>Collect $ symbols to increase your score.</li>
+                <li>Collect $ symbols to increase your cash.</li>
                 <li>Collect hearts to restore health.</li>
               </ul>}
               {index === 1 && <dl className="game-guide__controls">
@@ -81,7 +81,7 @@ export function GameGuide({ onClose }: { onClose: () => void }) {
                 </ul>
               </>}
               {index === 3 && <ul className="game-guide__icon-grid">
-                <Item image={icon("/images/pickups/dollar.svg")}><strong>Green $</strong>Score</Item>
+                <Item image={icon("/images/pickups/dollar.svg")}><strong>Green $</strong>Cash</Item>
                 <Item image={icon("/images/pickups/heart.svg")}><strong>Red heart</strong>Health</Item>
                 <Item image={logo("#facc15")}><strong>Yellow Logo</strong>Speed Boost</Item>
                 <Item image={logo("#991b1b")}><strong>Red symbol</strong>Penalty</Item>

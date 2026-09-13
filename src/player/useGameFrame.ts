@@ -1,6 +1,6 @@
 import { useFrame, type RenderCallback } from "@react-three/fiber";
 import { useLayoutEffect, useMemo, useRef, type RefObject } from "react";
-import { AnimationAction, AnimationClip, AnimationMixer, Object3D } from "three";
+import { AnimationAction, AnimationClip, AnimationMixer, Object3D, Frustum, Matrix4, Sphere, Vector3 } from "three";
 import { isGameFocused, subscribeGameFocus } from "./gameFocus";
 
 export function useGameFrame(callback: RenderCallback) {
@@ -11,6 +11,7 @@ export function useGameFrame(callback: RenderCallback) {
 
 /** One gameplay mixer, with a static idle preview while simulation is paused. */
 export function useGameAnimations(clips: AnimationClip[], root: RefObject<Object3D>, idleName: string) {
+  const visibility = useMemo(() => ({ frustum: new Frustum(), matrix: new Matrix4(), sphere: new Sphere(new Vector3(), 3) }), []);
   const mixers = useRef<{ gameplay: AnimationMixer; preview: AnimationMixer } | null>(null);
   const actions = useMemo(() => {
     const result: Record<string, AnimationAction | null> = {};
@@ -52,8 +53,16 @@ export function useGameAnimations(clips: AnimationClip[], root: RefObject<Object
     };
   }, [clips, idleName, root]);
 
-  useFrame((_, delta) => {
-    if (isGameFocused()) mixers.current?.gameplay.update(delta);
+  useFrame(({ camera }, delta) => {
+    if (!isGameFocused()) return;
+    // Keep nearby attack/death feedback smooth; damage is independent of mixers.
+    if (idleName === "idleV" && root.current) {
+      root.current.getWorldPosition(visibility.sphere.center);
+      visibility.frustum.setFromProjectionMatrix(visibility.matrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+      if (camera.position.distanceToSquared(visibility.sphere.center) > 24 * 24
+        && !visibility.frustum.intersectsSphere(visibility.sphere)) return;
+    }
+    mixers.current?.gameplay.update(delta);
   });
   return { actions };
 }

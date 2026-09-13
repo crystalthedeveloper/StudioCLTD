@@ -853,9 +853,17 @@ body aside.game-hud .game-hud__left .game-hud__stat strong {
   white-space: nowrap;
 }
 
-body aside.game-hud .game-hud__left .game-hud__stat--points strong {
+body aside.game-hud .game-hud__left .game-hud__stat--cash {
+  container-type: inline-size;
+  flex: 0 1 clamp(80px, 24vw, 220px);
+  min-width: 80px;
+}
+
+body aside.game-hud .game-hud__left .game-hud__stat--cash strong {
+  max-width: 100%;
+  font-variant-numeric: tabular-nums;
   color: #3f7d3a;
-  font-size: 18px;
+  font-size: min(18px, calc(100cqw / var(--cash-characters)));
   font-weight: 900;
 }
 
@@ -1005,18 +1013,21 @@ body aside.game-hud .game-hud__bottom .game-hud__fix {
     min-width: 56px !important;
   }
 
-  body aside.game-hud .game-hud__left .game-hud__stat--points {
-    width: 36px !important;
-    min-width: 36px !important;
+  body aside.game-hud .game-hud__left .game-hud__stat--cash {
+    width: auto !important;
+    min-width: 80px !important;
   }
 
   body aside.game-hud .game-hud__left .game-hud__stat-label {
     font-size: 6px;
   }
 
-  body aside.game-hud .game-hud__left .game-hud__stat strong,
-  body aside.game-hud .game-hud__left .game-hud__stat--points strong {
+  body aside.game-hud .game-hud__left .game-hud__stat strong {
     font-size: 10px;
+  }
+
+  body aside.game-hud .game-hud__left .game-hud__stat--cash strong {
+    font-size: min(10px, calc(100cqw / var(--cash-characters)));
   }
 
   body aside.game-hud .game-hud__left .game-hud__speed-meter {

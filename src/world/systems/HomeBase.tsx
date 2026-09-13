@@ -1,3 +1,4 @@
+import { assetForDevice } from "../mobileAssets";
 import { useTexture } from "@react-three/drei";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import { useEffect, useMemo } from "react";
@@ -15,7 +16,7 @@ import {
 export const homeBaseCenter = [12000, 0.6, 12000] as const;
 
 export function HomeBase() {
-  const concreteTextures = useTexture(concreteTexturePaths);
+  const concreteTextures = useTexture(concreteTexturePaths.map(assetForDevice));
   const resources = useMemo(() => {
     configureConcreteTextures(concreteTextures);
 

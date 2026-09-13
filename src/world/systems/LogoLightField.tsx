@@ -1,3 +1,5 @@
+import { isCompactVisualBudget } from "../visualQuality";
+import { assetForDevice } from "../mobileAssets";
 import { useGameFrame } from "../../player/useGameFrame";
 import { gameNow } from "../../player/gameFocus";
 import { gameTimers } from "../../player/gameFocus";
@@ -214,7 +216,7 @@ type LogoLightFieldProps = {
 };
 
 export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, onReset, restartKey }: LogoLightFieldProps) {
-  const { scene } = useGLTF(logoPath);
+  const { scene } = useGLTF(assetForDevice(logoPath));
   const pickupTextures = useTexture(["/images/pickups/dollar.svg", "/images/pickups/heart.svg"]);
   const pickupVisuals = useMemo(() => pickupTextures.map((texture) => {
     texture.colorSpace = SRGBColorSpace;
@@ -541,7 +543,7 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
   );
 }
 
-/** Score and health pickups use this visual; their fixed sensors remain untouched. */
+/** Cash and health pickups use this visual; their fixed sensors remain untouched. */
 function PickupIconVisual({ object, phase, scale }: { object: Object3D; phase: number; scale: number }) {
   const group = useRef<Group>(null);
   const camera = useThree((state) => state.camera);
@@ -588,4 +590,4 @@ function ContactLogoVisual({ glow = false, object, rotation, scale }: { glow?: b
   );
 }
 
-useGLTF.preload(logoPath);
+if (!isCompactVisualBudget()) useGLTF.preload(logoPath);

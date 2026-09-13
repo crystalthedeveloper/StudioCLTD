@@ -1,3 +1,4 @@
+import { formatCash } from "./formatCash";
 import { GameGuide } from "./GameGuide";
 import { powerIcons } from "../player/powerIcons";
 import { PowerMeter } from "./PowerMeter";
@@ -17,7 +18,7 @@ type GameHudProps = {
   health: number;
   onOpenWebsite: () => void;
   onRestart: () => void;
-  points: number;
+  cash: number;
 };
 
 const villainVoiceLabels: Record<string, string> = {
@@ -27,7 +28,8 @@ const villainVoiceLabels: Record<string, string> = {
   "site-improvement": "Site Improvement",
 };
 
-export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onCloseGuide, health, onOpenWebsite, onRestart, points }: GameHudProps) {
+export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onCloseGuide, health, onOpenWebsite, onRestart, cash }: GameHudProps) {
+  const formattedCash = formatCash(cash);
   const gameFocused = useGameFocus();
   const charges = useSyncExternalStore(subscribePowers, getFixCharges);
   const mode = useSyncExternalStore(subscribePowers, getSelectedPower);
@@ -132,9 +134,10 @@ export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onClose
           <strong>{completedSectionCount >= 8 ? "🏆" : `${completedSectionCount}/8`}</strong>
         </section>
 
-        <section className="game-hud__stat game-hud__stat--points" aria-label={`${points} points`} aria-live="polite">
-          <span className="game-hud__stat-label">Score</span>
-          <strong>{points}</strong>
+        <section className="game-hud__stat game-hud__stat--cash" aria-label={`Cash: ${formattedCash}`} aria-live="polite"
+          style={{ "--cash-characters": formattedCash.length } as CSSProperties}>
+          <span className="game-hud__stat-label">Cash</span>
+          <strong title={formattedCash}>{formattedCash}</strong>
         </section>
 
         <div className="game-hud__speed-meter">

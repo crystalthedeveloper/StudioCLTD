@@ -354,7 +354,7 @@ assert.equal(guide.close(), false, 'closing twice cannot resume again');
 powers.resetTemporaryPowers();
 console.log('Guide pause tests passed: exact timer freeze, restore playing state, preserve prior pause and cancel resume after blur.');
 
-// Actual animation time, rather than contact entry or browser timers, controls damage.
+// Attack animations are visual feedback only, even if an old caller supplies a callback.
 const combatModule = load('src/villain/villainCombat.ts', { three: THREE, '../player/gameFocus': focus });
 const actor = new THREE.Object3D();
 const actorMixer = new THREE.AnimationMixer(actor);
@@ -372,14 +372,14 @@ combat.updateAttack(true, true, impact);
 assert.equal(damage, 0);
 actorMixer.update(0.02);
 combat.updateAttack(true, true, impact);
-assert.equal(damage, 1, 'damage occurs at the strike time');
+assert.equal(damage, 0, 'strike animation never applies damage');
 actorMixer.update(0.1);
 combat.updateAttack(true, true, impact);
-assert.equal(damage, 1, 'one attack cannot hit twice');
+assert.equal(damage, 0, 'no duplicate animation damage');
 setGameFocused(false);
 combat.updateAttack(true, true, impact);
 advance(5000);
-assert.equal(damage, 1, 'paused attacks do no damage');
+assert.equal(damage, 0, 'paused attacks do no damage');
 setGameFocused(true);
 actorMixer.update(0.7);
 combat.updateAttack(true, true, impact);
@@ -391,16 +391,16 @@ actorMixer.update(0.3);
 assert.equal(combat.updateAttack(false, true, impact), false, 'leaving range immediately allows chasing');
 actorMixer.update(0.5);
 combat.updateAttack(false, true, impact);
-assert.equal(damage, 1, 'cancelled strike cannot deal late damage');
+assert.equal(damage, 0, 'cancelled strike cannot deal late damage');
 advance(450);
 combat.updateAttack(true, true, impact);
 actorMixer.update(0.3);
 combat.updateAttack(true, false, impact);
 actorMixer.update(0.6);
 combat.updateAttack(true, false, impact);
-assert.equal(damage, 1, 'death interrupts the attack');
+assert.equal(damage, 0, 'death interrupts the attack');
 setGameFocused(false);
-console.log('Villain combat tests passed: animation-timed impact, one hit per cycle, cooldown, range cancellation, death interruption and paused damage guard.');
+console.log('Villain combat tests passed: visual-only attacks, no animation damage, cooldown, range cancellation, death interruption and pause.');
 
 // Run navigation clearance and attack sight checks against real Rapier colliders.
 const rapierModule = await import('@dimforge/rapier3d-compat');

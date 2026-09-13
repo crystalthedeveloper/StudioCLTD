@@ -20,7 +20,7 @@ export function WinterSnow() {
     return () => query.removeEventListener("change", update);
   }, []);
   const geometry = useMemo(() => {
-    const count = compact ? 220 : 650;
+    const count = compact ? 100 : 650;
     const positions = new Float32Array(count * 3);
     const seeds = new Float32Array(count);
     // Deterministic distribution avoids changing the pattern on re-renders.

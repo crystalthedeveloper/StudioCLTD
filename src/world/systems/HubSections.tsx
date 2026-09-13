@@ -1,3 +1,6 @@
+import { useScreenVisibility } from "../useScreenVisibility";
+import { assetForDevice } from "../mobileAssets";
+import { NearbyAsset } from "../NearbyAsset";
 import { LocalLightSpill } from "./LocalLightSpill";
 import { playGameMedia, registerGameMedia, stopGameMedia } from "../../audio/gameMedia";
 import { useGameFrame } from "../../player/useGameFrame";
@@ -158,11 +161,14 @@ function loadScreenTexture(path: string) {
   const existingPromise = lazyTexturePromises.get(path);
   if (existingPromise) return existingPromise;
 
-  const loadPromise = textureLoader.loadAsync(path).then((loadedTexture) => {
+  const loadPromise = textureLoader.loadAsync(assetForDevice(path)).then((loadedTexture) => {
     configureScreenTexture(loadedTexture);
     lazyTextureCache.set(path, loadedTexture);
     lazyTexturePromises.delete(path);
     return loadedTexture;
+  }).catch((error) => {
+    lazyTexturePromises.delete(path);
+    throw error;
   });
 
   lazyTexturePromises.set(path, loadPromise);
@@ -422,30 +428,31 @@ export function HubSections({ activeServiceInfoId, onSectionTrigger, restartKey,
   return (
     <group name="HubSections">
       {hubSections.slice(0, visibleSectionCount).map((section) => (
-        <HubSectionDistrict
-          activeServiceInfoId={activeServiceInfoId}
-          key={`${section.id}:${restartKey}`}
-          billboardScale={billboardScale}
-          billboardYOffset={billboardYOffset}
-          section={section}
-          serviceResolutions={serviceResolutions}
-          activeSimpleDisplays={activeSimpleDisplays}
-          selectedOffer={offerOptions.find((offer) => offer.id === selectedOfferId) ?? null}
-          showcaseVideoState={showcaseVideoState}
-          onOfferSelect={(offerId) => {
-            setSelectedOfferId(offerId);
-            if (offerId) onSectionTrigger("offers", offerId);
-          }}
-          onSimpleDisplayTrigger={showSimpleDisplay}
-          onShowcasePause={() => {
-            if (showcaseVideoElement) pauseShowcaseVideo(showcaseVideoElement);
-            setShowcaseVideoState((current) => (current.playing ? { ...current, playing: false } : current));
-          }}
-          onShowcasePlay={() => {
-            setShowcaseVideoState({ playing: true });
-            onSectionTrigger("showcase", "play");
-          }}
-        />
+        <NearbyAsset key={`${section.id}:${restartKey}`} position={section.position}>
+          <HubSectionDistrict
+            activeServiceInfoId={activeServiceInfoId}
+            billboardScale={billboardScale}
+            billboardYOffset={billboardYOffset}
+            section={section}
+            serviceResolutions={serviceResolutions}
+            activeSimpleDisplays={activeSimpleDisplays}
+            selectedOffer={offerOptions.find((offer) => offer.id === selectedOfferId) ?? null}
+            showcaseVideoState={showcaseVideoState}
+            onOfferSelect={(offerId) => {
+              setSelectedOfferId(offerId);
+              if (offerId) onSectionTrigger("offers", offerId);
+            }}
+            onSimpleDisplayTrigger={showSimpleDisplay}
+            onShowcasePause={() => {
+              if (showcaseVideoElement) pauseShowcaseVideo(showcaseVideoElement);
+              setShowcaseVideoState((current) => (current.playing ? { ...current, playing: false } : current));
+            }}
+            onShowcasePlay={() => {
+              setShowcaseVideoState({ playing: true });
+              onSectionTrigger("showcase", "play");
+            }}
+          />
+        </NearbyAsset>
       ))}
     </group>
   );
@@ -725,11 +732,18 @@ function ServiceImageScreen({
   );
 }
 
-function ShowcaseScreenContent({ isPlaying }: { isPlaying: boolean }) {
+function ShowcaseScreenContent({ isPlaying: requestedPlaying }: { isPlaying: boolean }) {
+  const { ref: screenRef, visible } = useScreenVisibility();
+  const isPlaying = requestedPlaying && visible;
   const materialRef = useRef<MeshBasicMaterial>(null);
   const screenOpacityRef = useRef(0);
   const [videoTexture, setVideoTexture] = useState<VideoTexture | null>(() => showcaseVideoTexture);
   const [showTapToPlay, setShowTapToPlay] = useState(false);
+
+  // Explicit playback starts over; camera visibility resumes the existing time.
+  useEffect(() => {
+    if (requestedPlaying && showcaseVideoElement) showcaseVideoElement.currentTime = 0;
+  }, [requestedPlaying]);
 
   useEffect(() => {
     if (!isPlaying && !showcaseVideoElement) return undefined;
@@ -748,7 +762,7 @@ function ShowcaseScreenContent({ isPlaying }: { isPlaying: boolean }) {
 
     if (isPlaying) {
       setShowTapToPlay(false);
-      void playShowcaseVideo(video).then((playing) => {
+      void playShowcaseVideo(video, false).then((playing) => {
         if (disposed) return;
         setShowTapToPlay(!playing);
         if (playing) attachTextureWhenReady();
@@ -778,7 +792,7 @@ function ShowcaseScreenContent({ isPlaying }: { isPlaying: boolean }) {
 
   const handleTapToPlay = () => {
     const video = getShowcaseVideoElement();
-    void playShowcaseVideo(video).then((playing) => {
+    void playShowcaseVideo(video, false).then((playing) => {
       setShowTapToPlay(!playing);
       if (playing && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
         setVideoTexture(getShowcaseVideoTexture(video));
@@ -798,7 +812,7 @@ function ShowcaseScreenContent({ isPlaying }: { isPlaying: boolean }) {
 
   return (
     <>
-      <mesh geometry={screenContentGeometry} position={[0, -0.03, -0.2]} renderOrder={20} dispose={null}>
+      <mesh ref={screenRef} geometry={screenContentGeometry} position={[0, -0.03, -0.2]} renderOrder={20} dispose={null}>
         {videoTexture ? (
           <meshBasicMaterial
             ref={materialRef}
@@ -825,11 +839,18 @@ function ShowcaseScreenContent({ isPlaying }: { isPlaying: boolean }) {
   );
 }
 
-function WebsiteScreenContent({ isPlaying }: { isPlaying: boolean }) {
+function WebsiteScreenContent({ isPlaying: requestedPlaying }: { isPlaying: boolean }) {
+  const { ref: screenRef, visible } = useScreenVisibility();
+  const isPlaying = requestedPlaying && visible;
   const materialRef = useRef<MeshBasicMaterial>(null);
   const screenOpacityRef = useRef(0);
   const [videoTexture, setVideoTexture] = useState<VideoTexture | null>(() => websiteVideoTexture);
   const [showTapToPlay, setShowTapToPlay] = useState(false);
+
+  // Explicit playback starts over; camera visibility resumes the existing time.
+  useEffect(() => {
+    if (requestedPlaying && websiteVideoElement) websiteVideoElement.currentTime = 0;
+  }, [requestedPlaying]);
 
   useEffect(() => {
     if (!isPlaying && !websiteVideoElement) return undefined;
@@ -847,7 +868,7 @@ function WebsiteScreenContent({ isPlaying }: { isPlaying: boolean }) {
 
     if (isPlaying) {
       setShowTapToPlay(false);
-      void playWebsiteVideo(video).then((playing) => {
+      void playWebsiteVideo(video, false).then((playing) => {
         if (disposed) return;
         setShowTapToPlay(!playing);
         if (playing) attachTextureWhenReady();
@@ -875,7 +896,7 @@ function WebsiteScreenContent({ isPlaying }: { isPlaying: boolean }) {
 
   const handleTapToPlay = () => {
     const video = getWebsiteVideoElement();
-    void playWebsiteVideo(video).then((playing) => {
+    void playWebsiteVideo(video, false).then((playing) => {
       setShowTapToPlay(!playing);
       if (playing && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
         setVideoTexture(getWebsiteVideoTexture(video));
@@ -894,7 +915,7 @@ function WebsiteScreenContent({ isPlaying }: { isPlaying: boolean }) {
 
   return (
     <>
-      <mesh geometry={screenContentGeometry} position={[0, -0.03, -0.2]} renderOrder={20} dispose={null}>
+      <mesh ref={screenRef} geometry={screenContentGeometry} position={[0, -0.03, -0.2]} renderOrder={20} dispose={null}>
         {videoTexture ? (
           <meshBasicMaterial
             ref={materialRef}

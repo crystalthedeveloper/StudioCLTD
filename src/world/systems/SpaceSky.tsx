@@ -1,3 +1,4 @@
+import { assetForDevice } from "../mobileAssets";
 import { isCompactVisualBudget } from "../visualQuality";
 import { useGameFrame } from "../../player/useGameFrame";
 import { useTexture } from "@react-three/drei";
@@ -34,6 +35,7 @@ function configurePlanetTexture(texture: Texture) {
 }
 
 export function SpaceSky() {
+  const [compact] = useState(isCompactVisualBudget);
   const [segments] = useState(() => isCompactVisualBudget() ? 48 : 64);
   const planetsRef = useRef<Group>(null);
   const camera = useThree((state) => state.camera);
@@ -43,9 +45,9 @@ export function SpaceSky() {
     planetsRef.current?.traverse((object) => object.layers.set(3));
     return () => { if (!enabled) camera.layers.disable(3); };
   }, [camera]);
-  const cloudTexture = useTexture(cloudTexturePath);
-  const moonTexture = useTexture(moonTexturePath);
-  const venusTexture = useTexture(venusTexturePath);
+  const cloudTexture = useTexture(assetForDevice(cloudTexturePath));
+  const moonTexture = useTexture(assetForDevice(moonTexturePath));
+  const venusTexture = useTexture(assetForDevice(venusTexturePath));
   const nearCloudGroupRef = useRef<Group>(null);
   const middleCloudGroupRef = useRef<Group>(null);
   const farCloudGroupRef = useRef<Group>(null);
@@ -104,14 +106,14 @@ export function SpaceSky() {
         </sprite>
       </group>
 
-      <group ref={farCloudGroupRef} name="FarSlowCloudLayers">
+      {!compact && <group ref={farCloudGroupRef} name="FarSlowCloudLayers">
         <sprite position={[330, 126, 170]} scale={[245, 110, 1]} renderOrder={-100}>
           <spriteMaterial map={cloudTexture} color="#adb3b9" opacity={0.258} transparent alphaTest={0.01} depthWrite={false} fog={false} toneMapped={false} rotation={-0.1} />
         </sprite>
         <sprite position={[-240, 148, -520]} scale={[290, 128, 1]} renderOrder={-100}>
           <spriteMaterial map={cloudTexture} color="#9ea5ac" opacity={0.202} transparent alphaTest={0.01} depthWrite={false} fog={false} toneMapped={false} rotation={0.11} />
         </sprite>
-      </group>
+      </group>}
 
       <group ref={planetsRef} name="CosmicPlanets">
       <mesh position={[68, 42, -210]} rotation={[0.08, -0.48, 0]}>

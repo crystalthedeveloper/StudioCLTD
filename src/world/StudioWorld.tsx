@@ -1,3 +1,4 @@
+import { isCompactVisualBudget } from "./visualQuality";
 import { WINTER_THEME_ENABLED } from "./winterTheme";
 import { WinterSnow } from "./systems/WinterSnow";
 import { FixPowerPickups } from "./systems/FixPowerPickups";
@@ -87,7 +88,7 @@ export function StudioWorld({ damageFlashUntil, onBonusCollect, onCoinCollect, o
       {WINTER_THEME_ENABLED && <WinterSnow />}
       <FixPowerPickups key={`powers:${restartKey}`} />
       <SpaceSky />
-      <Environment preset="warehouse" background={false} environmentIntensity={0.16} />
+      {!isCompactVisualBudget() && <Environment preset="warehouse" background={false} environmentIntensity={0.16} />}
       <ModularTerrain radius={7} />
       <HomeBase />
       <LogoLightField

@@ -1,7 +1,6 @@
 import { AnimationAction, AnimationClip, AnimationUtils, LoopOnce, LoopRepeat } from "three";
 import { gameNow, isGameFocused } from "../player/gameFocus";
 
-export const attackImpactTime = 0.58;
 export const attackCooldownMs = 450;
 export function villainClips(clips: AnimationClip[]) {
   const hit = clips.find((clip) => clip.name === "hitV");
@@ -11,7 +10,6 @@ export function villainClips(clips: AnimationClip[]) {
 export function createVillainCombat(actions: Record<string, AnimationAction | null>) {
   let current: AnimationAction | null = null;
   let motion = "";
-  let impacted = false;
   let nextAttackAt = 0;
   function setMotion(next: "idle" | "running" | "attack" | "dead") {
     if (motion === next) return;
@@ -28,8 +26,8 @@ export function createVillainCombat(actions: Record<string, AnimationAction | nu
   }
   return {
     setMotion,
-    /** Returns true while the actor must stand still (attack or recovery). */
-    updateAttack(inRange: boolean, alive: boolean, onImpact: () => void) {
+    /** Visual feedback only. Returns true during attack/recovery; never applies damage. */
+    updateAttack(inRange: boolean, alive: boolean) {
       if (!isGameFocused()) return true;
       if (!alive) { setMotion("dead"); return true; }
       if (!inRange) {
@@ -39,10 +37,8 @@ export function createVillainCombat(actions: Record<string, AnimationAction | nu
       if (motion !== "attack") {
         setMotion("idle");
         if (gameNow() < nextAttackAt || !actions.attackV) return true;
-        impacted = false;
         setMotion("attack");
       }
-      if (current && !impacted && current.time >= attackImpactTime) { impacted = true; onImpact(); }
       if (current && current.time >= current.getClip().duration) {
         nextAttackAt = gameNow() + attackCooldownMs;
         setMotion("idle");

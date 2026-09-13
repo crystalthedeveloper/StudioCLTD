@@ -1,3 +1,5 @@
+import { createContactDamageGate } from "./player/contactDamage";
+import { isCompactVisualBudget } from "./world/visualQuality";
 import { createGuidePauseSession } from "./player/guidePauseSession";
 import { handlePowerShortcut, resetTemporaryPowers } from "./player/temporaryPowers";
 import { gameNow } from "./player/gameFocus";
@@ -31,9 +33,9 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   const [guideOpen, setGuideOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previousCompletedSectionCountRef = useRef(0);
-  const damageCooldownUntilRef = useRef(0);
+  const [contactDamageGate] = useState(createContactDamageGate);
   const healthRef = useRef(3);
-  const [coins, setCoins] = useState(0);
+  const [cash, setCash] = useState(0);
   const [completedSectionCount, setCompletedSectionCount] = useState(0);
   const [health, setHealth] = useState(3);
   const [damageFlashUntil, setDamageFlashUntil] = useState(0);
@@ -51,9 +53,9 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   }, []);
 
   const resetGameSession = useCallback(() => {
-    damageCooldownUntilRef.current = 0;
+    contactDamageGate.reset();
     previousCompletedSectionCountRef.current = 0;
-    setCoins(0);
+    setCash(0);
     setCompletedSectionCount(0);
     setHealth(3);
     healthRef.current = 3;
@@ -61,7 +63,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
     resetTemporaryPowers();
     setShareScreenOpen(false);
     onRestart();
-  }, [onRestart]);
+  }, [onRestart, contactDamageGate]);
 
   const handlePlayerDeath = useCallback(() => {
     resetGameSession();
@@ -72,17 +74,14 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   }, [resetGameSession]);
 
   const damagePlayer = useCallback(() => {
-    if (!isGameFocused()) return;
-    const now = gameNow();
-    if (now < damageCooldownUntilRef.current) return;
-
-    const cooldownUntil = now + 1250;
-    damageCooldownUntilRef.current = cooldownUntil;
+    if (healthRef.current <= 0) return;
+    const cooldownUntil = contactDamageGate.claim();
+    if (cooldownUntil === null) return;
     setDamageFlashUntil(cooldownUntil);
     const nextHealth = Math.max(0, healthRef.current - 1);
     healthRef.current = nextHealth;
     setHealth(nextHealth);
-  }, []);
+  }, [contactDamageGate]);
 
   const collectHealth = useCallback(() => {
     if (!isGameFocused()) return false;
@@ -123,6 +122,11 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   }, [completedSectionCount]);
 
   useEffect(() => {
+    if (isCompactVisualBudget()) {
+      setScreenAssetProgress(100);
+      setScreenAssetsReady(true);
+      return;
+    }
     let cancelled = false;
     preloadScreenTextures((nextProgress) => {
       if (!cancelled) setScreenAssetProgress((current) => Math.max(current, nextProgress));
@@ -259,7 +263,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
     <>
       <div className={`game-shell${gameFocused ? " game-shell--focused" : ""}`}>
         <Canvas
-          dpr={1}
+          dpr={isCompactVisualBudget() ? 0.85 : 1}
           frameloop={gameFocused ? "always" : "demand"}
           gl={{
             antialias: false,
@@ -294,8 +298,8 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
             <Physics gravity={[0, -20, 0]} paused={!gameFocused}>
               <StudioWorld
                 damageFlashUntil={damageFlashUntil}
-                onCoinCollect={() => setCoins((current) => current + 1)}
-                onBonusCollect={() => setCoins((current) => current + 3)}
+                onCoinCollect={() => setCash((current) => current + 1)}
+                onBonusCollect={() => setCash((current) => current + 3)}
                 onOpenShare={() => {
                   document.exitPointerLock?.();
                   setGameFocused(false);
@@ -325,7 +329,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         health={health}
         onOpenWebsite={onOpenWebsite}
         onRestart={handleManualRestart}
-        points={coins}
+        cash={cash}
       />
       <HubOverlay />
       {!gameFocused && !guideOpen && (

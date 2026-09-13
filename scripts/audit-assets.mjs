@@ -14,6 +14,7 @@ const publicRoot = resolve(root, 'public');
 const assets = files(publicRoot);
 const sources = [...files(resolve(root, 'src')), resolve(root, 'index.html')]
   .filter(path => /\.(tsx?|jsx?|css|html)$/.test(path));
+sources.push(resolve(root, "src/world/mobile-assets.json"));
 const source = sources.map(path => readFileSync(path, 'utf8')).join('\n');
 // Public URLs are literal in this project; review this scan if dynamic paths are added.
 const references = new Set([...source.matchAll(/["'`](\/(?:audio|videos|images|characters|logo|fonts)\/[^"'`\s]+)["'`]/g)].map(match => match[1]));

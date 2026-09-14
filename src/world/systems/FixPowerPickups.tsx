@@ -1,3 +1,4 @@
+import { routePowerPositions } from "../worldLayout";
 import { useTexture } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
 import { powerIcons } from "../../player/powerIcons";
@@ -12,10 +13,9 @@ import { playerWorldState } from "../playerWorldState";
 import { homeBaseCenter } from "./HomeBase";
 
 const locations: [number, number, number][] = [
-  [-6, 0, 6], [6, 0, 6], [0, 0, 14], [0, 0, -14],
-  [-18, 0, 0], [18, 0, 0], [-24, 0, -24], [24, 0, -24],
-  [-24, 0, 24], [24, 0, 24],
-  ...hubSections.map(({ position: [x, y, z] }): [number, number, number] => [x + 5, y, z + 3]),
+  ...routePowerPositions,
+  ...hubSections.map(({ position: [x, y, z], entrance: [dx, dz] }): [number, number, number] =>
+    [x + dx * 9 - dz * 5, y, z + dz * 9 + dx * 5]),
   [homeBaseCenter[0] - 5, homeBaseCenter[1], homeBaseCenter[2]],
   [homeBaseCenter[0] + 5, homeBaseCenter[1], homeBaseCenter[2]],
 ];

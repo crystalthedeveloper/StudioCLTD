@@ -1,0 +1,186 @@
+{
+  "info": {
+    "mounted": true,
+    "camera": [
+      0.5010263117140978,
+      2.3247645515383715,
+      12.346520463975253
+    ],
+    "mobile": false,
+    "batches": [
+      {
+        "count": 0,
+        "visible": false,
+        "castShadow": true,
+        "box": -1
+      },
+      {
+        "count": 0,
+        "visible": false,
+        "castShadow": true,
+        "box": -1
+      },
+      {
+        "count": 1,
+        "visible": true,
+        "castShadow": false,
+        "box": 2.7683019802930717
+      },
+      {
+        "count": 1,
+        "visible": true,
+        "castShadow": false,
+        "box": 3.0485564617886745
+      },
+      {
+        "count": 6,
+        "visible": true,
+        "castShadow": false,
+        "box": 72.0998153094072
+      },
+      {
+        "count": 6,
+        "visible": true,
+        "castShadow": false,
+        "box": 72.14681683449716
+      },
+      {
+        "count": 3,
+        "visible": true,
+        "castShadow": false,
+        "box": 43.300195004034585
+      },
+      {
+        "count": 6,
+        "visible": true,
+        "castShadow": false,
+        "box": 92.20773965152
+      },
+      {
+        "count": 0,
+        "visible": false,
+        "castShadow": true,
+        "box": -1
+      },
+      {
+        "count": 0,
+        "visible": false,
+        "castShadow": true,
+        "box": -1
+      },
+      {
+        "count": 6,
+        "visible": true,
+        "castShadow": false,
+        "box": 59.18809861515851
+      },
+      {
+        "count": 6,
+        "visible": true,
+        "castShadow": false,
+        "box": 59.182551216155744
+      },
+      {
+        "count": 10,
+        "visible": true,
+        "castShadow": false,
+        "box": 124.35342190525762
+      },
+      {
+        "count": 10,
+        "visible": true,
+        "castShadow": false,
+        "box": 124.1878985055485
+      },
+      {
+        "count": 5,
+        "visible": true,
+        "castShadow": false,
+        "box": 50.84955210921701
+      },
+      {
+        "count": 12,
+        "visible": true,
+        "castShadow": false,
+        "box": 103.62127460663822
+      },
+      {
+        "count": 0,
+        "visible": false,
+        "castShadow": true,
+        "box": -1
+      },
+      {
+        "count": 0,
+        "visible": false,
+        "castShadow": true,
+        "box": -1
+      },
+      {
+        "count": 3,
+        "visible": true,
+        "castShadow": false,
+        "box": 48.60807477279256
+      },
+      {
+        "count": 3,
+        "visible": true,
+        "castShadow": false,
+        "box": 48.48139372233721
+      },
+      {
+        "count": 8,
+        "visible": true,
+        "castShadow": false,
+        "box": 84.1464569843371
+      },
+      {
+        "count": 8,
+        "visible": true,
+        "castShadow": false,
+        "box": 83.81786214359785
+      },
+      {
+        "count": 7,
+        "visible": true,
+        "castShadow": false,
+        "box": 59.77607418528866
+      },
+      {
+        "count": 10,
+        "visible": true,
+        "castShadow": false,
+        "box": 89.19737248798774
+      },
+      {
+        "count": 4,
+        "visible": true,
+        "castShadow": false,
+        "box": 45.02821013390843
+      }
+    ]
+  },
+  "errors": [],
+  "assets": [
+    {
+      "url": "http://127.0.0.1:5174/images/scenery/pine-bark.webp",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5174/images/scenery/pine-alpha.webp",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5174/images/scenery/pine-needles.webp",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5174/images/scenery/rock.webp",
+      "status": 200
+    },
+    {
+      "url": "http://127.0.0.1:5174/images/scenery/rock-normal.webp",
+      "status": 200
+    }
+  ]
+}

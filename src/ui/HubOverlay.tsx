@@ -1,3 +1,4 @@
+import { groundCenter, groundSize } from "../world/worldLayout";
 import { gameTimers } from "../player/gameFocus";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { hubSections } from "../world/hubSections";
@@ -12,8 +13,8 @@ export function HubOverlay() {
     () =>
       hubSections.map((section) => ({
         ...section,
-        x: 50 + (section.position[0] / 62) * 38,
-        y: 50 + (section.position[2] / 62) * 38,
+        x: 50 + ((section.position[0] - groundCenter[0]) / groundSize[0]) * 100,
+        y: 50 + ((section.position[2] - groundCenter[1]) / groundSize[1]) * 100,
       })),
     []
   );
@@ -23,8 +24,8 @@ export function HubOverlay() {
 
     const interval = gameTimers.setInterval(() => {
       const nextPoint = {
-        x: 50 + (playerWorldState.position.x / 62) * 38,
-        y: 50 + (playerWorldState.position.z / 62) * 38,
+        x: 50 + ((playerWorldState.position.x - groundCenter[0]) / groundSize[0]) * 100,
+        y: 50 + ((playerWorldState.position.z - groundCenter[1]) / groundSize[1]) * 100,
       };
       const deltaX = Math.abs(nextPoint.x - playerPointRef.current.x);
       const deltaY = Math.abs(nextPoint.y - playerPointRef.current.y);

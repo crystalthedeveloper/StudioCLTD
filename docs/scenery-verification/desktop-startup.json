@@ -1,0 +1,544 @@
+{
+  "snapshots": {
+    "before": {
+      "id": "0d77546c-c7f1-42ef-a3df-80fc15e41a27",
+      "focused": false,
+      "meshes": [
+        {
+          "id": "8d2fddaf-6320-4337-b2c3-dd101333d106",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "d1db5df0-cfee-435f-abe0-8f4841f92a91",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "1a584b33-d272-4ac3-87d8-27fee0e0e4cc",
+          "count": 1,
+          "visible": true
+        },
+        {
+          "id": "41a1ffea-d2fc-400d-999f-82818ba7050b",
+          "count": 1,
+          "visible": true
+        },
+        {
+          "id": "2aa76d76-9f9b-4e99-a2d7-cf3b34cba9d2",
+          "count": 6,
+          "visible": true
+        },
+        {
+          "id": "78bb03a8-1a59-4dea-a7ec-448e560b0839",
+          "count": 6,
+          "visible": true
+        },
+        {
+          "id": "d64acab6-70e4-45e9-a2d6-aa1d7066feec",
+          "count": 3,
+          "visible": true
+        },
+        {
+          "id": "d8c3d843-38c8-449e-bfc1-572fca2a7d71",
+          "count": 6,
+          "visible": true
+        },
+        {
+          "id": "88aa5f42-5f97-476c-b3d0-8c6eef3bc2b2",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "26c85abe-2250-4413-ba6f-0a63ff54e33f",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "2a9b649f-a40e-46e0-8ad1-90e5d9f5e35d",
+          "count": 5,
+          "visible": true
+        },
+        {
+          "id": "a905a84e-336a-48df-9e64-34363ab9c84b",
+          "count": 5,
+          "visible": true
+        },
+        {
+          "id": "201ddc46-fdba-4157-abad-fb605a926288",
+          "count": 11,
+          "visible": true
+        },
+        {
+          "id": "6a8ac521-c407-45aa-a18b-dcbf0e549832",
+          "count": 11,
+          "visible": true
+        },
+        {
+          "id": "f81e8abb-b0df-4d91-87c6-3a649761e037",
+          "count": 5,
+          "visible": true
+        },
+        {
+          "id": "61f5bf1e-2f6e-451b-b813-51892d514e86",
+          "count": 12,
+          "visible": true
+        },
+        {
+          "id": "3f28ee60-4d24-4e43-9f04-784241205456",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "4e0de4e3-49c1-4dac-ba8d-443f238c0eed",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "304f264b-eee1-4154-9396-3c70c6f9fb23",
+          "count": 3,
+          "visible": true
+        },
+        {
+          "id": "f222d301-bae5-49f6-96bc-068ee9143979",
+          "count": 3,
+          "visible": true
+        },
+        {
+          "id": "23a09854-9d96-4858-ae21-df115f199f88",
+          "count": 8,
+          "visible": true
+        },
+        {
+          "id": "3ac44ad0-8be9-43f7-a50e-e409925fed57",
+          "count": 8,
+          "visible": true
+        },
+        {
+          "id": "bc00056b-1348-425b-87b2-05cbe30a4379",
+          "count": 7,
+          "visible": true
+        },
+        {
+          "id": "c5a7d219-3b13-4f5a-82e1-97663e19c2ad",
+          "count": 10,
+          "visible": true
+        },
+        {
+          "id": "58d61509-413e-4ffb-a55c-47be4ab7969d",
+          "count": 4,
+          "visible": true
+        }
+      ],
+      "playOverlay": true,
+      "loading": false
+    },
+    "escape": {
+      "id": "0d77546c-c7f1-42ef-a3df-80fc15e41a27",
+      "focused": false,
+      "meshes": [
+        {
+          "id": "8d2fddaf-6320-4337-b2c3-dd101333d106",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "d1db5df0-cfee-435f-abe0-8f4841f92a91",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "1a584b33-d272-4ac3-87d8-27fee0e0e4cc",
+          "count": 1,
+          "visible": true
+        },
+        {
+          "id": "41a1ffea-d2fc-400d-999f-82818ba7050b",
+          "count": 1,
+          "visible": true
+        },
+        {
+          "id": "2aa76d76-9f9b-4e99-a2d7-cf3b34cba9d2",
+          "count": 6,
+          "visible": true
+        },
+        {
+          "id": "78bb03a8-1a59-4dea-a7ec-448e560b0839",
+          "count": 6,
+          "visible": true
+        },
+        {
+          "id": "d64acab6-70e4-45e9-a2d6-aa1d7066feec",
+          "count": 3,
+          "visible": true
+        },
+        {
+          "id": "d8c3d843-38c8-449e-bfc1-572fca2a7d71",
+          "count": 6,
+          "visible": true
+        },
+        {
+          "id": "88aa5f42-5f97-476c-b3d0-8c6eef3bc2b2",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "26c85abe-2250-4413-ba6f-0a63ff54e33f",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "2a9b649f-a40e-46e0-8ad1-90e5d9f5e35d",
+          "count": 5,
+          "visible": true
+        },
+        {
+          "id": "a905a84e-336a-48df-9e64-34363ab9c84b",
+          "count": 5,
+          "visible": true
+        },
+        {
+          "id": "201ddc46-fdba-4157-abad-fb605a926288",
+          "count": 11,
+          "visible": true
+        },
+        {
+          "id": "6a8ac521-c407-45aa-a18b-dcbf0e549832",
+          "count": 11,
+          "visible": true
+        },
+        {
+          "id": "f81e8abb-b0df-4d91-87c6-3a649761e037",
+          "count": 5,
+          "visible": true
+        },
+        {
+          "id": "61f5bf1e-2f6e-451b-b813-51892d514e86",
+          "count": 12,
+          "visible": true
+        },
+        {
+          "id": "3f28ee60-4d24-4e43-9f04-784241205456",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "4e0de4e3-49c1-4dac-ba8d-443f238c0eed",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "304f264b-eee1-4154-9396-3c70c6f9fb23",
+          "count": 3,
+          "visible": true
+        },
+        {
+          "id": "f222d301-bae5-49f6-96bc-068ee9143979",
+          "count": 3,
+          "visible": true
+        },
+        {
+          "id": "23a09854-9d96-4858-ae21-df115f199f88",
+          "count": 8,
+          "visible": true
+        },
+        {
+          "id": "3ac44ad0-8be9-43f7-a50e-e409925fed57",
+          "count": 8,
+          "visible": true
+        },
+        {
+          "id": "bc00056b-1348-425b-87b2-05cbe30a4379",
+          "count": 7,
+          "visible": true
+        },
+        {
+          "id": "c5a7d219-3b13-4f5a-82e1-97663e19c2ad",
+          "count": 10,
+          "visible": true
+        },
+        {
+          "id": "58d61509-413e-4ffb-a55c-47be4ab7969d",
+          "count": 4,
+          "visible": true
+        }
+      ],
+      "playOverlay": true,
+      "loading": false
+    },
+    "pointerlock": {
+      "id": "0d77546c-c7f1-42ef-a3df-80fc15e41a27",
+      "focused": false,
+      "meshes": [
+        {
+          "id": "8d2fddaf-6320-4337-b2c3-dd101333d106",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "d1db5df0-cfee-435f-abe0-8f4841f92a91",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "1a584b33-d272-4ac3-87d8-27fee0e0e4cc",
+          "count": 1,
+          "visible": true
+        },
+        {
+          "id": "41a1ffea-d2fc-400d-999f-82818ba7050b",
+          "count": 1,
+          "visible": true
+        },
+        {
+          "id": "2aa76d76-9f9b-4e99-a2d7-cf3b34cba9d2",
+          "count": 6,
+          "visible": true
+        },
+        {
+          "id": "78bb03a8-1a59-4dea-a7ec-448e560b0839",
+          "count": 6,
+          "visible": true
+        },
+        {
+          "id": "d64acab6-70e4-45e9-a2d6-aa1d7066feec",
+          "count": 3,
+          "visible": true
+        },
+        {
+          "id": "d8c3d843-38c8-449e-bfc1-572fca2a7d71",
+          "count": 6,
+          "visible": true
+        },
+        {
+          "id": "88aa5f42-5f97-476c-b3d0-8c6eef3bc2b2",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "26c85abe-2250-4413-ba6f-0a63ff54e33f",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "2a9b649f-a40e-46e0-8ad1-90e5d9f5e35d",
+          "count": 6,
+          "visible": true
+        },
+        {
+          "id": "a905a84e-336a-48df-9e64-34363ab9c84b",
+          "count": 6,
+          "visible": true
+        },
+        {
+          "id": "201ddc46-fdba-4157-abad-fb605a926288",
+          "count": 10,
+          "visible": true
+        },
+        {
+          "id": "6a8ac521-c407-45aa-a18b-dcbf0e549832",
+          "count": 10,
+          "visible": true
+        },
+        {
+          "id": "f81e8abb-b0df-4d91-87c6-3a649761e037",
+          "count": 5,
+          "visible": true
+        },
+        {
+          "id": "61f5bf1e-2f6e-451b-b813-51892d514e86",
+          "count": 12,
+          "visible": true
+        },
+        {
+          "id": "3f28ee60-4d24-4e43-9f04-784241205456",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "4e0de4e3-49c1-4dac-ba8d-443f238c0eed",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "304f264b-eee1-4154-9396-3c70c6f9fb23",
+          "count": 3,
+          "visible": true
+        },
+        {
+          "id": "f222d301-bae5-49f6-96bc-068ee9143979",
+          "count": 3,
+          "visible": true
+        },
+        {
+          "id": "23a09854-9d96-4858-ae21-df115f199f88",
+          "count": 8,
+          "visible": true
+        },
+        {
+          "id": "3ac44ad0-8be9-43f7-a50e-e409925fed57",
+          "count": 8,
+          "visible": true
+        },
+        {
+          "id": "bc00056b-1348-425b-87b2-05cbe30a4379",
+          "count": 7,
+          "visible": true
+        },
+        {
+          "id": "c5a7d219-3b13-4f5a-82e1-97663e19c2ad",
+          "count": 10,
+          "visible": true
+        },
+        {
+          "id": "58d61509-413e-4ffb-a55c-47be4ab7969d",
+          "count": 4,
+          "visible": true
+        }
+      ],
+      "playOverlay": true,
+      "loading": false
+    },
+    "blur": {
+      "id": "0d77546c-c7f1-42ef-a3df-80fc15e41a27",
+      "focused": false,
+      "meshes": [
+        {
+          "id": "8d2fddaf-6320-4337-b2c3-dd101333d106",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "d1db5df0-cfee-435f-abe0-8f4841f92a91",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "1a584b33-d272-4ac3-87d8-27fee0e0e4cc",
+          "count": 1,
+          "visible": true
+        },
+        {
+          "id": "41a1ffea-d2fc-400d-999f-82818ba7050b",
+          "count": 1,
+          "visible": true
+        },
+        {
+          "id": "2aa76d76-9f9b-4e99-a2d7-cf3b34cba9d2",
+          "count": 6,
+          "visible": true
+        },
+        {
+          "id": "78bb03a8-1a59-4dea-a7ec-448e560b0839",
+          "count": 6,
+          "visible": true
+        },
+        {
+          "id": "d64acab6-70e4-45e9-a2d6-aa1d7066feec",
+          "count": 3,
+          "visible": true
+        },
+        {
+          "id": "d8c3d843-38c8-449e-bfc1-572fca2a7d71",
+          "count": 6,
+          "visible": true
+        },
+        {
+          "id": "88aa5f42-5f97-476c-b3d0-8c6eef3bc2b2",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "26c85abe-2250-4413-ba6f-0a63ff54e33f",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "2a9b649f-a40e-46e0-8ad1-90e5d9f5e35d",
+          "count": 6,
+          "visible": true
+        },
+        {
+          "id": "a905a84e-336a-48df-9e64-34363ab9c84b",
+          "count": 6,
+          "visible": true
+        },
+        {
+          "id": "201ddc46-fdba-4157-abad-fb605a926288",
+          "count": 10,
+          "visible": true
+        },
+        {
+          "id": "6a8ac521-c407-45aa-a18b-dcbf0e549832",
+          "count": 10,
+          "visible": true
+        },
+        {
+          "id": "f81e8abb-b0df-4d91-87c6-3a649761e037",
+          "count": 5,
+          "visible": true
+        },
+        {
+          "id": "61f5bf1e-2f6e-451b-b813-51892d514e86",
+          "count": 12,
+          "visible": true
+        },
+        {
+          "id": "3f28ee60-4d24-4e43-9f04-784241205456",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "4e0de4e3-49c1-4dac-ba8d-443f238c0eed",
+          "count": 0,
+          "visible": false
+        },
+        {
+          "id": "304f264b-eee1-4154-9396-3c70c6f9fb23",
+          "count": 3,
+          "visible": true
+        },
+        {
+          "id": "f222d301-bae5-49f6-96bc-068ee9143979",
+          "count": 3,
+          "visible": true
+        },
+        {
+          "id": "23a09854-9d96-4858-ae21-df115f199f88",
+          "count": 8,
+          "visible": true
+        },
+        {
+          "id": "3ac44ad0-8be9-43f7-a50e-e409925fed57",
+          "count": 8,
+          "visible": true
+        },
+        {
+          "id": "bc00056b-1348-425b-87b2-05cbe30a4379",
+          "count": 7,
+          "visible": true
+        },
+        {
+          "id": "c5a7d219-3b13-4f5a-82e1-97663e19c2ad",
+          "count": 10,
+          "visible": true
+        },
+        {
+          "id": "58d61509-413e-4ffb-a55c-47be4ab7969d",
+          "count": 4,
+          "visible": true
+        }
+      ],
+      "playOverlay": true,
+      "loading": false
+    }
+  },
+  "requests": [
+    "http://127.0.0.1:5175/images/scenery/pine-needles.webp",
+    "http://127.0.0.1:5175/images/scenery/pine-alpha.webp",
+    "http://127.0.0.1:5175/images/scenery/pine-bark.webp",
+    "http://127.0.0.1:5175/images/scenery/rock.webp",
+    "http://127.0.0.1:5175/images/scenery/rock-normal.webp"
+  ],
+  "errors": []
+}

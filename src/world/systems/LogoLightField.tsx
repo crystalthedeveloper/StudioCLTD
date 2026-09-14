@@ -1,3 +1,4 @@
+import { routePickupPositions, groundSize, groundCenter } from "../worldLayout";
 import { isCompactVisualBudget } from "../visualQuality";
 import { assetForDevice } from "../mobileAssets";
 import { useGameFrame } from "../../player/useGameFrame";
@@ -37,7 +38,6 @@ const transportPadClearance = 3.8;
 const collectibleSpacing = 5;
 const placementSearchStep = 1.25;
 const placementSearchDirections = 32;
-const placementWorldLimit = 68;
 
 type LogoKind = "coin" | "speed" | "penalty" | "contact" | "share" | "light" | "dark";
 
@@ -112,7 +112,7 @@ function distanceToSegment(
 
 function isOpenCollectiblePosition(position: readonly [number, number], placed: readonly PlazaLogo[]) {
   const [x, z] = position;
-  if (Math.hypot(x, z) > placementWorldLimit) return false;
+  if (Math.abs(x - groundCenter[0]) > groundSize[0] / 2 - 6 || Math.abs(z - groundCenter[1]) > groundSize[1] / 2 - 6) return false;
 
   for (const section of hubSections) {
     const [sectionX, , sectionZ] = section.position;
@@ -169,7 +169,7 @@ function resolveLogoPlacements(logos: readonly PlazaLogo[]) {
   }, []);
 }
 
-const accessiblePlazaLogos = resolveLogoPlacements(plazaLogos);
+const accessiblePlazaLogos = resolveLogoPlacements(plazaLogos.map(logo => ({ ...logo, position: routePickupPositions[logo.id] ?? logo.position })));
 
 const logoColors: Record<LogoKind, string> = {
   coin: "#3f7d3a",

@@ -1,3 +1,4 @@
+import { bonusRouteSpots } from "../worldLayout";
 import { isCompactVisualBudget } from "../visualQuality";
 import { NearbyAsset } from "../NearbyAsset";
 import { assetForDevice } from "../mobileAssets";
@@ -101,14 +102,8 @@ function createSectionEncounters(): SectionEncounterConfig[] {
 }
 
 const sectionEncounters = createSectionEncounters();
-const bonusSpawnSpots = [
-  new Vector3(-18, 0.1, 12),
-  new Vector3(18, 0.1, 12),
-  new Vector3(-16, 0.1, -16),
-  new Vector3(16, 0.1, -16),
-  new Vector3(0, 0.1, 15),
-];
-const bonusRoamingLimit = 18;
+const bonusSpawnSpots = bonusRouteSpots.map(([x, z]) => new Vector3(x, 0.1, z));
+const bonusRoamingLimit = 30;
 const bonusRampClearance = 2;
 
 function distanceToBonusRamp(

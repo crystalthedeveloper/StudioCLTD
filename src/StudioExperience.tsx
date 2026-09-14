@@ -3,7 +3,7 @@ import { isCompactVisualBudget } from "./world/visualQuality";
 import { createGuidePauseSession } from "./player/guidePauseSession";
 import { handlePowerShortcut, resetTemporaryPowers } from "./player/temporaryPowers";
 import { gameNow } from "./player/gameFocus";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { useProgress } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
@@ -28,6 +28,8 @@ type StudioExperienceProps = {
 
 export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRestart, restartKey }: StudioExperienceProps) {
   const gameFocused = useGameFocus();
+  const [worldReady, setWorldReady] = useState(false);
+  const markWorldReady = useCallback(() => setWorldReady(true), []);
   const playRequestedRef = useRef(false);
   const [guideSession] = useState(createGuidePauseSession);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -312,10 +314,12 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
                 restartKey={restartKey}
               />
             </Physics>
+            <WorldFirstRender onReady={markWorldReady} />
           </Suspense>
         </Canvas>
       </div>
       <StartupProgress
+        worldReady={worldReady}
         onProgress={onLoadProgress}
         onReady={onReady}
         screenAssetProgress={screenAssetProgress}
@@ -347,7 +351,23 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   );
 }
 
+/** Commits only after the entire world (including scenery textures) resolves.
+ * Notify after its first rendered frame, even while gameplay is paused.
+ */
+function WorldFirstRender({ onReady }: { onReady: () => void }) {
+  const scheduled = useRef(false);
+  const frame = useRef(0);
+  useFrame(() => {
+    if (scheduled.current) return;
+    scheduled.current = true;
+    frame.current = window.requestAnimationFrame(onReady);
+  });
+  useEffect(() => () => window.cancelAnimationFrame(frame.current), []);
+  return null;
+}
+
 function StartupProgress({
+  worldReady,
   onProgress,
   onReady,
   screenAssetProgress,
@@ -357,6 +377,7 @@ function StartupProgress({
   onReady: () => void;
   screenAssetProgress: number;
   screenAssetsReady: boolean;
+  worldReady: boolean;
 }) {
   const { active, progress } = useProgress();
   const displayedProgressRef = useRef(0);
@@ -370,7 +391,8 @@ function StartupProgress({
   onReadyRef.current = onReady;
   if (active) observedWorldLoadingRef.current = true;
 
-  const complete = !active && progress >= 100;
+  // useProgress includes all five scenery textures via Three's loading manager.
+  const complete = worldReady && !active && progress >= 100;
   const worldProgress = observedWorldLoadingRef.current || screenAssetsReady
     ? MathUtils.clamp(progress, 0, 100)
     : 0;

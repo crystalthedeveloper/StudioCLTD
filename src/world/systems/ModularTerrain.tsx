@@ -1,3 +1,5 @@
+import { groundSize, groundCenter } from "../worldLayout";
+import { PlazaPaths } from "./PlazaPaths";
 import { NearbyAsset } from "../NearbyAsset";
 import { isCompactVisualBudget } from "../visualQuality";
 import { assetForDevice } from "../mobileAssets";
@@ -20,9 +22,6 @@ import {
 } from "three";
 import { destinationPlatformRadius, hubSections, sectionRampApproachLength, sectionRampWidth } from "../hubSections";
 
-type ModularTerrainProps = {
-  radius: number;
-};
 
 export const concreteTexturePaths: string[] = [
   "/images/optimized/floor/world-weathered-concrete-seamless.webp",
@@ -185,8 +184,8 @@ export function createConcreteBoxGeometry(width: number, height: number, depth: 
   return applyWorldScaleBoxUvs(new RoundedBoxGeometry(width, height, depth, 1, Math.min(0.06, height / 6)), offsetX, offsetZ);
 }
 
-function createConcreteFloorGeometry(size: number) {
-  const geometry = new PlaneGeometry(size, size);
+function createConcreteFloorGeometry(width: number, depth: number) {
+  const geometry = new PlaneGeometry(width, depth);
   const positions = geometry.getAttribute("position");
   const uvs = geometry.getAttribute("uv");
   for (let index = 0; index < positions.count; index += 1) {
@@ -200,10 +199,9 @@ function createConcreteFloorGeometry(size: number) {
   return geometry;
 }
 
-export function ModularTerrain({ radius }: ModularTerrainProps) {
-  const platformSize = radius * 20 + 10;
+export function ModularTerrain() {
   const concreteTextures = useTexture(concreteTexturePaths.map(assetForDevice));
-  const floorGeometry = useMemo(() => createConcreteFloorGeometry(platformSize), [platformSize]);
+  const floorGeometry = useMemo(() => createConcreteFloorGeometry(...groundSize), []);
 
   useMemo(() => configureConcreteTextures(concreteTextures), [concreteTextures]);
   const terrainMaterial = useMemo(
@@ -224,16 +222,17 @@ export function ModularTerrain({ radius }: ModularTerrainProps) {
     <group name="WeatheredConcreteTerrain">
       <RigidBody name="StudioCLTDFloor" type="fixed" colliders={false}>
         <CuboidCollider
-          position={[0, -0.09, 0]}
-          args={[platformSize / 2, 0.09, platformSize / 2]}
+          position={[groundCenter[0], -0.09, groundCenter[1]]}
+          args={[groundSize[0] / 2, 0.09, groundSize[1] / 2]}
           friction={0}
           restitution={0.18}
         />
       </RigidBody>
-      <mesh rotation-x={-Math.PI / 2} receiveShadow>
+      <mesh position={[groundCenter[0], 0, groundCenter[1]]} rotation-x={-Math.PI / 2} receiveShadow>
         <primitive object={floorGeometry} attach="geometry" />
         <primitive object={floorMaterial} attach="material" />
       </mesh>
+      <PlazaPaths textures={concreteTextures} />
       {hubSections.map((section) => (
         <DestinationPlatform key={section.id} material={terrainMaterial} section={section} />
       ))}

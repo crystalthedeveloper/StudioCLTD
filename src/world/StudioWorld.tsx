@@ -1,9 +1,11 @@
+import { scenerySettings } from "./scenery/sceneryLayout";
 import { isCompactVisualBudget } from "./visualQuality";
 import { WINTER_THEME_ENABLED } from "./winterTheme";
 import { WinterSnow } from "./systems/WinterSnow";
 import { FixPowerPickups } from "./systems/FixPowerPickups";
 import { Environment } from "@react-three/drei";
 import { useEffect, useRef, useState } from "react";
+import { WinterScenery } from "./systems/WinterScenery";
 import { CharacterController } from "../player/CharacterController";
 import { resetSpeedBoost } from "../player/speedBoost";
 import { DialogueMessage } from "../ui/DialogueBubble";
@@ -85,11 +87,12 @@ export function StudioWorld({ damageFlashUntil, onBonusCollect, onCoinCollect, o
   return (
     <>
       <WorldLights />
+      {scenerySettings.enabled && <WinterScenery />}
       {WINTER_THEME_ENABLED && <WinterSnow />}
       <FixPowerPickups key={`powers:${restartKey}`} />
       <SpaceSky />
       {!isCompactVisualBudget() && <Environment preset="warehouse" background={false} environmentIntensity={0.16} />}
-      <ModularTerrain radius={7} />
+      <ModularTerrain />
       <HomeBase />
       <LogoLightField
         onCoinCollect={onCoinCollect}

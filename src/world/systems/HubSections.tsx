@@ -6,12 +6,18 @@ import { playGameMedia, registerGameMedia, stopGameMedia } from "../../audio/gam
 import { useGameFrame } from "../../player/useGameFrame";
 import { gameNow } from "../../player/gameFocus";
 import { gameTimers } from "../../player/gameFocus";
+import { useFrame } from "@react-three/fiber";
 import { Html, Text } from "@react-three/drei";
 import { CuboidCollider, CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload, RigidBody } from "@react-three/rapier";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   BoxGeometry,
   DoubleSide,
+  Group,
+  Object3D,
+  Mesh,
+  InstancedMesh,
+  Sprite,
   LinearFilter,
   MathUtils,
   MeshBasicMaterial,
@@ -64,10 +70,18 @@ const screenIdleColor = "#0b1018";
 const screenContentScale = 1.1;
 const screenViewingHeight = 4.3;
 const screenContentSize: [number, number] = [9.05 * screenContentScale, 4.62 * screenContentScale];
+// Entrances and selector pads are on local +Z. The solid TV body ends at
+// +0.08; layer the backing, media and text toward the viewer with real gaps.
+const screenBackingZ = 0.10;
+const screenContentZ = 0.12;
+const screenTextZ = 0.14;
+const screenControlZ = 0.16;
 const screenContentAspect = screenContentSize[0] / screenContentSize[1];
 const screenContentGeometry = new PlaneGeometry(...screenContentSize);
 const tvFrameGeometry = new BoxGeometry(10.4, 5.8, 0.32);
-const tvBackingGeometry = new PlaneGeometry(9.25, 4.85);
+// Inset the emissive backing beneath the media, including its +0.1 Y offset.
+// The old 4.85 height exposed a bright 0.014-unit strip above every screen.
+const tvBackingGeometry = new PlaneGeometry(9.25, 4.7);
 const serviceSectionIds = ["quick-fix", "urgent-fix", "performance", "site-improvement"];
 const serviceScreenImages: Record<string, { bad: string; good: string }> = {
   "quick-fix": {
@@ -99,25 +113,25 @@ const valueDisplayOptions = [
 const offerOptions = [
   {
     id: "quick-fix",
-    imagePath: "/images/optimized/offers/quick-fix.jpg",
+    imagePath: "/images/optimized/offers/quick-fix.webp",
     name: "Quick Fix",
     position: [-5.4, 0.18, selectorRowZ] as [number, number, number],
   },
   {
     id: "urgent-fix",
-    imagePath: "/images/optimized/offers/urgent-fix.jpg",
+    imagePath: "/images/optimized/offers/urgent-fix.webp",
     name: "Urgent Fix",
     position: [-1.8, 0.18, selectorRowZ] as [number, number, number],
   },
   {
     id: "performance",
-    imagePath: "/images/optimized/offers/performance.jpg",
+    imagePath: "/images/optimized/offers/performance.webp",
     name: "Performance",
     position: [1.8, 0.18, selectorRowZ] as [number, number, number],
   },
   {
     id: "site-improvement",
-    imagePath: "/images/optimized/offers/site-improvement.jpg",
+    imagePath: "/images/optimized/offers/site-improvement.webp",
     name: "Site Improvement",
     position: [5.4, 0.18, selectorRowZ] as [number, number, number],
   },
@@ -566,7 +580,7 @@ function SectionBillboard({
             roughness={0.68}
           />
         </mesh>
-        <mesh castShadow receiveShadow geometry={tvBackingGeometry} position={[0, 0.1, -0.26]} dispose={null}>
+        <mesh castShadow receiveShadow geometry={tvBackingGeometry} position={[0, 0.1, screenBackingZ]} dispose={null}>
           <meshStandardMaterial
             color="#111827"
             emissive="#ffffff"
@@ -576,12 +590,14 @@ function SectionBillboard({
           />
         </mesh>
       <Text
+        material-depthTest={true}
+        material-depthWrite={true}
         color="#ffffff"
         font={gameTextFont}
         fontSize={0.86}
         anchorX="center"
         anchorY="middle"
-        position={[0, 3.55, -0.34]}
+        position={[0, 3.55, screenTextZ]}
         maxWidth={9}
         outlineColor="#05070b"
         outlineWidth={0.018}
@@ -602,12 +618,14 @@ function SectionBillboard({
         <ShowcaseScreenContent isPlaying={showcaseVideoState.playing} />
       ) : (
         <Text
+          material-depthTest={true}
+          material-depthWrite={true}
           color="#ffffff"
           font={gameTextFont}
           fontSize={0.26}
           anchorX="center"
           anchorY="middle"
-          position={[0, -2.25, -0.34]}
+          position={[0, -2.25, screenTextZ]}
           maxWidth={8.5}
           outlineColor="#05070b"
           outlineWidth={0.01}
@@ -618,12 +636,14 @@ function SectionBillboard({
       {isOffers && (
         <>
           <Text
+            material-depthTest={true}
+            material-depthWrite={true}
             color={white}
             font={gameTextFont}
             fontSize={0.3}
             anchorX="center"
             anchorY="middle"
-            position={[0, -2.62, -0.38]}
+            position={[0, -2.62, screenTextZ]}
             maxWidth={8}
           >
             {selectedOffer?.name ?? "Select an offer"}
@@ -635,22 +655,73 @@ function SectionBillboard({
   );
 }
 
+// Scenery disables gameplay raycasting. Dedicated proxies use Three's normal
+// raycast methods without changing those meshes or including this TV itself.
+function collectScreenOccluders(
+  object: Object3D,
+  ownTV: Object3D,
+  targets: { current: Object3D }[],
+  proxies: WeakMap<Object3D, { current: Object3D }>,
+) {
+  if (object === ownTV || !object.visible) return;
+  for (const child of object.children) collectScreenOccluders(child, ownTV, targets, proxies);
+  if (!(object instanceof Mesh || object instanceof Sprite)) return;
+  const materials = Array.isArray(object.material) ? object.material : [object.material];
+  if (!materials.some((material) => material.visible && material.opacity > 0 && material.depthWrite)) return;
+
+  let proxy = proxies.get(object);
+  if (!proxy) {
+    const target = new Object3D();
+    target.raycast = (raycaster, intersections) => {
+      if (object instanceof InstancedMesh) InstancedMesh.prototype.raycast.call(object, raycaster, intersections);
+      else if (object instanceof Mesh) Mesh.prototype.raycast.call(object, raycaster, intersections);
+      else Sprite.prototype.raycast.call(object, raycaster, intersections);
+    };
+    proxy = { current: target };
+    proxies.set(object, proxy);
+  }
+  proxy.current.layers.mask = object.layers.mask;
+  targets.push(proxy);
+}
+
+function ScreenPlaybackControl({ children }: { children: ReactNode }) {
+  const anchor = useRef<Group>(null);
+  const occluders = useMemo<{ current: Object3D }[]>(() => [], []);
+  const proxies = useMemo(() => new WeakMap<Object3D, { current: Object3D }>(), []);
+
+  // Run before Html's visibility check, including when gameplay is paused.
+  useFrame(({ scene }) => {
+    occluders.length = 0;
+    const ownTV = anchor.current?.parent;
+    if (ownTV) collectScreenOccluders(scene, ownTV, occluders, proxies);
+  }, -1);
+
+  return (
+    <group ref={anchor}>
+      <Html center position={[0, -0.03, screenControlZ]} transform distanceFactor={8} occlude={occluders}>
+        {children}
+      </Html>
+    </group>
+  );
+}
+
 function OffersScreenContent({ selectedOffer }: { selectedOffer: OfferOption | null }) {
   const texture = useLazyScreenTexture(selectedOffer?.imagePath ?? null, Boolean(selectedOffer));
 
   return (
-    <mesh key={selectedOffer?.id ?? "offers-empty-screen"} geometry={screenContentGeometry} position={[0, -0.03, -0.2]} renderOrder={20} dispose={null}>
+    <mesh key={selectedOffer?.id ?? "offers-empty-screen"} geometry={screenContentGeometry} position={[0, -0.03, screenContentZ]} dispose={null}>
       {texture ? (
         <meshBasicMaterial
           key={`offer-image-${selectedOffer?.id}`}
           color={screenImageTint}
-          depthTest={false}
+          depthTest={true}
+          depthWrite={true}
           map={texture}
           side={DoubleSide}
           toneMapped
         />
       ) : (
-        <meshBasicMaterial key="offer-empty-screen" color={screenIdleColor} depthTest={false} side={DoubleSide} toneMapped />
+        <meshBasicMaterial key="offer-empty-screen" color={screenIdleColor} depthTest={true} depthWrite={true} side={DoubleSide} toneMapped />
       )}
     </mesh>
   );
@@ -670,8 +741,8 @@ function SimpleDisplayScreen({ imagePath }: { imagePath: string | null }) {
   }, [texture]);
 
   return (
-    <mesh geometry={screenContentGeometry} position={[0, -0.03, -0.2]} renderOrder={20} dispose={null}>
-      <meshBasicMaterial ref={materialRef} color={screenIdleColor} depthTest={false} side={DoubleSide} toneMapped />
+    <mesh geometry={screenContentGeometry} position={[0, -0.03, screenContentZ]} dispose={null}>
+      <meshBasicMaterial ref={materialRef} color={screenIdleColor} depthTest={true} depthWrite={true} side={DoubleSide} toneMapped />
     </mesh>
   );
 }
@@ -686,21 +757,20 @@ function ServiceScreenContent({ resolved, section }: { resolved: boolean; sectio
 function ServiceInfoScreen({ section }: { section: HubSection }) {
   return (
     <group name={`ServiceInfoScreen:${section.id}`}>
-      <mesh geometry={screenContentGeometry} position={[0, -0.03, -0.2]} renderOrder={20} dispose={null}>
-        <meshBasicMaterial color="#05070b" depthTest={false} side={DoubleSide} toneMapped={false} />
+      <mesh geometry={screenContentGeometry} position={[0, -0.03, screenContentZ]} dispose={null}>
+        <meshBasicMaterial color="#05070b" depthTest={true} depthWrite={true} side={DoubleSide} toneMapped={false} />
       </mesh>
       <Text
+        material-depthTest={true}
+        material-depthWrite={true}
         color="#ffffff"
         font={gameTextFont}
         fontSize={0.32}
         anchorX="center"
         anchorY="middle"
-        position={[0, -0.12, -0.4]}
+        position={[0, -0.12, screenTextZ]}
         maxWidth={8.4}
         lineHeight={1.3}
-        renderOrder={21}
-        material-depthTest={false}
-        material-depthWrite={false}
         material-toneMapped={false}
       >
         {serviceInfoText[section.id]}
@@ -722,11 +792,11 @@ function ServiceImageScreen({
   const texture = useLazyScreenTexture(texturePath, true, 240);
 
   return (
-    <mesh geometry={screenContentGeometry} position={[0, -0.03, -0.2]} renderOrder={20} dispose={null}>
+    <mesh geometry={screenContentGeometry} position={[0, -0.03, screenContentZ]} dispose={null}>
       {texture ? (
-        <meshBasicMaterial color={screenImageTint} depthTest={false} map={texture} side={DoubleSide} toneMapped />
+        <meshBasicMaterial color={screenImageTint} depthTest={true} depthWrite={true} map={texture} side={DoubleSide} toneMapped />
       ) : (
-        <meshBasicMaterial color={screenIdleColor} depthTest={false} side={DoubleSide} toneMapped />
+        <meshBasicMaterial color={screenIdleColor} depthTest={true} depthWrite={true} side={DoubleSide} toneMapped />
       )}
     </mesh>
   );
@@ -812,12 +882,13 @@ function ShowcaseScreenContent({ isPlaying: requestedPlaying }: { isPlaying: boo
 
   return (
     <>
-      <mesh ref={screenRef} geometry={screenContentGeometry} position={[0, -0.03, -0.2]} renderOrder={20} dispose={null}>
+      <mesh ref={screenRef} geometry={screenContentGeometry} position={[0, -0.03, screenContentZ]} dispose={null}>
         {videoTexture ? (
           <meshBasicMaterial
             ref={materialRef}
             color={screenImageTint}
-            depthTest={false}
+            depthTest={true}
+            depthWrite={true}
             map={videoTexture}
             opacity={0}
             side={DoubleSide}
@@ -825,15 +896,15 @@ function ShowcaseScreenContent({ isPlaying: requestedPlaying }: { isPlaying: boo
             transparent
           />
         ) : (
-          <meshBasicMaterial color={screenIdleColor} depthTest={false} side={DoubleSide} toneMapped />
+          <meshBasicMaterial color={screenIdleColor} depthTest={true} depthWrite={true} side={DoubleSide} toneMapped />
         )}
       </mesh>
       {isPlaying && showTapToPlay && (
-        <Html center position={[0, -0.03, -0.42]} transform distanceFactor={8} zIndexRange={[50, 40]}>
+        <ScreenPlaybackControl>
           <button className="studio-button showcase-play-fallback" type="button" onClick={handleTapToPlay}>
             Tap to Play Video
           </button>
-        </Html>
+        </ScreenPlaybackControl>
       )}
     </>
   );
@@ -915,12 +986,13 @@ function WebsiteScreenContent({ isPlaying: requestedPlaying }: { isPlaying: bool
 
   return (
     <>
-      <mesh ref={screenRef} geometry={screenContentGeometry} position={[0, -0.03, -0.2]} renderOrder={20} dispose={null}>
+      <mesh ref={screenRef} geometry={screenContentGeometry} position={[0, -0.03, screenContentZ]} dispose={null}>
         {videoTexture ? (
           <meshBasicMaterial
             ref={materialRef}
             color={screenImageTint}
-            depthTest={false}
+            depthTest={true}
+            depthWrite={true}
             map={videoTexture}
             opacity={0}
             side={DoubleSide}
@@ -928,15 +1000,15 @@ function WebsiteScreenContent({ isPlaying: requestedPlaying }: { isPlaying: bool
             transparent
           />
         ) : (
-          <meshBasicMaterial color={screenIdleColor} depthTest={false} side={DoubleSide} toneMapped />
+          <meshBasicMaterial color={screenIdleColor} depthTest={true} depthWrite={true} side={DoubleSide} toneMapped />
         )}
       </mesh>
       {isPlaying && showTapToPlay && (
-        <Html center position={[0, -0.03, -0.42]} transform distanceFactor={8} zIndexRange={[50, 40]}>
+        <ScreenPlaybackControl>
           <button className="studio-button showcase-play-fallback" type="button" onClick={handleTapToPlay}>
             Tap to Play Website Tour
           </button>
-        </Html>
+        </ScreenPlaybackControl>
       )}
     </>
   );
@@ -980,16 +1052,18 @@ export function HomeBaseVideoScreen() {
               roughness={0.68}
             />
           </mesh>
-          <mesh castShadow receiveShadow geometry={tvBackingGeometry} position={[0, 0.1, -0.26]} dispose={null}>
+          <mesh castShadow receiveShadow geometry={tvBackingGeometry} position={[0, 0.1, screenBackingZ]} dispose={null}>
             <meshStandardMaterial color="#111827" emissive="#ffffff" emissiveIntensity={0.045} metalness={0.08} roughness={0.72} />
           </mesh>
           <Text
+            material-depthTest={true}
+            material-depthWrite={true}
             color="#ffffff"
             font={gameTextFont}
             fontSize={0.86}
             anchorX="center"
             anchorY="middle"
-            position={[0, 3.55, -0.34]}
+            position={[0, 3.55, screenTextZ]}
             maxWidth={9}
             outlineColor="#05070b"
             outlineWidth={0.018}

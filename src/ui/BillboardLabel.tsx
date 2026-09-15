@@ -51,6 +51,8 @@ export function BillboardLabel({
   return (
     <group ref={groupRef} position={position}>
       <Text
+        material-depthTest={true}
+        material-depthWrite={true}
         anchorX="center"
         anchorY="middle"
         color={color}

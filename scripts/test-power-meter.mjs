@@ -4,7 +4,9 @@ import vm from 'node:vm';
 import ts from 'typescript';
 
 // Exercise the real power store and meter together with deterministic game time.
-let now = 0, focused = true, timerId = 0, frameId = 0, remaining = 0;
+let now = 0, focused = true, timerId = 0, frameId = 0, rendering;
+const amounts = {}, mounted = new Set();
+
 const timers = new Map(), frames = new Map(), focusListeners = new Set(), effects = [];
 const focus = {
   gameNow: () => now,
@@ -31,10 +33,11 @@ const runtime = { jsx: (type, props) => ({ type, props }), jsxs: (type, props) =
 const { PowerMeter: render } = load('src/ui/PowerMeter.tsx', {
   react: {
     useSyncExternalStore: (_, get) => get(),
-    useState: () => [remaining, value => { remaining = value; }],
-    useEffect: effect => { if (effects.length === 0) effects.push(effect); },
+    useState: initial => { const mode = rendering; return [amounts[mode] ?? initial(), value => { amounts[mode] = value; }]; },
+    useEffect: effect => { if (!mounted.has(rendering)) { mounted.add(rendering); effects.push(effect); } },
   },
   'react/jsx-runtime': runtime,
+  '../player/powerIcons': load('src/player/powerIcons.ts', {}),
   '../player/gameFocus': focus,
   '../player/temporaryPowers': powers,
 });
@@ -45,26 +48,31 @@ function advance(ms) {
   for (const [id, callback] of [...frames]) { frames.delete(id); callback(); }
 }
 function setFocus(value) { focused = value; focusListeners.forEach(listener => listener()); }
+function treeFor(mode) { rendering = mode; return render({mode}); }
 function check(mode, amount, draining) {
-  const tree = render();
-  const duration = mode ? powers.powerDurations[mode] : 1;
-  assert.equal(tree.props.style['--power-color'], mode ? powers.powerModes[mode].color : '#777');
-  const track = tree.props.children[1];
-  assert.equal(track.props.children.props.style.transform, `scaleX(${amount / duration})`);
-  assert.equal(track.props['aria-valuenow'], Math.round(amount / duration * 100));
-  assert.equal(frames.size, draining ? 1 : 0, 'only selected active power schedules frames');
+  if (mode === null) {
+    for (const key of Object.keys(powers.powerModes)) check(key, powers.getPowerRemainingMs(key), false);
+    return;
+  }
+  const tree = treeFor(mode);
+  const duration = powers.powerDurations[mode];
+  assert.equal(tree.props.style['--power-color'], powers.powerModes[mode].color);
+  assert.equal(tree.props.children[0].props.style.transform, `scaleX(${amount / duration})`);
+  assert.equal(tree.props.children[2].props['aria-valuenow'], Math.round(amount / duration * 100));
+  assert.equal(tree.props['aria-pressed'], powers.getSelectedPower() === mode);
+  assert.equal(frames.size, draining ? 1 : 0, 'only the active power schedules frames');
 }
-render();
-const cleanup = effects[0]();
+for (const mode of Object.keys(powers.powerModes)) treeFor(mode);
+const cleanups = effects.map(effect => effect());
 check(null, 0, false);
 for (const mode of Object.keys(powers.powerModes)) powers.collectFixPower(mode);
-check(null, 0, false);
+check('standard', 6000, false); check('rapid', 10000, false); check('power', 15000, false);
 powers.selectFixPower('power'); check('power', 15000, false);
 powers.activateSelectedPower(); check('power', 15000, true);
 advance(7000); check('power', 8000, true);
 powers.cycleFixPower(); check('standard', 6000, false);
 assert.equal(powers.getPowerStatus('power'), 'PAUSED');
-advance(30000); check('standard', 6000, false);
+advance(30000); check('standard', 6000, false); check('power', 8000, false);
 powers.activateSelectedPower(); advance(1250.5); check('standard', 4749.5, true);
 powers.cycleFixPower(); check('rapid', 10000, false);
 powers.cycleFixPower(); check('power', 8000, false);
@@ -85,7 +93,7 @@ powers.activateSelectedPower(); advance(4749.5); check('standard', 0, false);
 powers.cycleFixPower(); check('rapid', 10000, false);
 powers.activateSelectedPower(); advance(2500); check('rapid', 7500, true);
 powers.resetTemporaryPowers(); check(null, 0, false);
-cleanup();
+cleanups.forEach(cleanup => cleanup());
 assert.equal(focusListeners.size, 0);
 assert.equal(frames.size, 0);
 powers.collectFixPower('standard'); powers.selectFixPower('standard'); powers.activateSelectedPower();

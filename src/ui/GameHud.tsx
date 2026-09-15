@@ -1,8 +1,7 @@
 import { formatCash } from "./formatCash";
 import { GameGuide } from "./GameGuide";
-import { powerIcons } from "../player/powerIcons";
 import { PowerMeter } from "./PowerMeter";
-import { powerModes, type PowerMode, activateSelectedPower, canActivatePower, getActivePower, getFixCharges, getSelectedPower, getPowerStatus, selectFixPower, subscribePowers } from "../player/temporaryPowers";
+import { powerModes, type PowerMode, activateSelectedPower, canActivatePower, getActivePower, subscribePowers } from "../player/temporaryPowers";
 import { useGameFocus } from "../player/gameFocus";
 import { useSpeedBoostRemainingMs, speedBoostDurationMs } from "../player/speedBoost";
 import { setGameAudioEnabled, useGameAudioEnabled } from "../audio/gameAudio";
@@ -31,8 +30,6 @@ const villainVoiceLabels: Record<string, string> = {
 export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onCloseGuide, health, onOpenWebsite, onRestart, cash }: GameHudProps) {
   const formattedCash = formatCash(cash);
   const gameFocused = useGameFocus();
-  const charges = useSyncExternalStore(subscribePowers, getFixCharges);
-  const mode = useSyncExternalStore(subscribePowers, getSelectedPower);
   const activePower = useSyncExternalStore(subscribePowers, getActivePower);
   const activationReady = useSyncExternalStore(subscribePowers, canActivatePower);
   const audioEnabled = useGameAudioEnabled();
@@ -148,36 +145,25 @@ export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onClose
         </div>
       </div>
 
-      <div className="game-hud__powers" role="group" aria-label="Temporary powers. G selects; Space or Fix activates.">
-        {(Object.keys(powerModes) as PowerMode[]).map((weapon) => (
-          <button key={weapon} type="button" className="studio-button game-hud__power"
-            style={{ "--power-color": powerModes[weapon].color } as CSSProperties}
-            disabled={!gameFocused || !charges[weapon]}
-            aria-pressed={mode === weapon && charges[weapon]}
-            data-active={activePower === weapon}
-            aria-label={`${powerIcons[weapon].name} power, ${getPowerStatus(weapon)}`}
-            onClick={() => selectFixPower(weapon)}>
-            <img className="game-hud__power-icon" src={powerIcons[weapon].src} alt="" aria-hidden="true" draggable={false} />
-            <span>{getPowerStatus(weapon)}</span>
-            <small className="game-hud__power-shortcut" aria-hidden="true">G</small>
-          </button>
-        ))}
-        <PowerMeter />
-      </div>
-
       {gameFocused && <div className="game-hud__bottom">
         <DirectionControls />
-        <button
-          type="button"
-          className="studio-button game-hud__fix"
-          aria-label="Activate selected power"
-          title={activePower ? "Power active — G switches and pauses; matching pickups refill" : "Activate selected power (Space)"}
-          disabled={!activationReady}
-          onClick={activateSelectedPower}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 2-10 12h7l-1 8L21 9h-8Z" /></svg>
-          <small>FIX</small>
-        </button>
+        <div className="game-hud__powers" role="group" aria-label="Temporary powers. G selects; Space or Fix activates.">
+          {(Object.keys(powerModes) as PowerMode[]).map((mode) => (
+            <PowerMeter key={mode} mode={mode} />
+          ))}
+          <button
+            type="button"
+            className="studio-button game-hud__fix"
+            aria-label="Activate selected power"
+            title={activePower ? "Power active — G switches and pauses; matching pickups refill" : "Activate selected power (Space)"}
+            disabled={!activationReady}
+            onClick={activateSelectedPower}
+          >
+            <img className="game-hud__fix-logo" src="/images/cltd-logo.svg" alt="" aria-hidden="true" draggable={false} />
+            <small>FIX</small>
+          </button>
+        </div>
+
       </div>}
 
       {guideOpen && <GameGuide onClose={onCloseGuide} />}

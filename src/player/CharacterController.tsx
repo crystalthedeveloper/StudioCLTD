@@ -1,8 +1,10 @@
+import { registerPoweredJump, resetPoweredJump } from "./poweredJump";
 import { hasPowerSpeedBoost } from "./temporaryPowers";
 import { useGameFrame } from "./useGameFrame";
-import { CapsuleCollider, RigidBody, RapierRigidBody, useRapier } from "@react-three/rapier";
+import { BallCollider, RigidBody, RapierRigidBody, useRapier } from "@react-three/rapier";
 import { useEffect, useMemo, useRef } from "react";
 import { MathUtils, Vector3 } from "three";
+import { playerCenterHeightReduction, playerSphereRadius } from "./playerDimensions";
 import { PlayerCharacter } from "./PlayerCharacter";
 import { ThirdPersonCamera } from "./ThirdPersonCamera";
 import { CharacterAnimationState } from "./playerTypes";
@@ -23,7 +25,7 @@ const turnSpeed = 1.75;
 const forwardBackSmoothing = 11;
 const forwardBackStopSmoothing = 12;
 const maxFrameDelta = 1 / 30;
-const groundedRayDistance = 1.16;
+const groundedRayDistance = playerSphereRadius + 0.13;
 
 type CharacterControllerProps = {
   damageFlashUntil: number;
@@ -50,13 +52,42 @@ export function CharacterController({
   const lastFootstepAtRef = useRef(-Infinity);
   const footstepVariationRef = useRef(0);
   const groundRay = useMemo(() => new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 }), [rapier]);
-  const spawn = useMemo<[number, number, number]>(() => [0, 2.8, 8], []);
+  const jumpInProgress = useRef(false);
+  const leftGround = useRef(false);
+  const spawn = useMemo<[number, number, number]>(() => [0, 2.8 - playerCenterHeightReduction, 8], []);
+
+  const touchingGround = () => {
+    const body = bodyRef.current;
+    if (!body) return false;
+    const position = body.translation();
+    groundRay.origin.x = position.x;
+    groundRay.origin.y = position.y;
+    groundRay.origin.z = position.z;
+    const hit = world.castRayAndGetNormal(groundRay, playerSphereRadius + 0.04, true,
+      rapier.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, body);
+    return hit !== null && hit.normal.y > 0.5;
+  };
+  useEffect(() => registerPoweredJump({
+    launch: () => {
+      const body = bodyRef.current;
+      if (!body || jumpInProgress.current || !touchingGround() || Math.abs(body.linvel().y) > 0.5) return false;
+      jumpInProgress.current = true;
+      leftGround.current = false;
+      // At gravity -20, 9 units/s gives a roughly 2-unit rise.
+      body.applyImpulse({ x: 0, y: body.mass() * 9, z: 0 }, true);
+      return true;
+    },
+    airborne: () => jumpInProgress.current && !touchingGround(),
+  }), [world, rapier, groundRay]);
 
   useEffect(() => installFootstepAudioUnlock(), []);
 
   useEffect(() => {
     const body = bodyRef.current;
 
+    resetPoweredJump();
+    jumpInProgress.current = false;
+    leftGround.current = false;
     yawRef.current = 0;
     cameraYawRef.current = 0;
     forwardBackSpeedRef.current = 0;
@@ -76,7 +107,11 @@ export function CharacterController({
     const body = bodyRef.current;
     if (!body || !transportDestination) return;
 
-    const [x, y, z] = transportDestination.position;
+    resetPoweredJump();
+    jumpInProgress.current = false;
+    leftGround.current = false;
+    const [x, destinationY, z] = transportDestination.position;
+    const y = destinationY - playerCenterHeightReduction;
     yawRef.current = transportDestination.yaw;
     cameraYawRef.current = transportDestination.yaw;
     forwardBackSpeedRef.current = 0;
@@ -93,6 +128,14 @@ export function CharacterController({
     const frameDelta = Math.min(delta, maxFrameDelta);
     controlsRef.current = controls;
 
+    const onGround = touchingGround();
+    if (jumpInProgress.current) {
+      if (!onGround) leftGround.current = true;
+      if (leftGround.current && onGround && body.linvel().y <= 0.5) {
+        jumpInProgress.current = false;
+        resetPoweredJump();
+      }
+    }
     const velocity = body.linvel();
     const translation = body.translation();
     playerWorldState.position.set(translation.x, translation.y, translation.z);
@@ -165,6 +208,9 @@ export function CharacterController({
     body.setLinvel(nextVelocity, true);
 
     if (translation.y < -10) {
+      resetPoweredJump();
+      jumpInProgress.current = false;
+      leftGround.current = false;
       forwardBackSpeedRef.current = 0;
       body.setTranslation({ x: spawn[0], y: spawn[1], z: spawn[2] }, true);
       body.setLinvel({ x: 0, y: 0, z: 0 }, true);
@@ -195,7 +241,7 @@ export function CharacterController({
         angularDamping={1}
         canSleep={false}
       >
-        <CapsuleCollider args={[0.65, 0.38]} friction={0} restitution={0} />
+        <BallCollider args={[playerSphereRadius]} friction={0} restitution={0} />
         <PlayerCharacter
           animationStateRef={animationStateRef}
           damageFlashUntil={damageFlashUntil}

@@ -33,7 +33,7 @@ smokeTexture.minFilter = smokeTexture.magFilter = LinearFilter;
 smokeTexture.needsUpdate = true;
 
 /** One instanced draw, with fewer overlapping wisps on mobile. No lights or postprocessing. */
-export function createPowerSmoke(color: string, compact: boolean) {
+export function createPowerSmoke(color: string, compact: boolean, size = 1) {
   const count = compact ? 10 : 18;
   const plane = new PlaneGeometry(1, 1);
   const geometry = new InstancedBufferGeometry();
@@ -50,13 +50,14 @@ export function createPowerSmoke(color: string, compact: boolean) {
   const material = new ShaderMaterial({
     uniforms: {
       uSmoke: { value: smokeTexture }, uColor: { value: new Color(color) },
-      uTime: { value: 0 }, uStrength: { value: 0 },
+      uTime: { value: 0 }, uStrength: { value: 0 }, uSize: { value: size },
     },
     transparent: true, blending: NormalBlending, depthWrite: false,
     depthTest: true, toneMapped: false,
     vertexShader: `
       attribute vec4 aSeed;
       uniform float uTime;
+      uniform float uSize;
       varying vec2 vUv;
       varying float vFade;
       void main() {
@@ -71,8 +72,8 @@ export function createPowerSmoke(color: string, compact: boolean) {
         float angle = aSeed.z * 6.28 + sin(sway * 0.4) * 0.28;
         mat2 rotation = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
         vec2 corner = rotation * position.xy * vec2(size, size * 1.35);
-        vec4 viewCenter = modelViewMatrix * vec4(center, 1.0);
-        viewCenter.xy += corner;
+        vec4 viewCenter = modelViewMatrix * vec4(center * uSize, 1.0);
+        viewCenter.xy += corner * uSize;
         gl_Position = projectionMatrix * viewCenter;
         vUv = uv;
         vFade = smoothstep(0.0, 0.16, life) * (1.0 - smoothstep(0.55, 1.0, life));

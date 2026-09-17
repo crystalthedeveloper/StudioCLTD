@@ -2,6 +2,7 @@ import { gameNow } from "./gameFocus";
 import { gameTimers } from "./gameFocus";
 import { useEffect, useState } from "react";
 
+export const speedBoostColor = "#facc15";
 export const speedBoostDurationMs = 10000;
 let activeUntil = 0;
 let endTimeout: number | null = null;

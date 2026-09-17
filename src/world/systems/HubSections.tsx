@@ -68,7 +68,6 @@ const white = "#f5f7fb";
 const screenImageTint = "#f0f0f0";
 const screenIdleColor = "#0b1018";
 const screenContentScale = 1.1;
-const screenViewingHeight = 4.3;
 const screenContentSize: [number, number] = [9.05 * screenContentScale, 4.62 * screenContentScale];
 // Entrances and selector pads are on local +Z. The solid TV body ends at
 // +0.08; layer the backing, media and text toward the viewer with real gaps.
@@ -79,6 +78,11 @@ const screenControlZ = 0.16;
 const screenContentAspect = screenContentSize[0] / screenContentSize[1];
 const screenContentGeometry = new PlaneGeometry(...screenContentSize);
 const tvFrameGeometry = new BoxGeometry(10.4, 5.8, 0.32);
+// Both screen groups are already children of their local floor/platform origin.
+// Compensate for the existing responsive scale/offset without resizing the TV.
+function screenGroupHeight(scale: number, offset: number) {
+  return 0.5 + tvFrameGeometry.parameters.height * 0.5 * scale - offset;
+}
 // Inset the emissive backing beneath the media, including its +0.1 Y offset.
 // The old 4.85 height exposed a bright 0.014-unit strip above every screen.
 const tvBackingGeometry = new PlaneGeometry(9.25, 4.7);
@@ -565,7 +569,7 @@ function SectionBillboard({
   const isShowcase = section.id === "showcase";
 
   return (
-    <group name={`Billboard:${section.id}`} position={[0, screenViewingHeight, 0]}>
+    <group name={`Billboard:${section.id}`} position={[0, screenGroupHeight(billboardScale, billboardYOffset), 0]}>
       <RigidBody type="fixed" colliders={false} position={[0, billboardYOffset, 0]}>
         <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
       </RigidBody>
@@ -1037,7 +1041,7 @@ export function HomeBaseVideoScreen() {
 
   return (
     <group name="HomeBaseVideoScreen">
-      <group position={[0, screenViewingHeight, 7]} rotation-y={Math.PI}>
+      <group position={[0, screenGroupHeight(billboardScale, billboardYOffset), 7]} rotation-y={Math.PI}>
         <RigidBody type="fixed" colliders={false} position={[0, billboardYOffset, 0]}>
           <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
         </RigidBody>
@@ -1247,6 +1251,7 @@ function OfferPortalPad({
 }) {
   const { pulseRef, ringRef } = useTriggerPadVisuals(active, offerPadVisualConfig);
   const playerInsideRef = useRef(false);
+  const [playerInside, setPlayerInside] = useState(false);
   const activatedThisEntryRef = useRef(false);
   const lastActivatedAtRef = useRef(-Infinity);
   const isPlayerEvent = (event: IntersectionEnterPayload | IntersectionExitPayload) => {
@@ -1256,6 +1261,7 @@ function OfferPortalPad({
   const handleEnter = (event: IntersectionEnterPayload) => {
     if (!isPlayerEvent(event) || playerInsideRef.current) return;
     playerInsideRef.current = true;
+    setPlayerInside(true);
     activatedThisEntryRef.current = false;
 
     const now = gameNow();
@@ -1268,6 +1274,7 @@ function OfferPortalPad({
   const handleExit = (event: IntersectionExitPayload) => {
     if (!isPlayerEvent(event) || !playerInsideRef.current) return;
     playerInsideRef.current = false;
+    setPlayerInside(false);
     if (activatedThisEntryRef.current) onPlayerExit();
     activatedThisEntryRef.current = false;
   };
@@ -1288,14 +1295,14 @@ function OfferPortalPad({
       <mesh ref={pulseRef} geometry={portalPulseGeometry} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
-      <BillboardLabel
+      {!playerInside && <BillboardLabel
         color={padVisualStyle.labelColor}
         fontSize={offer.id === "site-improvement" ? 0.22 : 0.28}
         position={[0, triggerPopupLayout.labelHeight, 0]}
         maxWidth={2.8}
       >
         {offer.name}
-      </BillboardLabel>
+      </BillboardLabel>}
       {countdownSeconds > 0 && (
         <BillboardLabel
           color={padVisualStyle.labelColor}
@@ -1327,6 +1334,7 @@ function ShowcasePortalPad({
 }) {
   const { pulseRef, ringRef } = useTriggerPadVisuals(active, selectorPadVisualConfig);
   const playerInsideRef = useRef(false);
+  const [playerInside, setPlayerInside] = useState(false);
   const activatedThisEntryRef = useRef(false);
   const lastActivatedAtRef = useRef(-Infinity);
   const isPlayerEvent = (event: IntersectionEnterPayload | IntersectionExitPayload) =>
@@ -1335,6 +1343,7 @@ function ShowcasePortalPad({
   const activate = () => {
     if (playerInsideRef.current) return;
     playerInsideRef.current = true;
+    setPlayerInside(true);
     activatedThisEntryRef.current = false;
 
     const now = gameNow();
@@ -1347,6 +1356,7 @@ function ShowcasePortalPad({
   const deactivate = () => {
     if (!playerInsideRef.current) return;
     playerInsideRef.current = false;
+    setPlayerInside(false);
     if (activatedThisEntryRef.current) onPlayerExit();
     activatedThisEntryRef.current = false;
   };
@@ -1377,14 +1387,14 @@ function ShowcasePortalPad({
       <mesh ref={pulseRef} geometry={portalPulseGeometry} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
-      <BillboardLabel
+      {!playerInside && <BillboardLabel
         color={padVisualStyle.labelColor}
         fontSize={0.28}
         position={[0, triggerPopupLayout.labelHeight, 0]}
         maxWidth={3}
       >
         {label}
-      </BillboardLabel>
+      </BillboardLabel>}
     </group>
   );
 }

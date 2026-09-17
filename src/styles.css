@@ -1098,12 +1098,27 @@ body aside.game-hud .game-hud__powers .game-hud__fix {
   line-height: 1;
   white-space: nowrap;
 }
-.game-hud__power-icon {
-  display: block;
+.game-hud__power-dot-slot {
+  display: grid;
+  place-items: center;
   width: 18px;
   height: 18px;
   max-height: 100%;
-  object-fit: contain;
   flex-shrink: 0;
   pointer-events: none;
+}
+
+.game-hud__power-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--power-color);
+}
+.game-guide__power-dot {
+  display: block;
+  width: 14px;
+  height: 14px;
+  margin: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }

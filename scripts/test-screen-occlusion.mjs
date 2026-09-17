@@ -10,10 +10,10 @@ const ast = ts.createSourceFile('HubSections.tsx', source, ts.ScriptTarget.Lates
 const names = ['screenContentScale', 'screenContentSize', 'screenBackingZ', 'screenContentZ', 'screenTextZ', 'screenControlZ', 'screenContentGeometry', 'tvFrameGeometry', 'tvBackingGeometry'];
 const declarations = ast.statements.filter(node =>
   ts.isVariableStatement(node) && node.declarationList.declarations.some(d => names.includes(d.name.getText(ast))) ||
-  ts.isFunctionDeclaration(node) && node.name?.text === 'collectScreenOccluders'
+  ts.isFunctionDeclaration(node) && ['collectScreenOccluders', 'screenGroupHeight'].includes(node.name?.text)
 ).map(node => node.getText(ast)).join('\n');
 const context = { ...THREE, result: null };
-vm.runInNewContext(ts.transpileModule(`${declarations}\nresult = { ${names.join(', ')}, collectScreenOccluders };`, {
+vm.runInNewContext(ts.transpileModule(`${declarations}\nresult = { ${names.join(', ')}, collectScreenOccluders, screenGroupHeight };`, {
   compilerOptions: { target: ts.ScriptTarget.ES2020 },
 }).outputText, context);
 const surface = context.result;
@@ -102,3 +102,10 @@ assert(surface.screenControlZ > surface.screenTextZ);
 assert(surface.screenContentSize[0] < 10.4 && surface.screenContentSize[1] < 5.8, 'media fits within TV bezel');
 assert(!/depthTest=\{false\}|renderOrder=|zIndexRange=/.test(source));
 console.log(`Screen occlusion regression passed: ${views} entrance-side views across 8 world TVs and Home Base, desktop/mobile scales, foreground/background scenery, rear views, and HTML self-exclusion.`);
+
+for (const floor of [0, 0.6, 1.5, 2.1, 4.2]) for (const [scale, offset] of [[1, 0], [.78, -.55]]) {
+  const height = surface.screenGroupHeight(scale, offset);
+  const bottom = floor + height + offset - surface.tvFrameGeometry.parameters.height * scale / 2;
+  assert(Math.abs(bottom - floor - .5) < 1e-9, 'consistent half-unit frame clearance on all platforms and screen sizes');
+}
+console.log('Screen floor clearance passed for desktop/mobile and raised platforms.');

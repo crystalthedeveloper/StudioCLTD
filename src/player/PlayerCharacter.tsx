@@ -1,20 +1,17 @@
-import { assetForDevice } from "../world/mobileAssets";
+import { usePlayerBaseTexture } from "./usePlayerBaseTexture";
+import { configurePlayerSurface } from "./playerSurface";
+import { createPowerAppearance } from "./powerAppearance";
+import { PlayerLogoOverlay } from "./PlayerLogoOverlay";
+import { PlayerRollingEffects } from "./PlayerRollingEffects";
+import { MutableRefObject, useLayoutEffect, useMemo, useRef } from "react";
+import { Group, Mesh, MeshPhysicalMaterial, PointLight } from "three";
 import { ActivePowerAura } from "./ActivePowerAura";
 import { useGameFrame } from "./useGameFrame";
-import { useGameAnimations } from "./useGameFrame";
-import { gameNow } from "./gameFocus";
-import { useGLTF } from "@react-three/drei";
-import { MutableRefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AnimationAction, Group, LoopRepeat, Material, Mesh, Object3D, PointLight } from "three";
-import { SkeletonUtils } from "three-stdlib";
-import {
-  applyCharacterMaterials,
-  playerBodyMaterialName,
-  playerMaskMaterialName,
-  playerMaterialProfile,
-} from "../characters/characterMaterials";
+import { gameNow, isGameFocused, subscribeGameFocus } from "./gameFocus";
 import { DialogueBubble, DialogueMessage } from "../ui/DialogueBubble";
 import { isSpeedBoostActive, subscribeSpeedBoostChange } from "./speedBoost";
+import { getActivePowerMask, subscribePowers } from "./temporaryPowers";
+import { playerSphereRadius as sphereRadius } from "./playerDimensions";
 import { CharacterAnimationState } from "./playerTypes";
 
 type PlayerCharacterProps = {
@@ -24,203 +21,76 @@ type PlayerCharacterProps = {
   yawRef: MutableRefObject<number>;
 };
 
-const playerAnimationByState: Record<CharacterAnimationState, string> = {
-  idle: "idleH",
-  run: "runH",
-};
-const playerPoweredMaterialName = "HWhiteClown_material";
 const playerLightingLayer = 2;
 
-type PlayerMaterialSlot = {
-  index: number | null;
-  material: Material;
-  mesh: Mesh;
-};
-
-function fadeOutOtherActions(actions: Record<string, AnimationAction | null>, activeAction: AnimationAction) {
-  Object.values(actions).forEach((action) => {
-    if (!action || action === activeAction) return;
-
-    action.fadeOut(0.08);
-  });
-}
-
-export function PlayerCharacter({
-  animationStateRef,
-  damageFlashUntil,
-  dialogue,
-  yawRef,
-}: PlayerCharacterProps) {
-  const model = useGLTF(assetForDevice("/characters/char-optimized.glb"), false, true);
-  const scene = useMemo(() => SkeletonUtils.clone(model.scene), [model.scene]);
-  const group = useRef<Group>(null);
+export function PlayerCharacter({ damageFlashUntil, dialogue, yawRef }: PlayerCharacterProps) {
+  const appearance = useMemo(createPowerAppearance, []);
+  const baseTexture = usePlayerBaseTexture();
+  const compile = useMemo<MeshPhysicalMaterial["onBeforeCompile"]>(() => (shader, renderer) => {
+    configurePlayerSurface(shader, renderer);
+    appearance.compile(shader, renderer);
+  }, [appearance]);
+  const sphere = useRef<Mesh>(null);
+  const material = useRef<MeshPhysicalMaterial>(null);
+  const effects = useRef<Group>(null);
   const playerFillLightRef = useRef<PointLight>(null);
-  const { actions } = useGameAnimations(model.animations, group, "idleH");
-  const activeLocomotionStateRef = useRef<CharacterAnimationState | null>(null);
-  const materialSlotsRef = useRef<PlayerMaterialSlot[]>([]);
-  const poweredBodyMaterialRef = useRef<Material | null>(null);
-  const activeMaterialModeRef = useRef<"default" | "powered">("default");
-  const speedBoostActiveRef = useRef(isSpeedBoostActive());
-  const [speedBoostActive, setSpeedBoostActive] = useState(() => isSpeedBoostActive());
-
-  useEffect(() => {
-    applyCharacterMaterials(scene, model.materials, playerMaterialProfile);
-
-    scene.traverse((object) => {
-      if (object instanceof Mesh) {
-        object.castShadow = true;
-        object.receiveShadow = false;
-        object.layers.enable(playerLightingLayer);
-      }
-    });
-
-    const poweredBodyMaterial = model.materials?.[playerPoweredMaterialName] ?? findMaterialByName(scene, playerPoweredMaterialName);
-    poweredBodyMaterialRef.current = poweredBodyMaterial ?? null;
-    materialSlotsRef.current = collectBodyMaterialSlots(scene);
-    activeMaterialModeRef.current = "default";
-  }, [scene]);
-
-  useEffect(() => {
-    playerFillLightRef.current?.layers.set(playerLightingLayer);
-  }, []);
-
-  useEffect(() => {
-    const updateSpeedBoostActive = () => {
-      const nextActive = isSpeedBoostActive();
-      speedBoostActiveRef.current = nextActive;
-      setSpeedBoostActive(nextActive);
-    };
-
-    updateSpeedBoostActive();
-    return subscribeSpeedBoostChange(updateSpeedBoostActive);
-  }, []);
-
-  useEffect(() => {
-    speedBoostActiveRef.current = speedBoostActive;
-
-    if (speedBoostActive) {
-      applyPoweredMaterial();
-      return;
-    }
-
-    restoreDefaultMaterialIfIdle();
-  }, [speedBoostActive]);
-
-  const applyPoweredMaterial = () => {
-    const poweredMaterial = poweredBodyMaterialRef.current;
-    if (!poweredMaterial || activeMaterialModeRef.current === "powered") return;
-
-    materialSlotsRef.current.forEach((slot) => {
-      if (slot.index === null) {
-        slot.mesh.material = poweredMaterial;
-        return;
-      }
-
-      if (!Array.isArray(slot.mesh.material)) return;
-      slot.mesh.material[slot.index] = poweredMaterial;
-    });
-    activeMaterialModeRef.current = "powered";
-  };
-
-  const restoreDefaultMaterialIfIdle = () => {
-    if (speedBoostActiveRef.current || activeMaterialModeRef.current === "default") return;
-
-    materialSlotsRef.current.forEach((slot) => {
-      if (slot.index === null) {
-        slot.mesh.material = slot.material;
-        return;
-      }
-
-      if (!Array.isArray(slot.mesh.material)) return;
-      slot.mesh.material[slot.index] = slot.material;
-    });
-    activeMaterialModeRef.current = "default";
-  };
-
-  const playLocomotionAction = (nextState: CharacterAnimationState) => {
-    if (activeLocomotionStateRef.current === nextState) return;
-
-    const action = actions[playerAnimationByState[nextState]];
-    if (!action) return;
-
-    activeLocomotionStateRef.current = nextState;
-    fadeOutOtherActions(actions, action);
-    action.setLoop(LoopRepeat, Infinity);
-    action.clampWhenFinished = false;
-    action.reset().fadeIn(0.16).play();
-  };
+  const syncTint = useRef(() => {});
 
   useLayoutEffect(() => {
-    const idle = actions.idleH;
-    if (!idle) return;
-    activeLocomotionStateRef.current = "idle";
-    idle.reset().setLoop(LoopRepeat, Infinity).setEffectiveWeight(1).play();
-  }, [actions]);
+    sphere.current?.layers.enable(playerLightingLayer);
+    playerFillLightRef.current?.layers.set(playerLightingLayer);
+    const update = () => {
+      if (!material.current) return;
+      appearance.update(isGameFocused() ? getActivePowerMask() : 0, isGameFocused() && isSpeedBoostActive());
+    };
+    syncTint.current = update;
+    update();
+    const unsubscribeSpeed = subscribeSpeedBoostChange(update);
+    const unsubscribePower = subscribePowers(update);
+    const unsubscribeFocus = subscribeGameFocus(() => {
+      update();
+    });
+    return () => {
+      unsubscribeSpeed();
+      unsubscribePower();
+      unsubscribeFocus();
+      syncTint.current = () => {};
+
+    };
+  }, [appearance]);
 
   useGameFrame(() => {
-    if (!group.current) return;
+    const mesh = sphere.current;
+    if (!mesh) return;
+    syncTint.current();
+    if (effects.current) effects.current.rotation.y = yawRef.current;
+    mesh.visible = gameNow() >= damageFlashUntil || Math.floor(gameNow() / 90) % 2 === 0;
 
-    playLocomotionAction(animationStateRef.current);
-
-    group.current.rotation.y = yawRef.current;
-    group.current.position.y = -1.05;
-    group.current.rotation.z = 0;
-    group.current.rotation.x = 0;
-    scene.visible = gameNow() >= damageFlashUntil || Math.floor(gameNow() / 90) % 2 === 0;
   });
-
-  useEffect(() => () => {
-    scene.visible = true;
-  }, [scene]);
 
   return (
-    <group ref={group} position={[0, -1.05, 0]}>
-      <pointLight
-        ref={playerFillLightRef}
-        color="#fff4e8"
-        intensity={8}
-        distance={8}
-        decay={2}
-        position={[1.6, 3, 2.3]}
-      />
-      <ActivePowerAura />
-      <DialogueBubble message={dialogue} position={[0, 2.65, 0]} />
-      <primitive object={scene} rotation-y={Math.PI} scale={1.05} />
+    <group position={[0, -sphereRadius, 0]}>
+      <group ref={effects}>
+        <pointLight
+          ref={playerFillLightRef}
+          color="#fff4e8"
+          intensity={8}
+          distance={8}
+          decay={2}
+          position={[1.6, 3, 2.3]}
+        />
+        <ActivePowerAura />
+        <DialogueBubble message={dialogue} position={[0, 2.65, 0]} />
+      </group>
+      <PlayerRollingEffects sphere={sphere} />
+      <mesh ref={sphere} name="Player sphere" position={[0, sphereRadius, 0]} castShadow>
+        <sphereGeometry args={[sphereRadius, 48, 32]} />
+        <meshPhysicalMaterial ref={material} color="#ffffff" map={baseTexture} onBeforeCompile={compile}
+          customProgramCacheKey={() => "player-triplanar-multi-power-v2"}
+          roughness={0.18} metalness={0.15} transmission={0.35}
+          thickness={0.8} ior={1.35} clearcoat={0.7} clearcoatRoughness={0.2} />
+        <PlayerLogoOverlay />
+      </mesh>
     </group>
   );
-}
-
-function findMaterialByName(root: Object3D, materialName: string) {
-  let found: Material | null = null;
-
-  root.traverse((object) => {
-    if (found || !(object instanceof Mesh)) return;
-
-    const materials = Array.isArray(object.material) ? object.material : [object.material];
-    found = materials.find((material) => material?.name === materialName) ?? null;
-  });
-
-  return found;
-}
-
-function collectBodyMaterialSlots(root: Object3D) {
-  const slots: PlayerMaterialSlot[] = [];
-
-  root.traverse((object) => {
-    if (!(object instanceof Mesh)) return;
-
-    const materials = Array.isArray(object.material) ? object.material : [object.material];
-    materials.forEach((material, index) => {
-      if (!material || material.name === playerMaskMaterialName) return;
-      if (object.name !== "WhiteClown" && material.name !== playerBodyMaterialName) return;
-
-      slots.push({
-        index: Array.isArray(object.material) ? index : null,
-        material,
-        mesh: object,
-      });
-    });
-  });
-
-  return slots;
 }

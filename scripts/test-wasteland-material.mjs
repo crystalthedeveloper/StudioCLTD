@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+import * as THREE from 'three';
+const exports={};
+const deps={three:THREE,'../winterTheme':{WINTER_THEME_ENABLED:true}};
+vm.runInNewContext(ts.transpileModule(readFileSync('src/world/systems/ModularTerrain.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports,require:id=>deps[id]??{}});
+const textures=Array.from({length:4},()=>new THREE.Texture());
+const material=exports.createConcreteMaterial(textures,'#3f4953');
+const shader={vertexShader:THREE.ShaderLib.standard.vertexShader,fragmentShader:THREE.ShaderLib.standard.fragmentShader};
+material.onBeforeCompile(shader,{});
+for(const name of ['wornGround','frozenDirt','snowCoverage','cracks','grit','exposedRoughness','snowGradient'])assert(shader.fragmentShader.includes(name));
+assert(shader.fragmentShader.indexOf('float snowHeight')<shader.fragmentShader.indexOf('dFdx(snowHeight)'));
+assert.equal(material.map,textures[0]);assert.equal(material.normalMap,textures[3]);assert.equal(material.roughnessMap,textures[2]);
+assert.equal((shader.fragmentShader.match(/sampler2D/g)??[]).length,(THREE.ShaderLib.standard.fragmentShader.match(/sampler2D/g)??[]).length,'no added texture samplers');
+material.dispose();textures.forEach(t=>t.dispose());
+console.log('Wasteland material passed: production shader insertion order, existing maps reused, no extra texture samplers.');

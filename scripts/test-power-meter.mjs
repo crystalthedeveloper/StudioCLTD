@@ -28,7 +28,8 @@ function load(path, dependencies) {
   } });
   return exports;
 }
-const powers = load('src/player/temporaryPowers.ts', { './gameFocus': focus });
+const jump = load('src/player/poweredJump.ts', {});
+const powers = load('src/player/temporaryPowers.ts', { './gameFocus': focus, './poweredJump': jump });
 const runtime = { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
 const { PowerMeter: render } = load('src/ui/PowerMeter.tsx', {
   react: {
@@ -59,44 +60,24 @@ function check(mode, amount, draining) {
   assert.equal(tree.props.style['--power-color'], powers.powerModes[mode].color);
   assert.equal(tree.props.children[0].props.style.transform, `scaleX(${amount / duration})`);
   assert.equal(tree.props.children[2].props['aria-valuenow'], Math.round(amount / duration * 100));
-  assert.equal(tree.props['aria-pressed'], powers.getSelectedPower() === mode);
-  assert.equal(frames.size, draining ? 1 : 0, 'only the active power schedules frames');
+  assert.equal(tree.props['aria-pressed'], amount > 0);
+  assert.equal(frames.size, focused ? powers.getActivePowers().length : 0, 'every active bar updates independently');
 }
 for (const mode of Object.keys(powers.powerModes)) treeFor(mode);
 const cleanups = effects.map(effect => effect());
 check(null, 0, false);
 for (const mode of Object.keys(powers.powerModes)) powers.collectFixPower(mode);
-check('standard', 6000, false); check('rapid', 10000, false); check('power', 15000, false);
-powers.selectFixPower('power'); check('power', 15000, false);
-powers.activateSelectedPower(); check('power', 15000, true);
-advance(7000); check('power', 8000, true);
-powers.cycleFixPower(); check('standard', 6000, false);
-assert.equal(powers.getPowerStatus('power'), 'PAUSED');
-advance(30000); check('standard', 6000, false); check('power', 8000, false);
-powers.activateSelectedPower(); advance(1250.5); check('standard', 4749.5, true);
-powers.cycleFixPower(); check('rapid', 10000, false);
-powers.cycleFixPower(); check('power', 8000, false);
-advance(50000); check('power', 8000, false);
-powers.collectFixPower('power'); check('power', 15000, false);
-assert.equal(powers.getPowerStatus('power'), 'PAUSED');
-powers.activateSelectedPower(); check('power', 15000, true);
-setFocus(false); advance(60000); check('power', 15000, false);
-setFocus(true); check('power', 15000, true);
-advance(1000); check('power', 14000, true);
-powers.collectFixPower('power'); check('power', 15000, true);
-advance(15000); check('power', 0, false);
-assert.equal(powers.getPowerStatus('power'), 'EMPTY');
-assert.equal(powers.canActivatePower(), false);
-powers.cycleFixPower(); check('standard', 4749.5, false);
-assert.equal(powers.getPowerStatus('standard'), 'PAUSED');
-powers.activateSelectedPower(); advance(4749.5); check('standard', 0, false);
-powers.cycleFixPower(); check('rapid', 10000, false);
-powers.activateSelectedPower(); advance(2500); check('rapid', 7500, true);
-powers.resetTemporaryPowers(); check(null, 0, false);
+check('standard',6000,true);check('rapid',10000,true);check('power',15000,true);
+advance(1250.5);check('standard',4749.5,true);check('rapid',8749.5,true);check('power',13749.5,true);
+powers.collectFixPower('standard');check('standard',6000,true);check('power',13749.5,true);
+setFocus(false);advance(60000);check('standard',6000,false);check('rapid',8749.5,false);
+setFocus(true);advance(6000);check('standard',0,false);check('rapid',2749.5,true);
+advance(7749.5);check('power',0,false);
+powers.resetTemporaryPowers();check(null,0,false);
 cleanups.forEach(cleanup => cleanup());
 assert.equal(focusListeners.size, 0);
 assert.equal(frames.size, 0);
-powers.collectFixPower('standard'); powers.selectFixPower('standard'); powers.activateSelectedPower();
+powers.collectFixPower('standard');
 assert.equal(frames.size, 0, 'unmount unsubscribes from the power store');
 powers.resetTemporaryPowers();
-console.log('Power meter integration passed: all colours, immediate G selection, READY/full, PAUSED/saved, ACTIVE/draining, EMPTY/zero, refill, global pause and cleanup.');
+console.log('Power meter integration passed: concurrent bars, independent refill/expiry, pause and cleanup.');

@@ -1,3 +1,4 @@
+import { GroundedPickupVisual, usePickupSurfaces, type PickupSurface } from "../pickupSurface";
 import { routePickupPositions, groundSize, groundCenter } from "../worldLayout";
 import { isCompactVisualBudget } from "../visualQuality";
 import { assetForDevice } from "../mobileAssets";
@@ -15,7 +16,7 @@ import {
 } from "@react-three/rapier";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Color, DoubleSide, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PlaneGeometry, PointLight, SRGBColorSpace, Vector3 } from "three";
-import { activateSpeedBoost } from "../../player/speedBoost";
+import { activateSpeedBoost, speedBoostColor } from "../../player/speedBoost";
 import { playCollectibleSound } from "../../audio/collectibleSounds";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { destinationPlatformRadius, hubSections, sectionRampApproachLength, sectionRampWidth } from "../hubSections";
@@ -173,7 +174,7 @@ const accessiblePlazaLogos = resolveLogoPlacements(plazaLogos.map(logo => ({ ...
 
 const logoColors: Record<LogoKind, string> = {
   coin: "#3f7d3a",
-  speed: "#facc15",
+  speed: speedBoostColor,
   penalty: "#991b1b",
   contact: "#2583e8",
   share: "#a855f7",
@@ -268,6 +269,9 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
       })),
     [templates],
   );
+  const surfaceLocations = useMemo(() => logos.map(logo =>
+    [logo.position[0], (logo.height ?? floorLogoY) - floorLogoY, logo.position[1]] as const), [logos]);
+  const surfaces = usePickupSurfaces(surfaceLocations);
   const healthLogoCount = useMemo(() => logos.filter((logo) => logo.kind === "dark").length, [logos]);
 
   const handleHealthLogoCollected = useCallback((logoId: string) => {
@@ -297,11 +301,12 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
 
   return (
     <group name="PlazaLogoSystem">
-      {logos.map((logo) => (
+      {logos.map((logo, index) => (
         <PlazaLogoInstance
           key={logo.id}
           healthRespawnGeneration={healthRespawnGeneration}
           logo={logo}
+          surface={surfaces[index]}
           onCoinCollect={onCoinCollect}
           onHealthCollect={onHealthCollect}
           onHealthLogoCollected={handleHealthLogoCollected}
@@ -315,6 +320,7 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
 }
 
 type PlazaLogoInstanceProps = {
+  surface: PickupSurface;
   healthRespawnGeneration: number;
   logo: PlazaLogo & { object: Object3D };
   onCoinCollect: () => void;
@@ -325,7 +331,7 @@ type PlazaLogoInstanceProps = {
   restartKey: number;
 };
 
-function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHealthCollect, onHealthLogoCollected, onOpenShare, onReset, restartKey }: PlazaLogoInstanceProps) {
+function PlazaLogoInstance({ healthRespawnGeneration, logo, surface, onCoinCollect, onHealthCollect, onHealthLogoCollected, onOpenShare, onReset, restartKey }: PlazaLogoInstanceProps) {
   const [available, setAvailable] = useState(true);
   const availableRef = useRef(true);
   const collectedRef = useRef(false);
@@ -337,6 +343,7 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
   const contactOpenedRef = useRef(false);
   const contactCooldownUntilRef = useRef(0);
   const [contactCountdown, setContactCountdown] = useState(0);
+  const [playerStanding, setPlayerStanding] = useState(false);
 
   const clearContactTimers = useCallback(() => {
     if (contactIntervalRef.current !== null) gameTimers.clearInterval(contactIntervalRef.current);
@@ -394,6 +401,7 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
     contactOpenedRef.current = false;
     contactCooldownUntilRef.current = 0;
     setContactCountdown(0);
+    setPlayerStanding(false);
     availableRef.current = true;
     collectedRef.current = false;
     logo.object.visible = true;
@@ -472,7 +480,10 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
         return;
       }
 
-      if (logo.kind === "contact" || logo.kind === "share") startActionCountdown();
+      if (logo.kind === "contact" || logo.kind === "share") {
+        setPlayerStanding(true);
+        startActionCountdown();
+      }
     },
     [collectAndRespawn, logo.id, logo.kind, logo.object, onCoinCollect, onHealthCollect, onHealthLogoCollected, onReset, startActionCountdown],
   );
@@ -480,6 +491,7 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
   const handleExit = useCallback(
     ({ other }: IntersectionExitPayload) => {
       if ((logo.kind !== "contact" && logo.kind !== "share") || other.rigidBodyObject?.name !== "StudioCLTDPlayer") return;
+      setPlayerStanding(false);
       cancelContactCountdown();
     },
     [cancelContactCountdown, logo.kind],
@@ -487,7 +499,7 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
 
   if (!available && logo.kind !== "light") return null;
 
-  const position: [number, number, number] = [logo.position[0], logo.height ?? floorLogoY, logo.position[1]];
+  const position: [number, number, number] = [logo.position[0], surface.y, logo.position[1]];
   const standardVisual = (
     <>
       <primitive
@@ -501,7 +513,7 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
   const visual = (
     <>
       {logo.kind === "coin" || logo.kind === "dark" ? (
-        <PickupIconVisual object={logo.object} phase={logo.position[0] + logo.position[1]}
+        <PickupIconVisual object={logo.object}
           scale={logo.scaleMultiplier ?? 1} />
       ) : logo.kind === "contact" || logo.kind === "share" ? (
         <ContactLogoVisual
@@ -515,7 +527,7 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
   );
 
   if (logo.kind === "light") {
-    return <group position={position}>{visual}</group>;
+    return <group position={[logo.position[0], logo.height ?? floorLogoY, logo.position[1]]}>{visual}</group>;
   }
 
   return (
@@ -528,8 +540,8 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
         onIntersectionEnter={collect}
         onIntersectionExit={handleExit}
       />
-      {visual}
-      {(logo.kind === "contact" || logo.kind === "share") && contactCountdown === 0 && (
+      <GroundedPickupVisual surface={surface}>{visual}</GroundedPickupVisual>
+      {(logo.kind === "contact" || logo.kind === "share") && !playerStanding && (
         <BillboardLabel color={logoColors[logo.kind]} fontSize={0.25} position={[0, 1.75, 0]} maxWidth={4}>
           {logo.kind === "contact" ? "CONTACT" : "SHARE"}
         </BillboardLabel>
@@ -543,18 +555,17 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, onCoinCollect, onHea
   );
 }
 
-/** Cash and health pickups use this visual; their fixed sensors remain untouched. */
-function PickupIconVisual({ object, phase, scale }: { object: Object3D; phase: number; scale: number }) {
+/** Cash and health stay upright; the parent rests their lower edge on the surface. */
+function PickupIconVisual({ object, scale }: { object: Object3D; scale: number }) {
   const group = useRef<Group>(null);
   const camera = useThree((state) => state.camera);
   const update = () => {
     if (!group.current) return;
-    const seconds = gameNow() / 1000;
-    group.current.position.y = 0.85 + Math.sin(seconds * 1.2 + phase) * 0.08;
+    group.current.position.y = 0;
     group.current.quaternion.copy(camera.quaternion);
     // Keep the dollar upright and fully camera-facing from every viewing angle.
   };
-  useLayoutEffect(update, [camera, phase]);
+  useLayoutEffect(update, [camera]);
   useGameFrame(update);
   return <group ref={group} name="PickupIcon" scale={scale}>
     <primitive object={object} dispose={null} />
@@ -571,7 +582,7 @@ function ContactLogoVisual({ glow = false, object, rotation, scale }: { glow?: b
   useGameFrame(({ clock, scene }) => {
     if (!groupRef.current || clock.elapsedTime - lastUpdateRef.current < 1 / 24) return;
     lastUpdateRef.current = clock.elapsedTime;
-    groupRef.current.position.y = 0.1 + Math.sin(clock.elapsedTime * 0.85) * 0.08;
+    groupRef.current.position.y = 0;
     groupRef.current.rotation.y = rotation + clock.elapsedTime * 0.22;
     if (glowRef.current) {
       const player = scene.getObjectByName("StudioCLTDPlayer");

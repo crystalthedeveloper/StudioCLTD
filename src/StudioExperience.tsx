@@ -97,10 +97,10 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
     resetTemporaryPowers();
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || event.altKey || event.ctrlKey || event.metaKey || !isGameFocused()) return;
-      if (!["Space", "KeyG"].includes(event.code)) return;
+      if (event.code !== "Space") return;
       const target = event.target;
       if (target instanceof HTMLElement && target.closest("input, textarea, [contenteditable=true]")) return;
-      if (event.code === "Space" && target instanceof HTMLElement && target.closest("button:not(.game-hud__fix):not(.game-hud__power)")) return;
+      if (event.code === "Space" && target instanceof HTMLElement && target.closest("button:not(.game-hud__fix):not(.game-hud__power-bar)")) return;
       event.preventDefault();
       handlePowerShortcut(event.code);
     };
@@ -301,7 +301,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
               <StudioWorld
                 damageFlashUntil={damageFlashUntil}
                 onCoinCollect={() => setCash((current) => current + 1)}
-                onBonusCollect={() => setCash((current) => current + 3)}
+                onVillainReward={(amount) => setCash((current) => current + amount)}
                 onOpenShare={() => {
                   document.exitPointerLock?.();
                   setGameFocused(false);

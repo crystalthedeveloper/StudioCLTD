@@ -1,8 +1,9 @@
+import { playerSphereRadius } from "../../player/playerDimensions";
 import { bonusRouteSpots } from "../worldLayout";
 import { isCompactVisualBudget } from "../visualQuality";
 import { NearbyAsset } from "../NearbyAsset";
 import { assetForDevice } from "../mobileAssets";
-import { powerModes, type PowerMode, isPowerActive, resolvePowerContact } from "../../player/temporaryPowers";
+import { powerModes, type PowerMode, isPowerActive, resolvePowerContact, resetPowerContact } from "../../player/temporaryPowers";
 import { createVillainCombat, villainClips } from "../../villain/villainCombat";
 import { useVillainNavigation } from "../../villain/useVillainNavigation";
 import { reactToVillainHit, useVillainHitReaction } from "../../villain/useVillainHitReaction";
@@ -153,14 +154,15 @@ function canBonusVillainMove(fromX: number, fromZ: number, toX: number, toZ: num
   // Permit only steps that move it outward until it is back in valid ground.
   return nextClearance > getBonusRoamingClearance(fromX, fromZ) + 0.0001;
 }
-const powerDefeatHandlers = new Map<string, () => void>();
+const powerDefeatHandlers = new Map<string, (reward: number) => void>();
 const powerImpactListeners = new Set<(position: Vector3, mode: PowerMode) => void>();
 function poweredContact(id: string, basePosition: Vector3) {
-  return resolvePowerContact(true, (mode) => {
+  return resolvePowerContact(true, id, (mode, reward) => {
     const direction = basePosition.clone().sub(playerWorldState.position).setY(0).normalize();
     const point = basePosition.clone().add(new Vector3(0, 1, 0)).addScaledVector(direction, -0.25);
     reactToVillainHit(id, mode, direction);
-    powerDefeatHandlers.get(id)?.();
+    playVillainDefeatSound();
+    powerDefeatHandlers.get(id)?.(reward);
     powerImpactListeners.forEach(listener => listener(point, mode));
   });
 }
@@ -171,7 +173,7 @@ const impactMaterials = Object.fromEntries(Object.entries(powerModes).map(([mode
 const effectSphereGeometry = new SphereGeometry(1, 8, 6);
 
 type CombatPrototypeProps = {
-  onBonusCollect: () => void;
+  onVillainReward: (amount: number) => void;
   onInfoChange: (sectionId: string | null) => void;
   onPlayerDamage: () => void;
   onPlayerDialogue: (text: string) => void;
@@ -181,7 +183,7 @@ type CombatPrototypeProps = {
 };
 
 export function CombatPrototype({
-  onBonusCollect,
+  onVillainReward,
   onInfoChange,
   onPlayerDamage,
   onPlayerDialogue,
@@ -219,7 +221,7 @@ export function CombatPrototype({
       <PowerContactEffects key={`contact-effects:${restartKey}`} />
       <BonusVillainSystem
         key={`bonus-villains:${restartKey}`}
-        onDefeat={onBonusCollect}
+        onDefeat={onVillainReward}
         onPlayerDamage={contactDamage}
       />
       {sectionEncounters.slice(0, visibleEncounterCount).map((encounter) => (
@@ -234,6 +236,7 @@ export function CombatPrototype({
             onPlayerDialogue={onPlayerDialogue}
             onPlayerDamage={contactDamage}
             onSectionResolved={onSectionResolved}
+            onReward={onVillainReward}
           />
         </NearbyAsset>
       ))}
@@ -245,7 +248,7 @@ function BonusVillainSystem({
   onDefeat,
   onPlayerDamage,
 }: {
-  onDefeat: () => void;
+  onDefeat: (amount: number) => void;
   onPlayerDamage: () => void;
 }) {
   return (
@@ -264,7 +267,7 @@ function BonusVillain({
 }: {
   id: string;
   initialSpot: number;
-  onDefeat: () => void;
+  onDefeat: (amount: number) => void;
   onPlayerDamage: () => void;
 }) {
   const model = useGLTF(assetForDevice("/characters/char-optimized.glb"), false, true);
@@ -283,6 +286,7 @@ function BonusVillain({
   const cashPopupTimerRef = useRef(0);
   const [alive, setAlive] = useState(true);
   const [showCashPopup, setShowCashPopup] = useState(false);
+  const [cashReward, setCashReward] = useState(0);
   const cashPopupPositionRef = useRef(new Vector3());
   const clips = useMemo(() => villainClips(model.animations), [model.animations]);
   const { actions } = useGameAnimations(clips, groupRef, "idleV");
@@ -310,7 +314,7 @@ function BonusVillain({
   }, [id]);
 
   useEffect(() => {
-    const defeat = () => {
+    const defeat = (reward: number) => {
       if (!aliveRef.current) return;
       aliveRef.current = false;
       chasingPlayerRef.current = false;
@@ -320,7 +324,8 @@ function BonusVillain({
       bounds.getCenter(cashPopupPositionRef.current);
       cashPopupPositionRef.current.y = bounds.max.y + 0.4;
       setShowCashPopup(true);
-      onDefeat();
+      setCashReward(reward);
+      onDefeat(reward);
       cashPopupTimerRef.current = gameTimers.setTimeout(() => setShowCashPopup(false), 1100);
 
       const delay = 8000 + Math.random() * 2000;
@@ -336,6 +341,7 @@ function BonusVillain({
         targetSpotRef.current = (spawnIndex + 1 + initialSpot) % bonusSpawnSpots.length;
         chasingPlayerRef.current = false;
         groupRef.current?.position.copy(positionRef.current);
+        resetPowerContact(id);
         aliveRef.current = true;
         combat.setMotion("idle");
         setAlive(true);
@@ -357,7 +363,14 @@ function BonusVillain({
     const playerDistanceSq = playerDx * playerDx + playerDz * playerDz;
     const sameLevel = Math.abs(playerWorldState.position.y - (positionRef.current.y + 1)) < 1.5;
     const inRange = sameLevel && playerDistanceSq <= bonusVillainContactRadiusSq && navigation.sight(positionRef.current, playerWorldState.position);
-    if (inRange && poweredContact(id, positionRef.current)) return;
+    // Sphere against the bonus villain's body volume, not its chase radius.
+    const bodyDx = Math.max(Math.abs(playerDx) - 0.3, 0);
+    const bodyDz = Math.max(Math.abs(playerDz) - 0.3, 0);
+    const bodyDy = Math.max(positionRef.current.y + 0.18 - playerWorldState.position.y,
+      playerWorldState.position.y - (positionRef.current.y + 1.8), 0);
+    const touchingBody = bodyDx * bodyDx + bodyDy * bodyDy + bodyDz * bodyDz <= playerSphereRadius ** 2;
+    if (touchingBody && navigation.sight(positionRef.current, playerWorldState.position)
+      && poweredContact(id, positionRef.current)) return;
     if (inRange) onPlayerDamage();
     if (reaction.active()) { combat.setMotion("idle"); return; }
     if (combat.updateAttack(inRange, true)) {
@@ -443,7 +456,7 @@ function BonusVillain({
           position={[cashPopupPositionRef.current.x, cashPopupPositionRef.current.y, cashPopupPositionRef.current.z]}
           maxWidth={2}
         >
-          +$3
+          {`+$${cashReward}`}
         </BillboardLabel>
       )}
     </>
@@ -511,6 +524,7 @@ function SectionPortalEncounter({
   onPlayerDialogue,
   onPlayerDamage,
   onSectionResolved,
+  onReward,
 }: {
   encounter: SectionEncounterConfig;
   onInfoClose: () => void;
@@ -518,6 +532,7 @@ function SectionPortalEncounter({
   onPlayerDialogue: (text: string) => void;
   onPlayerDamage: () => void;
   onSectionResolved: (sectionId: string) => void;
+  onReward: (amount: number) => void;
 }) {
   const villainPosition = useMemo(() => encounter.villainPosition.clone(), [encounter]);
   const [villainStatus, setVillainStatus] = useState<VillainStatus>("idle");
@@ -545,10 +560,10 @@ function SectionPortalEncounter({
     if (now - lastActivatedRef.current < cooldownMs) return;
 
     defeatedRef.current = true;
+    onReward(100);
     triggerFixHaptic();
     lastActivatedRef.current = now;
     stopVillainVoice(encounter.id);
-    playVillainDefeatSound();
     setPortalActive(true);
     setDefeatActive(true);
     setVillainStatus("dead");
@@ -642,6 +657,7 @@ type TriggerPadProps = {
 export function TriggerPad({ active, label, onActivate, onDeactivate, position }: TriggerPadProps) {
   const { pulseRef, ringRef } = useTriggerPadVisuals(active, fixPadVisualConfig);
   const playerInsideRef = useRef(false);
+  const [playerInside, setPlayerInside] = useState(false);
   const lastTriggeredAtRef = useRef(-Infinity);
 
   const isPlayerEvent = (event: IntersectionEnterPayload | IntersectionExitPayload) => {
@@ -651,6 +667,7 @@ export function TriggerPad({ active, label, onActivate, onDeactivate, position }
   const handleEnter = (event: IntersectionEnterPayload) => {
     if (!isPlayerEvent(event) || playerInsideRef.current) return;
     playerInsideRef.current = true;
+    setPlayerInside(true);
 
     const now = gameNow();
     if (now - lastTriggeredAtRef.current < padActivationCooldownMs) return;
@@ -661,6 +678,7 @@ export function TriggerPad({ active, label, onActivate, onDeactivate, position }
   const handleExit = (event: IntersectionExitPayload) => {
     if (!isPlayerEvent(event)) return;
     playerInsideRef.current = false;
+    setPlayerInside(false);
     onDeactivate?.();
   };
 
@@ -680,7 +698,7 @@ export function TriggerPad({ active, label, onActivate, onDeactivate, position }
       <mesh ref={pulseRef} geometry={fixPulseGeometry} rotation-x={-Math.PI / 2} position={[0, 0.05, 0]} visible={false} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
-      {label && (
+      {label && !playerInside && (
         <BillboardLabel
           color={padVisualStyle.labelColor}
           fontSize={label === "More Info" ? 0.24 : 0.28}

@@ -1,7 +1,7 @@
 import { formatCash } from "./formatCash";
 import { GameGuide } from "./GameGuide";
 import { PowerMeter } from "./PowerMeter";
-import { powerModes, type PowerMode, activateSelectedPower, canActivatePower, getActivePower, subscribePowers } from "../player/temporaryPowers";
+import { powerModes, type PowerMode, jumpWithPower, isPowerActive, subscribePowers } from "../player/temporaryPowers";
 import { useGameFocus } from "../player/gameFocus";
 import { useSpeedBoostRemainingMs, speedBoostDurationMs } from "../player/speedBoost";
 import { setGameAudioEnabled, useGameAudioEnabled } from "../audio/gameAudio";
@@ -30,8 +30,7 @@ const villainVoiceLabels: Record<string, string> = {
 export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onCloseGuide, health, onOpenWebsite, onRestart, cash }: GameHudProps) {
   const formattedCash = formatCash(cash);
   const gameFocused = useGameFocus();
-  const activePower = useSyncExternalStore(subscribePowers, getActivePower);
-  const activationReady = useSyncExternalStore(subscribePowers, canActivatePower);
+  const activationReady = useSyncExternalStore(subscribePowers, isPowerActive);
   const audioEnabled = useGameAudioEnabled();
   const activeVillainVoiceId = useSyncExternalStore(
     subscribeVillainVoice,
@@ -147,20 +146,20 @@ export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onClose
 
       {gameFocused && <div className="game-hud__bottom">
         <DirectionControls />
-        <div className="game-hud__powers" role="group" aria-label="Temporary powers. G selects; Space or Fix activates.">
+        <div className="game-hud__powers" role="group" aria-label="Active powers. Pickups activate immediately; Space or Jump jumps.">
           {(Object.keys(powerModes) as PowerMode[]).map((mode) => (
             <PowerMeter key={mode} mode={mode} />
           ))}
           <button
             type="button"
             className="studio-button game-hud__fix"
-            aria-label="Activate selected power"
-            title={activePower ? "Power active — G switches and pauses; matching pickups refill" : "Activate selected power (Space)"}
+            aria-label="Jump while powered"
+            title="Jump while powered (Space)"
             disabled={!activationReady}
-            onClick={activateSelectedPower}
+            onClick={jumpWithPower}
           >
             <img className="game-hud__fix-logo" src="/images/cltd-logo.svg" alt="" aria-hidden="true" draggable={false} />
-            <small>FIX</small>
+            <small>JUMP</small>
           </button>
         </div>
 

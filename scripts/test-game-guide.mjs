@@ -23,6 +23,7 @@ const dependencies = {
   },
   'react-dom': { createPortal: tree => tree },
   'react/jsx-runtime': runtime,
+  '../player/temporaryPowers': { powerModes: { standard: {color:'#2F6FAF'}, rapid: {color:'#6B3A8E'}, power: {color:'#B63A3A'} } },
   '../player/powerIcons': { powerIcons: { standard: { worldSrc: 'wind.svg' }, rapid: { worldSrc: 'lightning.svg' }, power: { worldSrc: 'fire.svg' } } },
 };
 const exports = {};

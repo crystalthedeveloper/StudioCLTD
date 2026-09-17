@@ -118,10 +118,8 @@ export function VillainCharacter({ id, basePosition, platformPosition, onPlayerD
     const onPlatform = Math.abs(player.x - platformPosition.x) <= destinationPlatformRadius
       && Math.abs(player.z - platformPosition.z) <= destinationPlatformRadius
       && Math.abs(player.y - (platformPosition.y + 1)) < 1.6;
-    const distance = Math.hypot(player.x - basePosition.x, player.z - basePosition.z);
     const chasing = onPlatform;
-    const inRange = chasing && distance <= 1.2 && navigation.sight(basePosition, player, bodyRef.current);
-    if (inRange && onPowerContact()) return;
+    // Powered attacks require actual collider contact, handled above.
     const attacking = combat.updateAttack(contact.touching(), true);
     if (attacking) destination.copy(player);
     else {

@@ -16,7 +16,7 @@ type ThirdPersonCameraProps = {
 const cameraSettings = {
   distance: 4.35,
   height: 0.02,
-  targetHeight: 1.45,
+  targetHeight: 1.0,
   pitch: -0.04,
   shoulderOffset: 0.5,
   framingLookOffset: 0.06,

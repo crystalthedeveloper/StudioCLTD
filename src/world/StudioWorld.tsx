@@ -13,7 +13,7 @@ import { CombatPrototype } from "./systems/CombatPrototype";
 import { HubSections } from "./systems/HubSections";
 import { HomeBase } from "./systems/HomeBase";
 import { LogoLightField } from "./systems/LogoLightField";
-import { ModularTerrain } from "./systems/ModularTerrain";
+import { ModularTerrain, useSharedGroundMaterial } from "./systems/ModularTerrain";
 import { SpaceSky } from "./systems/SpaceSky";
 import { WorldLights } from "./systems/WorldLights";
 import { TransportPads } from "./systems/TransportPads";
@@ -21,7 +21,7 @@ import type { TransportDestination } from "./systems/TransportPads";
 
 type StudioWorldProps = {
   damageFlashUntil: number;
-  onBonusCollect: () => void;
+  onVillainReward: (amount: number) => void;
   onCoinCollect: () => void;
   onHealthCollect: () => boolean;
   onOpenShare: () => void;
@@ -42,7 +42,8 @@ const requiredSectionTriggers: Record<string, number> = {
   showcase: 1,
 };
 
-export function StudioWorld({ damageFlashUntil, onBonusCollect, onCoinCollect, onHealthCollect, onOpenShare, onPlayerDamage, onReset, onSectionComplete, restartKey }: StudioWorldProps) {
+export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, onHealthCollect, onOpenShare, onPlayerDamage, onReset, onSectionComplete, restartKey }: StudioWorldProps) {
+  const groundMaterial = useSharedGroundMaterial();
   const dialogueIdRef = useRef(0);
   const activatedSectionTriggersRef = useRef<Record<string, Set<string>>>({});
   const completedSectionsRef = useRef(new Set<string>());
@@ -92,8 +93,8 @@ export function StudioWorld({ damageFlashUntil, onBonusCollect, onCoinCollect, o
       <FixPowerPickups key={`powers:${restartKey}`} />
       <SpaceSky />
       {!isCompactVisualBudget() && <Environment preset="warehouse" background={false} environmentIntensity={0.16} />}
-      <ModularTerrain />
-      <HomeBase />
+      <ModularTerrain material={groundMaterial} />
+      <HomeBase material={groundMaterial} />
       <LogoLightField
         onCoinCollect={onCoinCollect}
         onHealthCollect={onHealthCollect}
@@ -110,7 +111,7 @@ export function StudioWorld({ damageFlashUntil, onBonusCollect, onCoinCollect, o
       />
       <CombatPrototype
         key={`combat:${restartKey}`}
-        onBonusCollect={onBonusCollect}
+        onVillainReward={onVillainReward}
         onInfoChange={setActiveServiceInfoId}
         onPlayerDamage={onPlayerDamage}
         restartKey={restartKey}

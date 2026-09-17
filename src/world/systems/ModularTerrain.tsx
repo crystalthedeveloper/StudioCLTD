@@ -70,25 +70,24 @@ export function createConcreteMaterial(textures: ConcreteTextures, color: string
     roughness: 1,
     roughnessMap: textures[2],
   });
-  // World-space joints and broad wear variation reuse the existing material:
-  // no decal meshes, texture downloads, colliders or extra draw calls.
+  // Every surface samples the same world-space coordinates, independent of mesh UVs.
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = "varying vec3 vConcretePosition; varying float vConcreteTop;\n" + shader.vertexShader;
-    shader.vertexShader = shader.vertexShader.replace("#include <worldpos_vertex>", `
-      #include <worldpos_vertex>
-      vConcretePosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
-      vConcreteTop = normalize(mat3(modelMatrix) * normal).y;
+    shader.vertexShader = shader.vertexShader.replace("#include <uv_vertex>", `
+      #include <uv_vertex>
+      vec3 groundWorld = (modelMatrix * vec4(position, 1.0)).xyz;
+      vec3 groundNormal = normalize(mat3(modelMatrix) * normal);
+      vec2 groundUv = abs(groundNormal.y) > 0.5 ? groundWorld.xz
+        : abs(groundNormal.x) > 0.5 ? groundWorld.zy : groundWorld.xy;
+      groundUv /= 14.0;
+      vMapUv = groundUv;
+      vNormalMapUv = groundUv;
+      vRoughnessMapUv = groundUv;
+      vBumpMapUv = groundUv;
+      vConcretePosition = groundWorld;
+      vConcreteTop = groundNormal.y;
     `);
     shader.fragmentShader = "varying vec3 vConcretePosition; varying float vConcreteTop;\n" + shader.fragmentShader;
-    shader.fragmentShader = shader.fragmentShader.replace("#include <color_fragment>", `
-      #include <color_fragment>
-      vec2 jointDistance = abs(mod(vConcretePosition.xz + 3.5, 7.0) - 3.5);
-      vec2 aa = max(fwidth(vConcretePosition.xz), vec2(0.008));
-      vec2 joint = 1.0 - smoothstep(vec2(0.012), vec2(0.012) + aa, jointDistance);
-      float seam = max(joint.x, joint.y) * smoothstep(0.8, 0.98, vConcreteTop);
-      float wear = sin(vConcretePosition.x * 0.39) * sin(vConcretePosition.z * 0.27);
-      diffuseColor.rgb *= 1.0 - seam * 0.18 + wear * 0.025;
-    `);
   };
   if (WINTER_THEME_ENABLED) {
     const concreteShader = material.onBeforeCompile;
@@ -111,24 +110,50 @@ export function createConcreteMaterial(textures: ConcreteTextures, color: string
       ` + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace("#include <roughnessmap_fragment>", `
         #include <roughnessmap_fragment>
-        // Irregular exposed patches, denser fresh drifts, and darker packed snow.
+        // World-space worn asphalt, frozen soil and dirty snow share existing maps.
         vec2 snowUv = vConcretePosition.xz;
         float drift = snowNoise(snowUv * 0.24);
         float clumps = snowNoise(snowUv * 1.8 + vec2(13.2, 7.9));
-        float grain = snowNoise(snowUv * 24.0);
-        // Fade subpixel grain to prevent shimmering on distant/mobile surfaces.
         float grainVisible = 1.0 - smoothstep(0.35, 1.2, length(fwidth(snowUv * 24.0)));
-        grain = mix(0.5, grain, grainVisible);
-        float snowCoverage = smoothstep(0.23, 0.43, drift + (clumps - 0.5) * 0.22)
-          * smoothstep(0.72, 0.96, vConcreteTop);
-        float fresh = smoothstep(0.38, 0.76, drift * 0.7 + clumps * 0.3);
-        vec3 snowColor = mix(vec3(0.19, 0.235, 0.285), vec3(0.36, 0.405, 0.45), fresh);
-        // Soft tonal occlusion between clumps; existing lights/shadows still apply.
-        snowColor *= 0.88 + 0.12 * clumps;
+        float grain = mix(0.5, snowNoise(snowUv * 24.0), grainVisible);
+        float topSurface = smoothstep(0.72, 0.96, vConcreteTop);
+        float snowCoverage = (0.72 + 0.28 * smoothstep(0.30, 0.65, drift + (clumps - 0.5) * 0.20)) * topSurface;
+        float soil = smoothstep(0.38, 0.66, snowNoise(snowUv * 0.12 + 37.0));
+        vec3 asphalt = diffuseColor.rgb * 0.7 + vec3(0.018, 0.022, 0.026);
+        vec3 frozenDirt = vec3(0.105, 0.081, 0.064) * (0.72 + clumps * 0.5);
+        vec3 wornGround = mix(asphalt, frozenDirt, soil * 0.8);
+        // Irregular cell boundaries form cracks; derivatives soften distant detail.
+        vec2 crackUv = snowUv * 0.85 + vec2(clumps * 0.2);
+        vec2 crackCell = floor(crackUv);
+        vec2 crackLocal = fract(crackUv);
+        float nearest = 8.0;
+        float secondNearest = 8.0;
+        for (int cy = -1; cy <= 1; cy++) {
+          for (int cx = -1; cx <= 1; cx++) {
+            vec2 cell = vec2(float(cx), float(cy));
+            vec2 seed = crackCell + cell;
+            vec2 point = cell + vec2(snowHash(seed), snowHash(seed + 19.7)) - crackLocal;
+            float distanceSquared = dot(point, point);
+            secondNearest = min(secondNearest, max(nearest, distanceSquared));
+            nearest = min(nearest, distanceSquared);
+          }
+        }
+        float crackAA = max(length(fwidth(crackUv)), 0.006);
+        float cracks = 1.0 - smoothstep(0.012, 0.012 + crackAA, secondNearest - nearest);
+        wornGround *= 1.0 - cracks * 0.35;
+        float grit = smoothstep(0.72, 0.84, grain) * grainVisible;
+        wornGround = mix(wornGround, vec3(0.22, 0.20, 0.17), grit * 0.35);
+        float fresh = smoothstep(0.48, 0.78, drift);
+        vec3 snowColor = mix(vec3(0.29, 0.30, 0.30), vec3(0.52, 0.57, 0.61), fresh);
+        snowColor *= 0.86 + clumps * 0.14;
         snowColor += (grain - 0.5) * 0.035;
-        diffuseColor.rgb = mix(diffuseColor.rgb, snowColor, snowCoverage * 0.96);
-        roughnessFactor = mix(roughnessFactor, mix(0.86, 0.98, fresh), snowCoverage);
-        float snowHeight = snowCoverage * (clumps * 0.018 + grain * 0.0025);
+        diffuseColor.rgb = mix(diffuseColor.rgb, wornGround, topSurface);
+        diffuseColor.rgb = mix(diffuseColor.rgb, snowColor, snowCoverage);
+        float exposedRoughness = mix(0.58, 0.91, clumps) * (0.85 + roughnessFactor * 0.15);
+        roughnessFactor = mix(roughnessFactor, exposedRoughness, topSurface);
+        roughnessFactor = mix(roughnessFactor, mix(0.88, 0.98, fresh), snowCoverage);
+        float snowHeight = topSurface * ((clumps * 0.006 + grit * 0.003 - cracks * 0.008) * (1.0 - snowCoverage)
+          + snowCoverage * (clumps * 0.018 + grain * 0.0025));
       `);
       shader.fragmentShader = shader.fragmentShader.replace("#include <normal_fragment_maps>", `
         #include <normal_fragment_maps>
@@ -150,7 +175,7 @@ export function createConcreteMaterial(textures: ConcreteTextures, color: string
     };
     material.envMapIntensity = 0.12;
   }
-  material.customProgramCacheKey = () => `studio-concrete-joints-v3-textured-winter-${WINTER_THEME_ENABLED}`;
+  material.customProgramCacheKey = () => `studio-shared-snow-v5-${WINTER_THEME_ENABLED}`;
   return material;
 }
 
@@ -199,23 +224,19 @@ function createConcreteFloorGeometry(width: number, depth: number) {
   return geometry;
 }
 
-export function ModularTerrain() {
-  const concreteTextures = useTexture(concreteTexturePaths.map(assetForDevice));
+/** One owner loads/configures/disposes the material used by all ground meshes. */
+export function useSharedGroundMaterial() {
+  const textures = useTexture(concreteTexturePaths.map(assetForDevice));
+  const material = useMemo(() => {
+    configureConcreteTextures(textures);
+    return createConcreteMaterial(textures, "#46515d");
+  }, [textures]);
+  useEffect(() => () => material.dispose(), [material]);
+  return material;
+}
+
+export function ModularTerrain({ material }: { material: MeshStandardMaterial }) {
   const floorGeometry = useMemo(() => createConcreteFloorGeometry(...groundSize), []);
-
-  useMemo(() => configureConcreteTextures(concreteTextures), [concreteTextures]);
-  const terrainMaterial = useMemo(
-    () => createConcreteMaterial(concreteTextures, "#46515d"),
-    [concreteTextures],
-  );
-  const floorMaterial = useMemo(() => {
-    const material = createConcreteMaterial(concreteTextures, "#3f4953");
-    material.color.set("#3f4953");
-    return material;
-  }, [concreteTextures]);
-
-  useEffect(() => () => floorMaterial.dispose(), [floorMaterial]);
-  useEffect(() => () => terrainMaterial.dispose(), [terrainMaterial]);
   useEffect(() => () => floorGeometry.dispose(), [floorGeometry]);
 
   return (
@@ -230,11 +251,11 @@ export function ModularTerrain() {
       </RigidBody>
       <mesh position={[groundCenter[0], 0, groundCenter[1]]} rotation-x={-Math.PI / 2} receiveShadow>
         <primitive object={floorGeometry} attach="geometry" />
-        <primitive object={floorMaterial} attach="material" />
+        <primitive object={material} attach="material" dispose={null} />
       </mesh>
-      <PlazaPaths textures={concreteTextures} />
+      <PlazaPaths material={material} />
       {hubSections.map((section) => (
-        <DestinationPlatform key={section.id} material={terrainMaterial} section={section} />
+        <DestinationPlatform key={section.id} material={material} section={section} />
       ))}
     </group>
   );

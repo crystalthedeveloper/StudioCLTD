@@ -1,16 +1,15 @@
+import { BallCollider, RigidBody, type RapierCollider, type IntersectionEnterPayload, type IntersectionExitPayload } from "@react-three/rapier";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { pickupSurfaceGap, usePickupSurfaces, type PickupSurface } from "../pickupSurface";
 import { routePowerPositions } from "../worldLayout";
-import { useTexture } from "@react-three/drei";
-import { useThree } from "@react-three/fiber";
-import { powerIcons } from "../../player/powerIcons";
-import { useLayoutEffect, useMemo, useRef } from "react";
-import { DoubleSide, InstancedMesh, Object3D, SRGBColorSpace } from "three";
-import { playCollectibleSound } from "../../audio/collectibleSounds";
-import { type PowerMode, collectFixPower, fixPowerRespawnMs } from "../../player/temporaryPowers";
-import { gameNow } from "../../player/gameFocus";
-import { useGameFrame } from "../../player/useGameFrame";
 import { hubSections } from "../hubSections";
-import { playerWorldState } from "../playerWorldState";
 import { homeBaseCenter } from "./HomeBase";
+import { isPlayerObject } from "../playerCollision";
+import { playCollectibleSound } from "../../audio/collectibleSounds";
+import { powerOrder, powerModes, collectFixPower, fixPowerRespawnMs, type PowerMode } from "../../player/temporaryPowers";
+import { createPowerSmoke } from "../../player/powerSmoke";
+import { gameNow, gameTimers } from "../../player/gameFocus";
+import { useGameFrame } from "../../player/useGameFrame";
 
 const locations: [number, number, number][] = [
   ...routePowerPositions,
@@ -20,63 +19,53 @@ const locations: [number, number, number][] = [
   [homeBaseCenter[0] + 5, homeBaseCenter[1], homeBaseCenter[2]],
 ];
 
-const pickupModes: PowerMode[] = ["standard", "rapid", "power"];
-
-const ignoreRaycast = () => {};
-
-/** Three instanced SVG draws, with baked icon-shaped glow and no extra lights. */
+const pickupRadius = 0.24;
 export function FixPowerPickups() {
-  const camera = useThree((state) => state.camera);
-  const textures = useTexture(pickupModes.map((mode) => powerIcons[mode].worldSrc));
-  const icons = useRef<(InstancedMesh | null)[]>([]);
-  const states = useMemo(() => locations.map(() => ({ collectedAt: -Infinity })), []);
-  const transform = useMemo(() => new Object3D(), []);
-  const updateVisual = (index: number, now: number, elapsed: number) => {
-    const [x, y, z] = locations[index];
-    const available = elapsed >= fixPowerRespawnMs;
-    const pickupProgress = Math.min(elapsed / 300, 1);
-    const size = available ? 0.7125 : 0.7125 * (1 - pickupProgress);
-    transform.position.set(x, y + 0.65 + (available ? Math.sin(now / 850 + index) * 0.06 : pickupProgress * 0.9), z);
-    // Gentle bobbing only: keep the SVG fully camera-facing and upright.
-    transform.quaternion.copy(camera.quaternion);
-    transform.scale.setScalar(size);
-    transform.updateMatrix();
-    icons.current[index % pickupModes.length]?.setMatrixAt(Math.floor(index / pickupModes.length), transform.matrix);
+  const surfaces = usePickupSurfaces(locations);
+  return <group name="FixPowerPickups">{locations.map(([x, , z], index) =>
+    <SmokePickup key={index} x={x} z={z} surface={surfaces[index]} mode={powerOrder[index % powerOrder.length]} />
+  )}</group>;
+}
+function SmokePickup({ x, z, surface, mode }: { x: number; z: number; surface: PickupSurface; mode: PowerMode }) {
+  const smoke = useMemo(() => createPowerSmoke(powerModes[mode].color, true, 0.26), [mode]);
+  const collider = useRef<RapierCollider>(null);
+  const available = useRef(true);
+  const [visible, setVisible] = useState(true);
+  const overlaps = useRef(new Set<number>());
+  const timer = useRef<number>();
+  const collect = () => {
+    if (!available.current || overlaps.current.size === 0 || !collectFixPower(mode)) return;
+    available.current = false;
+    overlaps.current.clear();
+    collider.current?.setEnabled(false);
+    setVisible(false);
+    playCollectibleSound("power");
+    timer.current = gameTimers.setTimeout(() => {
+      available.current = true;
+      setVisible(true);
+      collider.current?.setEnabled(true);
+    }, fixPowerRespawnMs);
   };
+  const enter = ({ other }: IntersectionEnterPayload) => {
+    if (!isPlayerObject(other.rigidBodyObject) && !isPlayerObject(other.colliderObject)) return;
+    overlaps.current.add(other.collider.handle);
+    collect();
+  };
+  const leave = ({ other }: IntersectionExitPayload) => { overlaps.current.delete(other.collider.handle); };
   useGameFrame(() => {
-    const now = gameNow();
-    const player = playerWorldState.position;
-    locations.forEach(([x, y, z], index) => {
-      const state = states[index];
-      let elapsed = now - state.collectedAt;
-      if (elapsed >= fixPowerRespawnMs && Math.hypot(player.x - x, player.z - z) < 1.15 && Math.abs(player.y - (y + 0.9)) < 1.5) {
-        if (collectFixPower(pickupModes[index % pickupModes.length])) {
-          state.collectedAt = now;
-          elapsed = 0;
-          playCollectibleSound("power");
-        }
-      }
-      updateVisual(index, now, elapsed);
-    });
-    icons.current.forEach((mesh) => { if (mesh) mesh.instanceMatrix.needsUpdate = true; });
+    smoke.material.uniforms.uTime.value = gameNow() / 1000;
+    smoke.material.uniforms.uStrength.value = 0.8;
+    // Handles an overlap that began while paused without using distance tests.
+    collect();
   });
-  // Initialize the paused first render without collecting or advancing timers.
-  useLayoutEffect(() => {
-    textures.forEach((texture) => { texture.colorSpace = SRGBColorSpace; texture.needsUpdate = true; });
-    const now = gameNow();
-    locations.forEach((_, index) => updateVisual(index, now, now - states[index].collectedAt));
-    icons.current.forEach((mesh) => { if (mesh) mesh.instanceMatrix.needsUpdate = true; });
-  }, [textures, camera, states, transform]);
-  return <group name="FixPowerPickups">
-    {pickupModes.map((mode, index) => (
-      <instancedMesh key={mode} name={`PowerIcon:${powerIcons[mode].name}`}
-        ref={(mesh) => { icons.current[index] = mesh; }}
-        args={[undefined, undefined, Math.ceil((locations.length - index) / pickupModes.length)]}
-        frustumCulled={false} raycast={ignoreRaycast}>
-        <planeGeometry args={[1, 1]} />
-        <meshBasicMaterial map={textures[index]} transparent alphaTest={0.005}
-          side={DoubleSide} depthWrite={false} toneMapped={false} />
-      </instancedMesh>
-    ))}
-  </group>;
+  useEffect(() => {
+    smoke.material.uniforms.uStrength.value = 0.8;
+    return () => { gameTimers.clearTimeout(timer.current); smoke.geometry.dispose(); smoke.material.dispose(); };
+  }, [smoke]);
+  return <RigidBody type="fixed" colliders={false} position={[x, surface.y + pickupSurfaceGap, z]}>
+    <BallCollider ref={collider} sensor args={[pickupRadius]} position={[0, pickupRadius, 0]}
+      onIntersectionEnter={enter} onIntersectionExit={leave} />
+    <mesh name={`PowerSmoke:${mode}`} visible={visible} geometry={smoke.geometry} material={smoke.material}
+      frustumCulled={false} dispose={null} />
+  </RigidBody>;
 }

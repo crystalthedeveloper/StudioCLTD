@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { powerIcons } from "../player/powerIcons";
+import { powerModes } from "../player/temporaryPowers";
 
 const sections = ["How to Play", "Controls", "Powers", "World Pickups"] as const;
 const icon = (src: string) => <img src={src} alt="" aria-hidden="true" />;
@@ -56,7 +56,7 @@ export function GameGuide({ onClose }: { onClose: () => void }) {
             <div id={`guide-section-${index}`} role="region" aria-labelledby={`guide-toggle-${index}`} hidden={open !== section} className="game-guide__body">
               {index === 0 && <ul className="game-guide__steps">
                 <li>Explore the world and collect powers.</li>
-                <li>Activate a power before touching a villain.</li>
+                <li>Collect coloured smoke to activate powers, then touch a villain to defeat them.</li>
                 <li>Defeat all 8 villains to complete the game.</li>
                 <li>Collect $ symbols to increase your cash.</li>
                 <li>Collect hearts to restore health.</li>
@@ -64,20 +64,19 @@ export function GameGuide({ onClose }: { onClose: () => void }) {
               {index === 1 && <dl className="game-guide__controls">
                 <div><dt>WASD / Arrow Keys</dt><dd>Move</dd></div>
                 <div><dt>On-screen arrows</dt><dd>Move</dd></div>
-                <div><dt>G / Power icons</dt><dd>Select a collected power</dd></div>
-                <div><dt>Spacebar / Fix</dt><dd>Activate or resume the selected power</dd></div>
+                <div><dt>Spacebar / Jump</dt><dd>Jump from the ground; steer while airborne</dd></div>
                 <div><dt>ESC</dt><dd>Pause</dd></div>
               </dl>}
               {index === 2 && <>
                 <ul className="game-guide__icon-grid">
-                  <Item image={icon(powerIcons.standard.worldSrc)}><strong>Wind</strong>6 seconds</Item>
-                  <Item image={icon(powerIcons.rapid.worldSrc)}><strong>Lightning</strong>10 seconds and increased speed</Item>
-                  <Item image={icon(powerIcons.power.worldSrc)}><strong>Fire</strong>15 seconds and strongest contact impact</Item>
+                  <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.standard.color }} aria-hidden="true" />}><strong>Wind</strong>6 seconds</Item>
+                  <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.rapid.color }} aria-hidden="true" />}><strong>Shock</strong>10 seconds and increased speed</Item>
+                  <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.power.color }} aria-hidden="true" />}><strong>Fire</strong>15 seconds and strongest contact impact</Item>
                 </ul>
                 <ul className="game-guide__notes">
-                  <li>Only one power can be active at a time.</li>
-                  <li>Switching powers pauses and saves the previous power’s remaining time.</li>
-                  <li>Collecting the same power refills it completely.</li>
+                  <li>All three powers can run together with independent timers.</li>
+                  <li>Collecting smoke activates that power immediately.</li>
+                  <li>Collecting the same power restarts only its timer.</li>
                 </ul>
               </>}
               {index === 3 && <ul className="game-guide__icon-grid">

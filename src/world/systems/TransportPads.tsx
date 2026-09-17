@@ -2,7 +2,7 @@ import { LocalLightSpill } from "./LocalLightSpill";
 import { createSquarePadGeometry } from "../squarePadGeometry";
 import { gameNow } from "../../player/gameFocus";
 import { CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload, RigidBody } from "@react-three/rapier";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MeshStandardMaterial, ShapeGeometry, Vector3 } from "three";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { hubSections } from "../hubSections";
@@ -167,17 +167,20 @@ function TransportPad({
   position: readonly [number, number, number];
 }) {
   const playerInsideRef = useRef(false);
+  const [playerInside, setPlayerInside] = useState(false);
 
   const handleEnter = (event: IntersectionEnterPayload) => {
     if (playerInsideRef.current) return;
     if (!isPlayerObject(event.other.rigidBodyObject) && !isPlayerObject(event.other.colliderObject)) return;
     playerInsideRef.current = true;
+    setPlayerInside(true);
     onEnter(event);
   };
 
   const handleExit = (event: IntersectionExitPayload) => {
     if (!isPlayerObject(event.other.rigidBodyObject) && !isPlayerObject(event.other.colliderObject)) return;
     playerInsideRef.current = false;
+    setPlayerInside(false);
   };
 
   return (
@@ -192,14 +195,14 @@ function TransportPad({
       <LocalLightSpill color={glowColor ?? padVisualStyle.color} intensity={glowColor ? 2.2 : 0.6} distance={4} />
       <mesh geometry={geometry} material={material} rotation-x={-Math.PI / 2} />
 
-      <BillboardLabel
+      {!playerInside && <BillboardLabel
         color={labelColor}
         fontSize={label === "Site Improvement" ? 0.2 : 0.24}
         position={[0, triggerPopupLayout.labelHeight, 0]}
         maxWidth={3}
       >
         {label}
-      </BillboardLabel>
+      </BillboardLabel>}
     </RigidBody>
   );
 }

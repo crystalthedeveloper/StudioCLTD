@@ -1,7 +1,6 @@
 import { createVillainContact } from "./villainContact";
 import { isPlayerObject } from "../world/playerCollision";
 import { assetForDevice } from "../world/mobileAssets";
-import { useVillainHitReaction } from "./useVillainHitReaction";
 import { createVillainCombat, villainClips } from "./villainCombat";
 import { useVillainNavigation } from "./useVillainNavigation";
 import { destinationPlatformRadius } from "../world/hubSections";
@@ -20,6 +19,7 @@ import {
 import { applyNaturalMaterials } from "../characters/naturalMaterials";
 import { DialogueBubble, DialogueMessage } from "../ui/DialogueBubble";
 import { playerWorldState } from "../world/playerWorldState";
+import { isPowerActive } from "../player/temporaryPowers";
 import { hideVillainMask } from "./hideVillainMask";
 
 export type VillainStatus = "idle" | "running" | "dead";
@@ -40,6 +40,7 @@ const rotationDamping = 5.5;
 const modelFacingOffset = 0;
 const modelYOffset = 0.28;
 const villainMaterialTuningVersion = 3;
+const poweredContactRadiusSq = 1.35 * 1.35;
 
 type HighlightableMaterial = Material & {
   color?: Color;
@@ -64,6 +65,7 @@ export function VillainCharacter({ id, basePosition, platformPosition, onPlayerD
   const { actions } = useGameAnimations(clips, modelRef, "idleV");
   const combat = useMemo(() => createVillainCombat(actions), [actions]);
   const bodyRef = useRef<RapierRigidBody>(null);
+  const deathRequestedRef = useRef(false);
   const home = useMemo(() => basePosition.clone(), []);
   const navigation = useVillainNavigation();
   const destination = useMemo(() => new Vector3(), []);
@@ -84,10 +86,14 @@ export function VillainCharacter({ id, basePosition, platformPosition, onPlayerD
     enhanceVillainSuitMaterial(findVillainSuitMaterial(scene));
   }, [scene]);
 
-  const reaction = useVillainHitReaction(id, scene);
   const contact = useMemo(createVillainContact, []);
   const handleContact = () => {
-    if (villainStatus === "dead" || onPowerContact()) return;
+    if (villainStatus === "dead" || deathRequestedRef.current) return;
+    if (onPowerContact()) {
+      deathRequestedRef.current = true;
+      combat.setMotion("dead");
+      return;
+    }
     onPlayerDamage();
   };
 
@@ -101,15 +107,33 @@ export function VillainCharacter({ id, basePosition, platformPosition, onPlayerD
     root.rotation.x = 0;
     root.rotation.z = 0;
 
-    contact.update(handleContact);
-    if (reaction.active()) { combat.setMotion("idle"); return; }
+    // Rapier stay callbacks can be missed while a kinematic villain and a
+    // stationary player are already overlapping. Keep a deterministic body
+    // overlap check so power contact never depends on movement or impact.
+    const dx = playerWorldState.position.x - basePosition.x;
+    const dz = playerWorldState.position.z - basePosition.z;
+    const sameHeight = playerWorldState.position.y >= basePosition.y - 0.2
+      && playerWorldState.position.y <= basePosition.y + 2.8;
+    const poweredBodyOverlap = isPowerActive() && sameHeight && dx * dx + dz * dz <= poweredContactRadiusSq;
+    if (poweredBodyOverlap && !deathRequestedRef.current && villainStatus !== "dead") {
+      handleContact();
+    }
 
-    if (villainStatus === "dead") {
+    contact.update(handleContact);
+    if (villainStatus === "dead" || deathRequestedRef.current) {
       combat.setMotion("dead");
       if (frozenDeathYawRef.current === null) {
         frozenDeathYawRef.current = root.rotation.y;
       }
       root.rotation.y = frozenDeathYawRef.current;
+      return;
+    }
+
+    // A powered overlap must never reach the villain attack state machine.
+    // This explicit stay check also covers a power activating while colliders
+    // are already touching, including a completely stationary Player.
+    if (isPowerActive() && contact.touching()) {
+      if (onPowerContact()) deathRequestedRef.current = true;
       return;
     }
 
@@ -166,14 +190,14 @@ export function VillainCharacter({ id, basePosition, platformPosition, onPlayerD
 
   return (
     <RigidBody ref={bodyRef} type="kinematicPosition" colliders={false} position={[basePosition.x, basePosition.y, basePosition.z]}>
-      <CuboidCollider args={[0.5, 1.25, 0.5]} position={[0, 1.2, 0]}
+      {villainStatus !== "dead" && <CuboidCollider args={[0.5, 1.25, 0.5]} position={[0, 1.2, 0]}
         onCollisionEnter={({ other }) => {
           if (isPlayerObject(other.rigidBodyObject) || isPlayerObject(other.colliderObject)) {
             contact.enter(other.collider.handle, handleContact);
           }
         }}
         onCollisionExit={({ other }) => contact.exit(other.collider.handle)}
-      />
+      />}
       <group ref={rootRef}>
         <group ref={modelRef} position={[0, modelYOffset, 0]}>
           <DialogueBubble
@@ -182,7 +206,7 @@ export function VillainCharacter({ id, basePosition, platformPosition, onPlayerD
             position={dialogueVariant === "danger" ? [0, 3.75, 0] : [0, 3.25, 0]}
             variant={dialogueVariant}
           />
-          <group ref={reaction.group}><primitive object={scene} scale={1.16} /></group>
+          <primitive object={scene} scale={1.16} />
         </group>
       </group>
     </RigidBody>

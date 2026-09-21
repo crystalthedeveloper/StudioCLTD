@@ -2,6 +2,7 @@ import { scenerySettings } from "./scenery/sceneryLayout";
 import { isCompactVisualBudget } from "./visualQuality";
 import { WINTER_THEME_ENABLED } from "./winterTheme";
 import { WinterSnow } from "./systems/WinterSnow";
+import { GroundFog } from "./systems/GroundFog";
 import { FixPowerPickups } from "./systems/FixPowerPickups";
 import { Environment } from "@react-three/drei";
 import { useEffect, useRef, useState } from "react";
@@ -88,6 +89,7 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
       <WorldLights />
       {scenerySettings.enabled && <WinterScenery />}
       {WINTER_THEME_ENABLED && <WinterSnow />}
+      <GroundFog />
       <FixPowerPickups key={`powers:${restartKey}`} />
       <SpaceSky />
       {!isCompactVisualBudget() && <Environment preset="warehouse" background={false} environmentIntensity={0.16} />}

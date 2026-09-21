@@ -3,10 +3,11 @@ import { bonusRouteSpots } from "../worldLayout";
 import { isCompactVisualBudget } from "../visualQuality";
 import { NearbyAsset } from "../NearbyAsset";
 import { assetForDevice } from "../mobileAssets";
-import { powerModes, type PowerMode, isPowerActive, resolvePowerContact, resetPowerContact } from "../../player/temporaryPowers";
+import { powerModes, type PowerMode, getActivePowers, isPowerActive, resolvePowerContact, resetPowerContact } from "../../player/temporaryPowers";
+import { createPowerSmoke } from "../../player/powerSmoke";
 import { createVillainCombat, villainClips } from "../../villain/villainCombat";
 import { useVillainNavigation } from "../../villain/useVillainNavigation";
-import { reactToVillainHit, useVillainHitReaction } from "../../villain/useVillainHitReaction";
+import { useVillainHitReaction } from "../../villain/useVillainHitReaction";
 import { LocalLightSpill } from "./LocalLightSpill";
 import { useGameFrame } from "../../player/useGameFrame";
 import { useGameAnimations } from "../../player/useGameFrame";
@@ -15,7 +16,7 @@ import { gameTimers } from "../../player/gameFocus";
 import { useGLTF } from "@react-three/drei";
 import { CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload } from "@react-three/rapier";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AdditiveBlending, Box3, Group, Mesh, MeshBasicMaterial, SphereGeometry, Vector3 } from "three";
+import { Box3, Group, Mesh, Vector3 } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import { applyCharacterMaterials, villainMaterialProfile } from "../../characters/characterMaterials";
 import { applyNaturalMaterials } from "../../characters/naturalMaterials";
@@ -157,21 +158,17 @@ function canBonusVillainMove(fromX: number, fromZ: number, toX: number, toZ: num
 const powerDefeatHandlers = new Map<string, (reward: number) => void>();
 const powerImpactListeners = new Set<(position: Vector3, mode: PowerMode) => void>();
 function poweredContact(id: string, basePosition: Vector3) {
+  const defeat = powerDefeatHandlers.get(id);
+  if (!defeat) return false;
   return resolvePowerContact(true, id, (mode, reward) => {
     const direction = basePosition.clone().sub(playerWorldState.position).setY(0).normalize();
     const point = basePosition.clone().add(new Vector3(0, 1, 0)).addScaledVector(direction, -0.25);
-    reactToVillainHit(id, mode, direction);
+    defeat(reward);
     playVillainDefeatSound();
-    powerDefeatHandlers.get(id)?.(reward);
-    powerImpactListeners.forEach(listener => listener(point, mode));
+    // Emit one visual wisp per active power; gameplay still resolves exactly once.
+    getActivePowers().forEach(activeMode => powerImpactListeners.forEach(listener => listener(point, activeMode)));
   });
 }
-const maxContactImpacts = 8;
-const impactMaterials = Object.fromEntries(Object.entries(powerModes).map(([mode, config]) => [mode,
-  new MeshBasicMaterial({ color: config.color, blending: AdditiveBlending, depthWrite: false, toneMapped: false }),
-])) as Record<PowerMode, MeshBasicMaterial>;
-const effectSphereGeometry = new SphereGeometry(1, 8, 6);
-
 type CombatPrototypeProps = {
   onVillainReward: (amount: number) => void;
   onInfoChange: (sectionId: string | null) => void;
@@ -369,11 +366,13 @@ function BonusVillain({
     const bodyDy = Math.max(positionRef.current.y + 0.18 - playerWorldState.position.y,
       playerWorldState.position.y - (positionRef.current.y + 1.8), 0);
     const touchingBody = bodyDx * bodyDx + bodyDy * bodyDy + bodyDz * bodyDz <= playerSphereRadius ** 2;
-    if (touchingBody && navigation.sight(positionRef.current, playerWorldState.position)
+    if (touchingBody
       && poweredContact(id, positionRef.current)) return;
     if (inRange) onPlayerDamage();
     if (reaction.active()) { combat.setMotion("idle"); return; }
-    if (combat.updateAttack(inRange, true)) {
+    // Powered players must be approached all the way to body contact. The
+    // longer melee attack range otherwise leaves an idle player out of reach.
+    if (combat.updateAttack(inRange && !isPowerActive(), true)) {
       group.rotation.y = Math.atan2(playerDx, playerDz);
       return;
     }
@@ -463,56 +462,42 @@ function BonusVillain({
   );
 }
 
-type ContactImpact = { mode: PowerMode; id: number; position: Vector3 };
+type VillainSmoke = { mode: PowerMode; id: number; position: Vector3 };
 
 function PowerContactEffects() {
-  const [impacts, setImpacts] = useState<ContactImpact[]>([]);
+  const [smokeBursts, setSmokeBursts] = useState<VillainSmoke[]>([]);
   const nextId = useRef(0);
   useEffect(() => {
-    const impact = (position: Vector3, mode: PowerMode) => {
+    const smoke = (position: Vector3, mode: PowerMode) => {
       const id = nextId.current++;
-      setImpacts(current => [...current.slice(-(maxContactImpacts - 1)), { id, mode, position }]);
+      setSmokeBursts(current => [...current.slice(-7), { id, mode, position }]);
     };
-    powerImpactListeners.add(impact);
-    return () => { powerImpactListeners.delete(impact); };
+    powerImpactListeners.add(smoke);
+    return () => { powerImpactListeners.delete(smoke); };
   }, []);
   return <group name="PowerContactEffects">
-    {impacts.map(impact => <ImpactBurst key={impact.id} impact={impact}
-      onComplete={() => setImpacts(current => current.filter(({ id }) => id !== impact.id))} />)}
+    {smokeBursts.map(burst => <VillainSmokeBurst key={burst.id} burst={burst}
+      onComplete={() => setSmokeBursts(current => current.filter(({ id }) => id !== burst.id))} />)}
   </group>;
 }
 
-function ImpactBurst({ onComplete, impact }: { onComplete: () => void; impact: ContactImpact }) {
-  const { position, mode } = impact;
-  const groupRef = useRef<Group>(null);
+function VillainSmokeBurst({ onComplete, burst }: { onComplete: () => void; burst: VillainSmoke }) {
+  const { position, mode } = burst;
   const elapsedRef = useRef(0);
-  const sparkDirections = useMemo(() => [
-    new Vector3(0.8, 0.5, 0.2),
-    new Vector3(-0.55, 0.75, 0.35),
-    new Vector3(0.25, 0.9, -0.65),
-    new Vector3(-0.4, 0.35, -0.8),
-  ].map((direction) => direction.normalize()), []);
+  const smoke = useMemo(() => createPowerSmoke(powerModes[mode].color, isCompactVisualBudget(), 0.52), [mode]);
 
   useGameFrame((_, delta) => {
     elapsedRef.current += delta;
-    const progress = Math.min(elapsedRef.current / powerModes[mode].impactDuration, 1);
-    const group = groupRef.current;
-    if (group) {
-      group.scale.setScalar(0.12 * (1 - progress) * powerModes[mode].impactSize);
-      group.children.forEach((child, index) => {
-        if (index === 0) return;
-        child.position.copy(sparkDirections[index - 1]).multiplyScalar(progress * 2);
-      });
-    }
+    const progress = Math.min(elapsedRef.current / 1.5, 1);
+    smoke.material.uniforms.uTime.value = gameNow() / 1000;
+    smoke.material.uniforms.uStrength.value = Math.max(0, 1 - progress);
     if (progress >= 1) onComplete();
   });
+  useEffect(() => () => { smoke.geometry.dispose(); smoke.material.dispose(); }, [smoke]);
 
   return (
-    <group ref={groupRef} position={position} scale={0.12 * powerModes[mode].impactSize}>
-      <mesh geometry={effectSphereGeometry} material={impactMaterials[mode]} />
-      {sparkDirections.map((_, index) => (
-        <mesh key={index} geometry={effectSphereGeometry} material={impactMaterials[mode]} scale={0.12} />
-      ))}
+    <group position={position}>
+      <mesh geometry={smoke.geometry} material={smoke.material} frustumCulled={false} position={[0, -0.9, 0]} />
     </group>
   );
 }
@@ -567,7 +552,6 @@ function SectionPortalEncounter({
     setPortalActive(true);
     setDefeatActive(true);
     setVillainStatus("dead");
-    onPlayerDialogue("FIXED!");
     sectionResolvedTimerRef.current = gameTimers.setTimeout(() => {
       onSectionResolved(encounter.id);
     }, 240);
@@ -630,7 +614,6 @@ function SectionPortalEncounter({
   return (
     <group name={`PortalEncounter:${encounter.id}`}>
       <TriggerPad label="More Info" position={encounter.infoPadPosition} active={infoPortalActive} onActivate={activateInfoPad} onDeactivate={deactivateInfoPad} />
-      {defeatActive && <BillboardLabel color="#ffffff" fontSize={0.28} position={[villainPosition.x, villainPosition.y + 2.8, villainPosition.z]} maxWidth={2}>FIXED!</BillboardLabel>}
       {villainVisible && (
         <VillainCharacter
           id={encounter.id}

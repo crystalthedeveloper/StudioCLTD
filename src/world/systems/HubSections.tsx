@@ -47,6 +47,9 @@ const offerCountdownMs = 3000;
 const offerDisplayMs = 10000;
 const simpleDisplayMs = 10000;
 const mobileBillboardScale = 0.78;
+const tvSizeScale = 0.9;
+// Lower the visual centre by the lost half-height to preserve its bottom edge.
+const tvCentreDrop = (scale: number) => 2.9 * scale * (1 - tvSizeScale);
 const mobileBillboardYOffset = -0.55;
 const portalTriggerRadius = 1.06;
 const portalActivationCooldownMs = 900;
@@ -570,7 +573,7 @@ function SectionBillboard({
       <RigidBody type="fixed" colliders={false} position={[0, billboardYOffset, 0]}>
         <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
       </RigidBody>
-      <group name={`BillboardVisual:${section.id}`} position={[0, billboardYOffset, 0]} scale={billboardScale}>
+      <group name={`BillboardVisual:${section.id}`} position={[0, billboardYOffset - tvCentreDrop(billboardScale), 0]} scale={billboardScale * tvSizeScale}>
         <LocalLightSpill position={[0, -1.8, -0.8]} intensity={5} distance={10} />
         <mesh castShadow receiveShadow geometry={tvFrameGeometry} position={[0, 0, -0.08]} dispose={null}>
           <meshStandardMaterial
@@ -719,7 +722,7 @@ function OfferPreviewScreen({ offer, active }: { offer: OfferOption; active: boo
   const texture = useLazyScreenTexture(offer.imagePath, true);
   const fit = offerImageScale(texture);
   const leftSide = offer.position[0] < 0;
-  return <group name={`OfferScreen:${offer.id}`} position={[leftSide ? -1.5 : 1.5, 2.35, 0]}
+  return <group name={`OfferScreen:${offer.id}`} scale={tvSizeScale} position={[leftSide ? -1.5 : 1.5, 2.35 - offerPreviewFrame.parameters.height * 0.5 * (1 - tvSizeScale), 0]}
     rotation-y={leftSide ? Math.PI / 2 : -Math.PI / 2}>
     <mesh geometry={offerPreviewFrame} dispose={null}>
       <meshBasicMaterial color={active ? "#c7ced3" : "#111827"} />
@@ -1067,7 +1070,7 @@ export function HomeBaseVideoScreen() {
         <RigidBody type="fixed" colliders={false} position={[0, billboardYOffset, 0]}>
           <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
         </RigidBody>
-        <group position={[0, billboardYOffset, 0]} scale={billboardScale}>
+        <group position={[0, billboardYOffset - tvCentreDrop(billboardScale), 0]} scale={billboardScale * tvSizeScale}>
           <LocalLightSpill position={[0, -1.8, -0.8]} intensity={5} distance={10} />
         <mesh castShadow receiveShadow geometry={tvFrameGeometry} position={[0, 0, -0.08]} dispose={null}>
             <meshStandardMaterial

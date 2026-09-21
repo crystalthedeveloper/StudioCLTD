@@ -16,7 +16,7 @@ export function PlayerSmokeOrb(_props: { damageFlashUntil: number }) {
     map.needsUpdate = true;
     return map;
   }, [source]);
-  const smoke = useMemo(() => createPowerSmoke("#000000", isCompactVisualBudget(), 1, true), []);
+  const smoke = useMemo(() => createPowerSmoke("#000000", isCompactVisualBudget(), 1.1, true), []);
   const motion = useMemo(() => ({
     position: new Vector3(), previous: new Vector3(), initialized: false, elapsed: 0,
     history: Array.from({ length: 8 }, () => new Vector3()),

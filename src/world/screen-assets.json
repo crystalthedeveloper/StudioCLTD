@@ -1,0 +1,317 @@
+{
+  "/images/optimized/offers/1hour.webp": {
+    "sourceHash": "e59f61b4165edbb2ca165dbfd853f552cc8c57608354349ffcd7347c02cb027f",
+    "mobile": {
+      "url": "/images/screens/offers-1hour-mobile.65d5858d8f4f2726.webp",
+      "width": 768,
+      "height": 392,
+      "bytes": 21720
+    },
+    "desktop": {
+      "url": "/images/screens/offers-1hour-desktop.d7f186b70ffc51df.webp",
+      "width": 1536,
+      "height": 784,
+      "bytes": 73434
+    }
+  },
+  "/images/optimized/offers/2-5hour.webp": {
+    "sourceHash": "a54d36434dc8e54d7497567d98889268760a4ebdc3154cb901fbb3c4c35e1201",
+    "mobile": {
+      "url": "/images/screens/offers-2-5hour-mobile.5402e9a4a0b41461.webp",
+      "width": 768,
+      "height": 392,
+      "bytes": 22910
+    },
+    "desktop": {
+      "url": "/images/screens/offers-2-5hour-desktop.adb4465466ff47e9.webp",
+      "width": 1536,
+      "height": 784,
+      "bytes": 76626
+    }
+  },
+  "/images/optimized/offers/5hour.webp": {
+    "sourceHash": "a09e49d4c7f24d29bb5826521797bde6a6638e73bd3fa3c60ac28b6c95a015ab",
+    "mobile": {
+      "url": "/images/screens/offers-5hour-mobile.bde1d5664feebb61.webp",
+      "width": 768,
+      "height": 392,
+      "bytes": 22476
+    },
+    "desktop": {
+      "url": "/images/screens/offers-5hour-desktop.36b4b94455a912f8.webp",
+      "width": 1536,
+      "height": 784,
+      "bytes": 75898
+    }
+  },
+  "/images/optimized/offers/audit.webp": {
+    "sourceHash": "430726f89811c713411b2e6c0c649a7c6255ee09b71bcb7d6ee8fa552a625833",
+    "mobile": {
+      "url": "/images/screens/offers-audit-mobile.4546d2e7ea4f1bee.webp",
+      "width": 768,
+      "height": 392,
+      "bytes": 22878
+    },
+    "desktop": {
+      "url": "/images/screens/offers-audit-desktop.6d8848dea3358d2c.webp",
+      "width": 1536,
+      "height": 784,
+      "bytes": 78294
+    }
+  },
+  "/images/optimized/offers/business-sprint.webp": {
+    "sourceHash": "f5e7dcbbcb2a45c00ea43cd4b3092cb4eb8c932bf78a22581c8248237126f99c",
+    "mobile": {
+      "url": "/images/screens/offers-business-sprint-mobile.0e06cfce7f7a135d.webp",
+      "width": 768,
+      "height": 392,
+      "bytes": 24918
+    },
+    "desktop": {
+      "url": "/images/screens/offers-business-sprint-desktop.d58d3bb506938e31.webp",
+      "width": 1536,
+      "height": 784,
+      "bytes": 80090
+    }
+  },
+  "/images/optimized/offers/custom-engineering-sprint.webp": {
+    "sourceHash": "5a21e9a2139fc881f6071f728f9913a8599c9344fbea92bf98b414940463c0d0",
+    "mobile": {
+      "url": "/images/screens/offers-custom-engineering-sprint-mobile.320a22f72378124d.webp",
+      "width": 768,
+      "height": 392,
+      "bytes": 26382
+    },
+    "desktop": {
+      "url": "/images/screens/offers-custom-engineering-sprint-desktop.d0a94359ee04ada4.webp",
+      "width": 1536,
+      "height": 784,
+      "bytes": 84122
+    }
+  },
+  "/images/optimized/offers/ecommerce-sprint.webp": {
+    "sourceHash": "5b81b65364421ff7d8f7679131e3b7f5a4d593c52c1d2cd877ec80628840425a",
+    "mobile": {
+      "url": "/images/screens/offers-ecommerce-sprint-mobile.f27b2db318acf6c3.webp",
+      "width": 768,
+      "height": 392,
+      "bytes": 25362
+    },
+    "desktop": {
+      "url": "/images/screens/offers-ecommerce-sprint-desktop.75bdf45d670bda26.webp",
+      "width": 1536,
+      "height": 784,
+      "bytes": 79842
+    }
+  },
+  "/images/optimized/offers/enterprise.webp": {
+    "sourceHash": "43385b5cd79dbd2788e3fbf72880370351aa42a3e42a8fea8075b436c6883d0a",
+    "mobile": {
+      "url": "/images/screens/offers-enterprise-mobile.3bbee66ff19354b7.webp",
+      "width": 768,
+      "height": 392,
+      "bytes": 24556
+    },
+    "desktop": {
+      "url": "/images/screens/offers-enterprise-desktop.4e2a6eae7ad64da0.webp",
+      "width": 1536,
+      "height": 784,
+      "bytes": 76370
+    }
+  },
+  "/images/optimized/performance/performance-bad.webp": {
+    "sourceHash": "219e5c8c472380aebac5ec9acb9a8457786c54e8af4e73af94916905a6f2bfc9",
+    "mobile": {
+      "url": "/images/screens/performance-performance-bad-mobile.3682082d8f77aa15.webp",
+      "width": 768,
+      "height": 432,
+      "bytes": 44482
+    },
+    "desktop": {
+      "url": "/images/screens/performance-performance-bad-desktop.07e6a560d9f5fbd3.webp",
+      "width": 1536,
+      "height": 864,
+      "bytes": 133308
+    }
+  },
+  "/images/optimized/performance/performance-good.webp": {
+    "sourceHash": "85f070a0e1492cd941554d7397ffc55e75a2f0cc79e4272aa79b234ae0010eb6",
+    "mobile": {
+      "url": "/images/screens/performance-performance-good-mobile.49c13bbaf20147ff.webp",
+      "width": 768,
+      "height": 432,
+      "bytes": 31460
+    },
+    "desktop": {
+      "url": "/images/screens/performance-performance-good-desktop.b6d9a549ffb33953.webp",
+      "width": 1536,
+      "height": 864,
+      "bytes": 91926
+    }
+  },
+  "/images/optimized/quickFix/quick-fix-bad.jpg": {
+    "sourceHash": "c25808f31367ee844654fb63f834ae408a748201f7601af04685fc26fa5d5e56",
+    "mobile": {
+      "url": "/images/screens/quickFix-quick-fix-bad-mobile.ef79bc3783e05685.webp",
+      "width": 768,
+      "height": 432,
+      "bytes": 22696
+    },
+    "desktop": {
+      "url": "/images/screens/quickFix-quick-fix-bad-desktop.f6b8e42e098fb931.webp",
+      "width": 1024,
+      "height": 576,
+      "bytes": 40832
+    }
+  },
+  "/images/optimized/quickFix/quick-fix-good.jpg": {
+    "sourceHash": "7d99714e2c0796ec1ac1c9e1658de6507ba9be82d996010695eeae1ec200724a",
+    "mobile": {
+      "url": "/images/screens/quickFix-quick-fix-good-mobile.f393d3b799316ee0.webp",
+      "width": 768,
+      "height": 432,
+      "bytes": 20102
+    },
+    "desktop": {
+      "url": "/images/screens/quickFix-quick-fix-good-desktop.d1079a0c7475cc55.webp",
+      "width": 1024,
+      "height": 576,
+      "bytes": 35776
+    }
+  },
+  "/images/optimized/siteImprovement/site-improvement-bad.webp": {
+    "sourceHash": "cabd0852119ffd22159b5d7f646f97112265dd58052477e7455040746816bd6f",
+    "mobile": {
+      "url": "/images/screens/siteImprovement-site-improvement-bad-mobile.f6497f9572890f5f.webp",
+      "width": 768,
+      "height": 432,
+      "bytes": 35094
+    },
+    "desktop": {
+      "url": "/images/screens/siteImprovement-site-improvement-bad-desktop.1548323bc270e364.webp",
+      "width": 1536,
+      "height": 864,
+      "bytes": 104964
+    }
+  },
+  "/images/optimized/siteImprovement/site-improvement-good.webp": {
+    "sourceHash": "a15e2a320ca958307b4bb8c63a7ee8ac4051d1537691adedbe98a7f78644efe7",
+    "mobile": {
+      "url": "/images/screens/siteImprovement-site-improvement-good-mobile.6d70aa4c467d8d52.webp",
+      "width": 768,
+      "height": 432,
+      "bytes": 21584
+    },
+    "desktop": {
+      "url": "/images/screens/siteImprovement-site-improvement-good-desktop.e9c412849af2311d.webp",
+      "width": 1536,
+      "height": 864,
+      "bytes": 64168
+    }
+  },
+  "/images/optimized/tips/content-tip.webp": {
+    "sourceHash": "b168b1763af0a70495e0f9e52b6931f5b4e60c64bd9b40559ea1bc44f51f3b11",
+    "mobile": {
+      "url": "/images/screens/tips-content-tip-mobile.1b6347f75b46f5ec.webp",
+      "width": 768,
+      "height": 392,
+      "bytes": 32332
+    },
+    "desktop": {
+      "url": "/images/screens/tips-content-tip-desktop.8a35e57661fd8608.webp",
+      "width": 1536,
+      "height": 784,
+      "bytes": 104436
+    }
+  },
+  "/images/optimized/tips/images-tip.webp": {
+    "sourceHash": "eb519e85a43a625f6888b58493cc3c6f3ba99c86fb81b23d64aaf41dc82ecb29",
+    "mobile": {
+      "url": "/images/screens/tips-images-tip-mobile.2b0631732fbfa5bd.webp",
+      "width": 768,
+      "height": 392,
+      "bytes": 29648
+    },
+    "desktop": {
+      "url": "/images/screens/tips-images-tip-desktop.3a40e153d3971813.webp",
+      "width": 1536,
+      "height": 784,
+      "bytes": 93224
+    }
+  },
+  "/images/optimized/tips/navigation-tip.webp": {
+    "sourceHash": "0cdb5e91ac6c6dd819eb7bcc5150e2732a636cf6447787dbf491fba2b3154e70",
+    "mobile": {
+      "url": "/images/screens/tips-navigation-tip-mobile.92cd9db5d4f9361a.webp",
+      "width": 768,
+      "height": 392,
+      "bytes": 28628
+    },
+    "desktop": {
+      "url": "/images/screens/tips-navigation-tip-desktop.7237cdacf8145208.webp",
+      "width": 1536,
+      "height": 784,
+      "bytes": 91312
+    }
+  },
+  "/images/optimized/urgentFix/urgent-fix-bad.jpg": {
+    "sourceHash": "b2bc17858f45d13e2d21d228d80cd88cdcafdb8c9a661913db4a332bc9ece6d0",
+    "mobile": {
+      "url": "/images/screens/urgentFix-urgent-fix-bad-mobile.12c8fa0c327db08a.webp",
+      "width": 768,
+      "height": 432,
+      "bytes": 14688
+    },
+    "desktop": {
+      "url": "/images/screens/urgentFix-urgent-fix-bad-desktop.e5ed382ea0aeefef.webp",
+      "width": 1536,
+      "height": 864,
+      "bytes": 49320
+    }
+  },
+  "/images/optimized/urgentFix/urgent-fix-good.jpg": {
+    "sourceHash": "e45a3a9be64654cddb4dd7f5d7e36902a941064dc22de0c1da2bb29b1b65ac0f",
+    "mobile": {
+      "url": "/images/screens/urgentFix-urgent-fix-good-mobile.b5dce1a45ce7d728.webp",
+      "width": 768,
+      "height": 432,
+      "bytes": 27358
+    },
+    "desktop": {
+      "url": "/images/screens/urgentFix-urgent-fix-good-desktop.e40edf0d24896ed3.webp",
+      "width": 1536,
+      "height": 864,
+      "bytes": 93026
+    }
+  },
+  "/images/optimized/values/value-speed.webp": {
+    "sourceHash": "bda58c40adfc5e7d646f8dc6ba7ca0ebab50b68e60b398c4aca55c39497a3784",
+    "mobile": {
+      "url": "/images/screens/values-value-speed-mobile.3ed8cd73dbd9cc75.webp",
+      "width": 768,
+      "height": 392,
+      "bytes": 34732
+    },
+    "desktop": {
+      "url": "/images/screens/values-value-speed-desktop.697c0b31cac9d4e7.webp",
+      "width": 1536,
+      "height": 784,
+      "bytes": 112086
+    }
+  },
+  "/images/optimized/values/value.webp": {
+    "sourceHash": "3cca529e9b1d1c4842fd116f03fa980276e76e70431d9f86d81ce51e5520015f",
+    "mobile": {
+      "url": "/images/screens/values-value-mobile.028c3d8913899dd5.webp",
+      "width": 768,
+      "height": 392,
+      "bytes": 33420
+    },
+    "desktop": {
+      "url": "/images/screens/values-value-desktop.a071d23571448cc3.webp",
+      "width": 1536,
+      "height": 784,
+      "bytes": 107500
+    }
+  }
+}

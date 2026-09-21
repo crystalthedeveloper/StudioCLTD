@@ -23,7 +23,7 @@ const dependencies = {
   },
   'react-dom': { createPortal: tree => tree },
   'react/jsx-runtime': runtime,
-  '../player/temporaryPowers': { powerModes: { standard: {color:'#2F6FAF'}, rapid: {color:'#6B3A8E'}, power: {color:'#B63A3A'} } },
+  '../player/temporaryPowers': { powerModes: { standard: {color:'#009B3A'}, rapid: {color:'#FED100'}, power: {color:'#CE1126'} } },
   '../player/powerIcons': { powerIcons: { standard: { worldSrc: 'wind.svg' }, rapid: { worldSrc: 'lightning.svg' }, power: { worldSrc: 'fire.svg' } } },
 };
 const exports = {};
@@ -53,6 +53,17 @@ for (let i = 0; i < 4; i++) {
   assert.equal(regions().filter(n => !n.props.hidden).length, 1);
   assert.ok(nodes(toggles()[i]).some(n => n.type === 'svg'), 'every section has a chevron');
 }
+function text(tree) {
+  if (Array.isArray(tree)) return tree.map(text).join(' ');
+  if (typeof tree === 'string') return tree;
+  return tree?.props ? text(tree.props.children) : '';
+}
+const guideText = text(tree);
+assert(!/Speed|Yellow Logo/.test(guideText));
+assert(guideText.includes('last active Power expires'));
+for (const name of ['Wind', 'Shock', 'Fire']) assert(guideText.includes(name));
+assert(text(regions()[1]).includes('any Power active'), 'Jump instructions require a Power');
+assert(text(regions()[3]).includes('Gold smoke'), 'pickup guide describes the three smoke pickups');
 const buttons = Array.from({length:5}, () => new Element());
 refs[0].current = { querySelectorAll: () => buttons, contains: element => buttons.includes(element) };
 refs[1].current = buttons[0];

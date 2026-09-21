@@ -8,7 +8,6 @@ import { playerCenterHeightReduction, playerSphereRadius } from "./playerDimensi
 import { PlayerCharacter } from "./PlayerCharacter";
 import { ThirdPersonCamera } from "./ThirdPersonCamera";
 import { CharacterAnimationState } from "./playerTypes";
-import { isSpeedBoostActive } from "./speedBoost";
 import { useKeyboardControls } from "./useKeyboardControls";
 import { DialogueMessage } from "../ui/DialogueBubble";
 import { playerWorldState } from "../world/playerWorldState";
@@ -141,7 +140,7 @@ export function CharacterController({
     playerWorldState.position.set(translation.x, translation.y, translation.z);
     const hasForwardBackInput = controls.forward !== controls.backward;
     const turnInput = Number(controls.left) - Number(controls.right);
-    const forwardBackSpeed = (isSpeedBoostActive() || hasPowerSpeedBoost()) ? boostedRunSpeed : baseRunSpeed;
+    const forwardBackSpeed = hasPowerSpeedBoost() ? boostedRunSpeed : baseRunSpeed;
 
     if (turnInput !== 0) {
       yawRef.current += turnInput * turnSpeed * frameDelta;
@@ -181,7 +180,7 @@ export function CharacterController({
       body,
     ) !== null;
     if (isMoving && horizontalSpeed > 0.8 && grounded) {
-      const cadence = isSpeedBoostActive() ? 0.3 : 0.42;
+      const cadence = hasPowerSpeedBoost() ? 0.3 : 0.42;
       if (clock.elapsedTime - lastFootstepAtRef.current >= cadence) {
         lastFootstepAtRef.current = clock.elapsedTime;
         footstepVariationRef.current = (footstepVariationRef.current + 0.37) % 1;

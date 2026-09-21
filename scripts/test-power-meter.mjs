@@ -22,7 +22,7 @@ function load(path, dependencies) {
   const code = ts.transpileModule(readFileSync(path, 'utf8'), {
     fileName: path, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
-  vm.runInNewContext(code, { exports, require: id => dependencies[id], window: {
+  vm.runInNewContext(code, { exports, require: id => id === './effectColors' ? load('src/player/effectColors.ts', {}) : dependencies[id], window: {
     requestAnimationFrame: callback => { frames.set(++frameId, callback); return frameId; },
     cancelAnimationFrame: id => frames.delete(id),
   } });

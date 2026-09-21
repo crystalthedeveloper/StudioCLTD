@@ -40,7 +40,7 @@ export function PowerMeter({ mode }: { mode: PowerMode }) {
       <span className="game-hud__power-amount" role="progressbar" aria-label={`${power.name} time remaining`}
         aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}
         aria-valuetext={`${status}, ${Math.ceil(remaining / 1000)} seconds remaining`}>
-        {Math.ceil(remaining / 1000)}s
+        <span className="game-hud__power-name">{power.name}</span> {Math.ceil(remaining / 1000)}s
       </span>
     </button>
   );

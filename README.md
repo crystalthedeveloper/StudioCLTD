@@ -6,13 +6,13 @@ StudioCLTD is a lightweight third-person React Three Fiber game world for explor
 
 - Eight interactive sections tracked independently from `0/8`: Tips, Offers, Value, Quick Fix, Urgent Fix, Performance, Site Improvement, and Showcase.
 - Third-person movement with WASD, keyboard arrows, and multi-touch on-screen arrows.
-- Collectible contact powers: blue Wind for 6 seconds, yellow Lightning for 10 seconds with increased speed, and red Fire for 15 seconds.
-- Select with G or a power box; activate with Space or ⚡ Fix. Active powers defeat villains on contact and prevent villain contact damage.
+- Collectible contact powers: green Wind for 6 seconds, gold Shock for 10 seconds, and red Fire for 15 seconds. Every active Power includes faster movement.
+- Collect smoke to activate a Power immediately; use Space or Jump for a powered jump. Active powers defeat villains on contact and prevent villain contact damage.
 - Main villains advance section Progress through the existing Fix logic.
 - Two roaming bonus villains award `+$3` Cash and respawn after 8–10 seconds without affecting Progress.
-- Green Coin, yellow Speed, red Penalty, blue Contact, purple Share, and decorative black/white logos.
+- Green Coin, red Penalty, blue Contact, purple Share, and decorative black/white logos.
 - Responsive Showcase and Home Base website-video screens.
-- Compact responsive HUD with Progress, Cash, Speed, D-pad, Fix, sound, guide, restart, and website controls.
+- Compact responsive HUD with Health, Progress, Cash, three Power timers, D-pad, Jump, sound, guide, restart, and website controls.
 - Full-page restart for a completely fresh game state.
 
 ## World Layout
@@ -38,8 +38,8 @@ Home Base contains Contact and Share, a responsive `crystalthedeveloper.ca` vide
 | Move forward/backward | `W` / `S`, ↑ / ↓, or on-screen arrows |
 | Turn left/right | `A` / `D`, ← / →, or on-screen arrows |
 | Combined movement | Hold forward/backward with left/right |
-| Select a collected power | `G` or a power icon box |
-| Activate selected power | `Space` or **⚡ FIX** |
+| Activate a Power | Collect its smoke pickup |
+| Jump while any Power is active | `Space` or **Jump** |
 | Game Guide | `1` or Info |
 | Toggle sound | `2` or Sound |
 | Full restart | `3` or Restart |
@@ -47,14 +47,13 @@ Home Base contains Contact and Share, a responsive `crystalthedeveloper.ca` vide
 | Enter game focus | Click/tap **Play** |
 | Release pointer lock | `Esc` |
 
-Power boxes show EMPTY, READY, SELECTED, ACTIVE, or PAUSED. G cycles every collected power, including previously active powers. Switching immediately stops the old effect and saves its exact remaining time; Space or Fix explicitly starts or resumes the selection. A selected paused power remains labelled PAUSED, with its button pressed to indicate selection. The POWER bar uses the selected power’s colour and remaining amount: full when ready, frozen when paused, draining only when active, and empty at zero. Only one power can be active. Collecting the same power in any state refills its original duration. Active powers stay active; paused powers stay paused, even when selected. Refills never auto-activate or stack durations. Global game pause freezes all timers.
+Wind, Shock, and Fire activate on pickup and have independent timers stacked at the top right. Multiple Powers retain their own abilities and smoke colours. Every Power grants the same movement boost; multiple Powers do not multiply it. Normal movement returns only after all active Powers expire. Collecting a Power again refills only its own timer. Global pause freezes all timers.
 
 ## Logo Guide
 
 | Color | Purpose |
 | --- | --- |
 | Green `#3F7D3A` | Coin / Cash |
-| Yellow `#FACC15` | Speed Boost |
 | Red | Penalty |
 | Blue `#2583E8` | Contact |
 | Purple `#A855F7` | Share |

@@ -21,10 +21,10 @@ for (const duration of [6000, 10000, 15000]) {
   assert.equal(powerSmokeStrength(-1, duration), 0);
   assert.equal(powerSmokeStrength(duration, duration), ignition, 'timer refill restores ignition');
 }
-for (const color of ['#339DFF', '#FFD60A', '#FF3838']) {
+for (const color of ['#009B3A', '#FED100', '#CE1126']) {
   const desktop = createPowerSmoke(color, false), mobile = createPowerSmoke(color, true);
-  assert.equal(desktop.geometry.instanceCount, 18);
-  assert.equal(mobile.geometry.instanceCount, 10, 'mobile reduces overlapping smoke');
+  assert.equal(desktop.geometry.instanceCount, 24);
+  assert.equal(mobile.geometry.instanceCount, 12, 'mobile reduces overlapping smoke');
   for (const smoke of [desktop, mobile]) {
     assert.equal(smoke.geometry.index.count, 6, 'each wisp is just two triangles');
     assert.equal(smoke.material.depthWrite, false, 'transparent smoke does not hide geometry behind it');
@@ -32,14 +32,17 @@ for (const color of ['#339DFF', '#FFD60A', '#FF3838']) {
     assert(smoke.material.uniforms.uColor.value.equals(new THREE.Color(color)));
     assert.equal(smoke.material.uniforms.uStrength.value, 0, 'new material cannot render a full-opacity first frame');
     const texture = smoke.material.uniforms.uSmoke.value;
+    const size = smoke === mobile ? 64 : 128;
+    assert.equal(texture.image.width, size);
     assert.equal(texture.image.data[3], 0, 'texture corners are transparent');
-    assert.equal(texture.image.data[(127 * 128 + 127) * 4 + 3], 0);
+    assert.equal(texture.image.data[(size * size - 1) * 4 + 3], 0);
     let geometryDisposed = false, materialDisposed = false;
     smoke.geometry.addEventListener('dispose', () => { geometryDisposed = true; });
     smoke.material.addEventListener('dispose', () => { materialDisposed = true; });
     smoke.geometry.dispose(); smoke.material.dispose();
     assert(geometryDisposed && materialDisposed);
   }
-  assert.equal(desktop.material.uniforms.uSmoke.value, mobile.material.uniforms.uSmoke.value, 'all instances reuse one baked texture');
+  assert.equal(desktop.material.uniforms.uSmoke.value, createPowerSmoke(color, false).material.uniforms.uSmoke.value, 'desktop instances reuse one baked texture');
+  assert.equal(mobile.material.uniforms.uSmoke.value, createPowerSmoke(color, true).material.uniforms.uSmoke.value, 'mobile instances reuse one smaller baked texture');
 }
 console.log('Smoke aura tests passed: ignition, sustained translucency, expiry fade, refill, colours, mobile budget, occlusion and resource cleanup.');

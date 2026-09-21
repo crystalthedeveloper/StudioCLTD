@@ -3,7 +3,6 @@ import { GameGuide } from "./GameGuide";
 import { PowerMeter } from "./PowerMeter";
 import { powerModes, type PowerMode, jumpWithPower, isPowerActive, subscribePowers } from "../player/temporaryPowers";
 import { useGameFocus } from "../player/gameFocus";
-import { useSpeedBoostRemainingMs, speedBoostDurationMs } from "../player/speedBoost";
 import { setGameAudioEnabled, useGameAudioEnabled } from "../audio/gameAudio";
 import { getActiveVillainVoiceId, subscribeVillainVoice } from "../audio/villainAudio";
 import { useEffect, useSyncExternalStore, type CSSProperties } from "react";
@@ -38,10 +37,6 @@ export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onClose
     getActiveVillainVoiceId,
   );
   const activeVillainVoiceLabel = activeVillainVoiceId ? villainVoiceLabels[activeVillainVoiceId] : null;
-  const remainingMs = useSpeedBoostRemainingMs();
-  const active = remainingMs > 0;
-  const progress = active ? Math.min(100, (remainingMs / speedBoostDurationMs) * 100) : 0;
-
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
       if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
@@ -136,10 +131,9 @@ export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onClose
           <strong title={formattedCash}>{formattedCash}</strong>
         </section>
 
-        <div className="game-hud__speed-meter">
-          <span>Speed</span>
-          <div className="game-hud__meter-track game-hud__meter-track--speed" role="progressbar" aria-label="Speed boost time remaining" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
-            <i style={{ width: `${progress}%` }} />
+        <div className="game-hud__effect-hub" role="group" aria-label="Power timers">
+          <div className="game-hud__power-stack">
+            {(Object.keys(powerModes) as PowerMode[]).map((mode) => <PowerMeter key={mode} mode={mode} />)}
           </div>
         </div>
       </div>
@@ -147,9 +141,6 @@ export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onClose
       {gameFocused && <div className="game-hud__bottom">
         <DirectionControls />
         <div className="game-hud__powers" role="group" aria-label="Active powers. Pickups activate immediately; Space or Jump jumps.">
-          {(Object.keys(powerModes) as PowerMode[]).map((mode) => (
-            <PowerMeter key={mode} mode={mode} />
-          ))}
           <button
             type="button"
             className="studio-button game-hud__fix"

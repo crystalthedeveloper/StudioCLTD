@@ -1,5 +1,5 @@
 import { useScreenVisibility } from "../useScreenVisibility";
-import { assetForDevice } from "../mobileAssets";
+import { screenAssetForDevice } from "../screenAssets";
 import { NearbyAsset } from "../NearbyAsset";
 import { LocalLightSpill } from "./LocalLightSpill";
 import { playGameMedia, registerGameMedia, stopGameMedia } from "../../audio/gameMedia";
@@ -115,30 +115,22 @@ const valueDisplayOptions = [
   { id: "speed", label: "Speed", imagePath: "/images/optimized/values/value-speed.webp", position: [1.8, 0.18, selectorRowZ] as [number, number, number] },
 ];
 const offerOptions = [
-  {
-    id: "quick-fix",
-    imagePath: "/images/optimized/offers/quick-fix.webp",
-    name: "Quick Fix",
-    position: [-5.4, 0.18, selectorRowZ] as [number, number, number],
-  },
-  {
-    id: "urgent-fix",
-    imagePath: "/images/optimized/offers/urgent-fix.webp",
-    name: "Urgent Fix",
-    position: [-1.8, 0.18, selectorRowZ] as [number, number, number],
-  },
-  {
-    id: "performance",
-    imagePath: "/images/optimized/offers/performance.webp",
-    name: "Performance",
-    position: [1.8, 0.18, selectorRowZ] as [number, number, number],
-  },
-  {
-    id: "site-improvement",
-    imagePath: "/images/optimized/offers/site-improvement.webp",
-    name: "Site Improvement",
-    position: [5.4, 0.18, selectorRowZ] as [number, number, number],
-  },
+  { id: "1hour", imagePath: "/images/optimized/offers/1hour.webp", name: "1-Hour Block",
+    position: [-8, 0.18, -7.2] as [number, number, number] },
+  { id: "2-5hour", imagePath: "/images/optimized/offers/2-5hour.webp", name: "2.5-Hour Block",
+    position: [-8, 0.18, -2.4] as [number, number, number] },
+  { id: "5hour", imagePath: "/images/optimized/offers/5hour.webp", name: "5-Hour Block",
+    position: [-8, 0.18, 2.4] as [number, number, number] },
+  { id: "audit", imagePath: "/images/optimized/offers/audit.webp", name: "Diagnostic Audit",
+    position: [-8, 0.18, 7.2] as [number, number, number] },
+  { id: "business-sprint", imagePath: "/images/optimized/offers/business-sprint.webp", name: "Business Sprint",
+    position: [8, 0.18, -7.2] as [number, number, number] },
+  { id: "custom-engineering-sprint", imagePath: "/images/optimized/offers/custom-engineering-sprint.webp", name: "Custom Engineering Sprint",
+    position: [8, 0.18, -2.4] as [number, number, number] },
+  { id: "ecommerce-sprint", imagePath: "/images/optimized/offers/ecommerce-sprint.webp", name: "Ecommerce Sprint",
+    position: [8, 0.18, 2.4] as [number, number, number] },
+  { id: "enterprise", imagePath: "/images/optimized/offers/enterprise.webp", name: "Enterprise",
+    position: [8, 0.18, 7.2] as [number, number, number] },
 ];
 
 type OfferOption = (typeof offerOptions)[number];
@@ -163,24 +155,28 @@ const requiredScreenImagePaths = Array.from(
   ])
 );
 
-function configureScreenTexture(texture: Texture) {
+function configureScreenTexture(texture: Texture, source: string) {
   texture.colorSpace = SRGBColorSpace;
   texture.generateMipmaps = false;
   texture.minFilter = LinearFilter;
   texture.magFilter = LinearFilter;
-  configureTextureCover(texture, screenContentAspect);
+  if (source.startsWith("/images/optimized/offers/")) {
+    texture.repeat.set(1, 1);
+    texture.offset.set(0, 0);
+  } else configureTextureCover(texture, screenContentAspect);
   texture.needsUpdate = true;
 }
 
-function loadScreenTexture(path: string) {
+function loadScreenTexture(source: string) {
+  const path = screenAssetForDevice(source);
   const cached = lazyTextureCache.get(path);
   if (cached) return Promise.resolve(cached);
 
   const existingPromise = lazyTexturePromises.get(path);
   if (existingPromise) return existingPromise;
 
-  const loadPromise = textureLoader.loadAsync(assetForDevice(path)).then((loadedTexture) => {
-    configureScreenTexture(loadedTexture);
+  const loadPromise = textureLoader.loadAsync(path).then((loadedTexture) => {
+    configureScreenTexture(loadedTexture, source);
     lazyTextureCache.set(path, loadedTexture);
     lazyTexturePromises.delete(path);
     return loadedTexture;
@@ -232,7 +228,8 @@ function configureTextureCover(texture: Texture, targetAspect: number) {
   texture.offset.y = (1 - repeatY) / 2;
 }
 
-function useLazyScreenTexture(path: string | null, enabled: boolean, delayMs = 0) {
+function useLazyScreenTexture(source: string | null, enabled: boolean, delayMs = 0) {
+  const path = source ? screenAssetForDevice(source) : null;
   const [texture, setTexture] = useState<Texture | null>(() => (path ? lazyTextureCache.get(path) ?? null : null));
   const cachedTexture = path && enabled ? lazyTextureCache.get(path) ?? null : null;
 
@@ -253,7 +250,7 @@ function useLazyScreenTexture(path: string | null, enabled: boolean, delayMs = 0
     lazyTextureRequestIndex += 1;
 
     const timeout = window.setTimeout(() => {
-      loadScreenTexture(path).then((loadedTexture) => {
+      loadScreenTexture(source!).then((loadedTexture) => {
         if (cancelled) return;
 
         setTexture(loadedTexture);
@@ -264,7 +261,7 @@ function useLazyScreenTexture(path: string | null, enabled: boolean, delayMs = 0
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [delayMs, enabled, path]);
+  }, [delayMs, enabled, path, source]);
 
   return enabled ? cachedTexture ?? texture : null;
 }
@@ -709,11 +706,36 @@ function ScreenPlaybackControl({ children }: { children: ReactNode }) {
   );
 }
 
+/** Contain the complete offer artwork; never crop or stretch it to the TV frame. */
+function offerImageScale(texture: Texture | null): [number, number, number] {
+  const image = texture?.image as { width: number; height: number } | undefined;
+  if (!image?.width || !image.height) return [1, 1, 1];
+  const aspect = image.width / image.height;
+  return aspect > screenContentAspect ? [1, screenContentAspect / aspect, 1] : [aspect / screenContentAspect, 1, 1];
+}
+
+const offerPreviewFrame = new BoxGeometry(3.9, 2.08, 0.12);
+function OfferPreviewScreen({ offer, active }: { offer: OfferOption; active: boolean }) {
+  const texture = useLazyScreenTexture(offer.imagePath, true);
+  const fit = offerImageScale(texture);
+  const leftSide = offer.position[0] < 0;
+  return <group name={`OfferScreen:${offer.id}`} position={[leftSide ? -1.5 : 1.5, 2.35, 0]}
+    rotation-y={leftSide ? Math.PI / 2 : -Math.PI / 2}>
+    <mesh geometry={offerPreviewFrame} dispose={null}>
+      <meshBasicMaterial color={active ? "#c7ced3" : "#111827"} />
+    </mesh>
+    <mesh geometry={screenContentGeometry} position={[0, 0, 0.07]}
+      scale={[fit[0] * 3.7 / screenContentSize[0], fit[1] * 3.7 / screenContentSize[0], 1]} dispose={null}>
+      <meshBasicMaterial key={texture ? "loaded" : "empty"} color={texture ? "#ffffff" : screenIdleColor} map={texture} toneMapped={false} />
+    </mesh>
+  </group>;
+}
+
 function OffersScreenContent({ selectedOffer }: { selectedOffer: OfferOption | null }) {
   const texture = useLazyScreenTexture(selectedOffer?.imagePath ?? null, Boolean(selectedOffer));
 
   return (
-    <mesh key={selectedOffer?.id ?? "offers-empty-screen"} geometry={screenContentGeometry} position={[0, -0.03, screenContentZ]} dispose={null}>
+    <mesh key={selectedOffer?.id ?? "offers-empty-screen"} geometry={screenContentGeometry} position={[0, -0.03, screenContentZ]} scale={offerImageScale(texture)} dispose={null}>
       {texture ? (
         <meshBasicMaterial
           key={`offer-image-${selectedOffer?.id}`}
@@ -1281,6 +1303,7 @@ function OfferPortalPad({
 
   return (
     <group name={`OfferPortal:${offer.id}`} position={offer.position}>
+      <OfferPreviewScreen offer={offer} active={active} />
       <CylinderCollider
         sensor
         args={[0.28, portalTriggerRadius]}
@@ -1297,7 +1320,7 @@ function OfferPortalPad({
       </mesh>
       {!playerInside && <BillboardLabel
         color={padVisualStyle.labelColor}
-        fontSize={offer.id === "site-improvement" ? 0.22 : 0.28}
+        fontSize={offer.name.length > 18 ? 0.2 : 0.24}
         position={[0, triggerPopupLayout.labelHeight, 0]}
         maxWidth={2.8}
       >

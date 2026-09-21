@@ -5,7 +5,7 @@ import ts from 'typescript';
 function load(path, deps = {}) {
   const exports = {};
   const code = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
-  vm.runInNewContext(code, { exports, require: id => deps[id] });
+  vm.runInNewContext(code, { exports, require: id => id === './effectColors' ? load('src/player/effectColors.ts') : deps[id] });
   return exports;
 }
 let now = 0, focused = true, grounded = true, launches = 0, hits = 0;

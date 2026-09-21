@@ -48,3 +48,78 @@ For a reproducible runtime comparison, serve separate baseline and changed produ
 ## Regenerating mobile assets
 
 Run `python3 scripts/build-mobile-assets.py` on macOS with `cwebp` and `sips` available, followed by the build and tests above. Originals remain untouched. The script writes the mobile files and `src/world/mobile-assets.json`. No asset generation tools become browser dependencies.
+
+## Current screen images and smoke (September 2026)
+
+TV artwork is selected once in `src/world/systems/HubSections.tsx`. Both device sizes
+are generated from those current sources by `npm run assets:screens` (also run
+before `npm run dev` and `npm run build`). The generator uses Sharp to preserve
+aspect ratio and output WebP with a 768 px mobile / 1536 px desktop maximum edge,
+without upscaling. Generated images live in the ignored `public/images/screens/`
+directory; their URL/dimension manifest is `src/world/screen-assets.json`.
+Development source-image edits regenerate the manifest automatically.
+
+Each URL hashes both its current source and encoded output. Updating one source
+changes both device URLs; unchanged sources keep their URLs. Vercel serves these
+hashed files with one-year immutable caching and revalidates the HTML entrypoint.
+No service worker is registered by this app. Old `images/mobile` screen derivatives
+and their mappings have been removed; the generic mobile-asset builder excludes
+screen folders. Screen textures are cached by resolved, versioned URL, and mobile
+retains its existing on-demand loading. Current total encoded screen payload is
+567,426 bytes for mobile versus 1,746,554 bytes for desktop (about 68% smaller).
+
+Smoke uses one instanced draw per cloud: 12 wisps and a shared 64×64 density texture
+on mobile, 24 wisps and a shared 128×128 texture on desktop. Both use the same
+spatial envelope. Feathered, irregular density lobes, gentle texture advection,
+size variation and scalar light/shadow variation retain distinct active hues.
+There are no smoke dynamic lights or fullscreen bloom passes. Mobile ground glow
+is half desktop strength. The existing motion trail, effect timers and SVG logo
+are retained.
+
+Validation:
+- `node scripts/test-screen-assets.mjs` checks current sources, dimensions, WebP,
+  hashes, stable builds, and invalidation of both derivatives after a source edit.
+- `node scripts/test-player-smoke.mjs` checks all 8 Power combinations and motion.
+- `node scripts/test-power-smoke.mjs` checks device particle/texture budgets.
+- `scripts/check-mobile-smoke-browser.mjs` uses Playwright (provide
+  `PLAYWRIGHT_MODULE_PATH` if installed externally) and a running Vite dev server
+  (`GAME_TEST_URL`, default port 5180). It checks all 21 images before and after
+  normal refresh, decoded sizes, legacy requests, smoke palettes and shader errors
+  in mobile emulation and desktop. Screenshots/report default to
+  `/private/tmp/studiocltd-smoke-qa`; override `SMOKE_QA_OUTPUT` as needed.
+
+The broader `test-mobile-assets.mjs` currently reports a pre-existing animation
+mismatch between the character GLB variants. Neither character asset was modified
+by this screen/smoke pass. Browser emulation validates rendering and requests,
+not real-device frame rate or a deployed site's headers.
+
+
+### Final HUD, offer gallery and ground trail
+
+`src/player/effectColors.ts` is the only palette definition: Wind green `#009B3A`,
+Shock gold `#FED100`, and Fire red `#CE1126`. HUD dots,
+bars, smoke, pickup lighting and hit effects consume those shared values. The
+Player still displays each active hue in separate wisps and drops expired hues.
+The top-right hub is one vertical stack: Wind, Shock, Fire. Existing arrow
+and Jump controls remain at the bottom; Health, Progress and Cash are unchanged.
+
+The ground trail tracks an invisible visual anchor at the original sphere centre.
+It uses pooled instanced snow/dust puffs and brief ground marks (12 each on mobile,
+24 each on desktop), emits only during grounded movement, fades after stopping,
+and clears on transport or pause. It never writes to the Rapier body.
+
+Offers now has eight pads and individual preview screens along the two sides of
+the platform. Each uses its matching supplied WebP; `2-5hour.webp` is labelled
+"2.5-Hour Block" to match the artwork. The main Offers TV retains its selected-offer
+display, and the existing countdown/cancellation and offer-page link are retained.
+Offer artwork uses full UVs and an aspect-preserving contain scale on both the
+previews and main TV. The shared trigger label height is 0.58 units (secondary
+countdown labels 0.94 units), above the pads and below their previous positions.
+
+
+Each active Power grants the existing 18.4-unit movement speed (normal: 13.2).
+The boost is derived directly from the union of active Power timers, does not
+multiply with overlapping Powers, and ends only when all Powers expire. There is
+no separate boost pickup, HUD, timer store, colour or sound. Remaining collectible
+positions and respawn timings are unchanged. `test-power-movement.mjs` exercises
+the real controller with each Power, overlaps, expiry, refill, pause and reset.

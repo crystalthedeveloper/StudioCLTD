@@ -55,26 +55,28 @@ export function GameGuide({ onClose }: { onClose: () => void }) {
             </button></h3>
             <div id={`guide-section-${index}`} role="region" aria-labelledby={`guide-toggle-${index}`} hidden={open !== section} className="game-guide__body">
               {index === 0 && <ul className="game-guide__steps">
-                <li>Explore the world and collect powers.</li>
-                <li>Collect coloured smoke to activate powers, then touch a villain to defeat them.</li>
+                <li>Explore the world and collect Wind, Shock, and Fire smoke.</li>
+                <li>Each Power activates immediately, makes you move faster, and lets you defeat villains on contact.</li>
                 <li>Defeat all 8 villains to complete the game.</li>
                 <li>Collect $ symbols to increase your cash.</li>
                 <li>Collect hearts to restore health.</li>
               </ul>}
               {index === 1 && <dl className="game-guide__controls">
-                <div><dt>WASD / Arrow Keys</dt><dd>Move</dd></div>
-                <div><dt>On-screen arrows</dt><dd>Move</dd></div>
-                <div><dt>Spacebar / Jump</dt><dd>Jump from the ground; steer while airborne</dd></div>
+                <div><dt>WASD / Arrow Keys</dt><dd>Move; any active Power automatically makes you faster</dd></div>
+                <div><dt>On-screen arrows</dt><dd>Use the same movement controls on touch screens</dd></div>
+                <div><dt>Spacebar / Jump</dt><dd>With any Power active, jump from the ground; steer while airborne</dd></div>
                 <div><dt>ESC</dt><dd>Pause</dd></div>
               </dl>}
               {index === 2 && <>
                 <ul className="game-guide__icon-grid">
-                  <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.standard.color }} aria-hidden="true" />}><strong>Wind</strong>6 seconds</Item>
-                  <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.rapid.color }} aria-hidden="true" />}><strong>Shock</strong>10 seconds and increased speed</Item>
-                  <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.power.color }} aria-hidden="true" />}><strong>Fire</strong>15 seconds and strongest contact impact</Item>
+                  <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.standard.color }} aria-hidden="true" />}><strong>Wind</strong>Green smoke — 6 seconds of Power and faster movement</Item>
+                  <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.rapid.color }} aria-hidden="true" />}><strong>Shock</strong>Gold smoke — 10 seconds of Power and faster movement</Item>
+                  <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.power.color }} aria-hidden="true" />}><strong>Fire</strong>Red smoke — 15 seconds of Power, faster movement, and the strongest contact impact</Item>
                 </ul>
                 <ul className="game-guide__notes">
-                  <li>All three powers can run together with independent timers.</li>
+                  <li>All three Powers grant powered jumps and contact attacks. Their timers are stacked at the top right.</li>
+                  <li>Powers can run together with independent timers and separate coloured smoke wisps.</li>
+                  <li>Faster movement does not stack: it continues until the last active Power expires, then normal movement returns.</li>
                   <li>Collecting smoke activates that power immediately.</li>
                   <li>Collecting the same power restarts only its timer.</li>
                 </ul>
@@ -82,7 +84,9 @@ export function GameGuide({ onClose }: { onClose: () => void }) {
               {index === 3 && <ul className="game-guide__icon-grid">
                 <Item image={icon("/images/pickups/dollar.svg")}><strong>Green $</strong>Cash</Item>
                 <Item image={icon("/images/pickups/heart.svg")}><strong>Red heart</strong>Health</Item>
-                <Item image={logo("#facc15")}><strong>Yellow Logo</strong>Speed Boost</Item>
+                <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.standard.color }} aria-hidden="true" />}><strong>Green smoke</strong>Wind Power + faster movement</Item>
+                <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.rapid.color }} aria-hidden="true" />}><strong>Gold smoke</strong>Shock Power + faster movement</Item>
+                <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.power.color }} aria-hidden="true" />}><strong>Red smoke</strong>Fire Power + faster movement</Item>
                 <Item image={logo("#991b1b")}><strong>Red symbol</strong>Penalty</Item>
                 <Item image={logo("#a855f7")}><strong>Purple symbol</strong>Share</Item>
                 <Item image={logo("#dedede")}><strong>White logo</strong>Decorative</Item>

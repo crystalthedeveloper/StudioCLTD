@@ -7,7 +7,6 @@ import { Environment } from "@react-three/drei";
 import { useEffect, useRef, useState } from "react";
 import { WinterScenery } from "./systems/WinterScenery";
 import { CharacterController } from "../player/CharacterController";
-import { resetSpeedBoost } from "../player/speedBoost";
 import { DialogueMessage } from "../ui/DialogueBubble";
 import { CombatPrototype } from "./systems/CombatPrototype";
 import { HubSections } from "./systems/HubSections";
@@ -59,7 +58,6 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
     setServiceResolutions({});
     setPlayerDialogue(null);
     setTransportDestination(null);
-    resetSpeedBoost();
   }, [restartKey]);
 
 

@@ -11,6 +11,9 @@ import { createPowerSmoke } from "../../player/powerSmoke";
 import { gameNow, gameTimers } from "../../player/gameFocus";
 import { useGameFrame } from "../../player/useGameFrame";
 
+import { isCompactVisualBudget } from "../visualQuality";
+import { PickupSmokeGlow } from "./PickupSmokeGlow";
+
 const locations: [number, number, number][] = [
   ...routePowerPositions,
   ...hubSections.map(({ position: [x, y, z], entrance: [dx, dz] }): [number, number, number] =>
@@ -27,7 +30,7 @@ export function FixPowerPickups() {
   )}</group>;
 }
 function SmokePickup({ x, z, surface, mode }: { x: number; z: number; surface: PickupSurface; mode: PowerMode }) {
-  const smoke = useMemo(() => createPowerSmoke(powerModes[mode].color, true, 0.26), [mode]);
+  const smoke = useMemo(() => createPowerSmoke(powerModes[mode].color, isCompactVisualBudget(), 0.52), [mode]);
   const collider = useRef<RapierCollider>(null);
   const available = useRef(true);
   const [visible, setVisible] = useState(true);
@@ -54,17 +57,18 @@ function SmokePickup({ x, z, surface, mode }: { x: number; z: number; surface: P
   const leave = ({ other }: IntersectionExitPayload) => { overlaps.current.delete(other.collider.handle); };
   useGameFrame(() => {
     smoke.material.uniforms.uTime.value = gameNow() / 1000;
-    smoke.material.uniforms.uStrength.value = 0.8;
+    smoke.material.uniforms.uStrength.value = 1;
     // Handles an overlap that began while paused without using distance tests.
     collect();
   });
   useEffect(() => {
-    smoke.material.uniforms.uStrength.value = 0.8;
+    smoke.material.uniforms.uStrength.value = 1;
     return () => { gameTimers.clearTimeout(timer.current); smoke.geometry.dispose(); smoke.material.dispose(); };
   }, [smoke]);
   return <RigidBody type="fixed" colliders={false} position={[x, surface.y + pickupSurfaceGap, z]}>
     <BallCollider ref={collider} sensor args={[pickupRadius]} position={[0, pickupRadius, 0]}
       onIntersectionEnter={enter} onIntersectionExit={leave} />
+    <PickupSmokeGlow visible={visible} color={powerModes[mode].color} surface={surface} />
     <mesh name={`PowerSmoke:${mode}`} visible={visible} geometry={smoke.geometry} material={smoke.material}
       frustumCulled={false} dispose={null} />
   </RigidBody>;

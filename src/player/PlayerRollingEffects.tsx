@@ -21,7 +21,8 @@ function softMaterial(color: string, instanced: boolean) {
     fragmentShader: `uniform vec3 tint; varying vec2 vUv; varying float vOpacity;
       void main() {
         float r = length(vUv * 2.0 - 1.0);
-        float alpha = (1.0 - smoothstep(0.05, 1.0, r)) * vOpacity;
+        float grain = 0.72 + 0.28 * sin(vUv.x * 19.0 + sin(vUv.y * 13.0)) * sin(vUv.y * 17.0);
+        float alpha = (1.0 - smoothstep(0.05, 1.0, r)) * vOpacity * grain;
         if (alpha < 0.002) discard;
         gl_FragColor = vec4(tint, alpha);
         #include <colorspace_fragment>
@@ -40,15 +41,16 @@ function makePool(count: number, color: string) {
 }
 
 /** World-space visuals only: never changes the body, collider, or movement. */
-export function PlayerRollingEffects({ sphere }: { sphere: RefObject<Mesh> }) {
+export function PlayerRollingEffects({ sphere }: { sphere: RefObject<Object3D> }) {
   const scene = useThree(state => state.scene);
   const { world, rapier } = useRapier();
   const shadow = useRef<Mesh>(null);
   const puffs = useRef<InstancedMesh>(null);
   const trail = useRef<InstancedMesh>(null);
+  const compact = useMemo(isCompactVisualBudget, []);
   const resources = useMemo(() => ({
-    puffs: makePool(isCompactVisualBudget() ? 24 : 40, WINTER_THEME_ENABLED ? "#edf4fa" : "#bca98f"),
-    trail: makePool(32, WINTER_THEME_ENABLED ? "#657480" : "#51463b"),
+    puffs: makePool(compact ? 12 : 24, WINTER_THEME_ENABLED ? "#edf4fa" : "#bca98f"),
+    trail: makePool(compact ? 12 : 24, WINTER_THEME_ENABLED ? "#657480" : "#51463b"),
     shadowGeometry: new PlaneGeometry(1, 1), shadowMaterial: softMaterial("#121722", false),
   }), []);
   const motion = useMemo(() => ({
@@ -124,11 +126,12 @@ export function PlayerRollingEffects({ sphere }: { sphere: RefObject<Mesh> }) {
         motion.direction.dot(motion.previousDirection)))) / Math.max(delta, 0.001);
     }
     const boost = Math.min(1, acceleration / 25) * 0.35 + Math.min(1, turn / 3) * 0.35 + (landed ? 0.5 : 0);
-    if (!moving || distance < 0) clear();
-    else if (grounded) {
+    if (distance < 0) clear();
+    if (!moving) motion.spacing = 0;
+    if (distance >= 0 && moving && grounded) {
       motion.spacing += distance;
-      const interval = 0.12 / (1 + boost);
-      const count = Math.min(5, Math.floor(motion.spacing / interval) + (landed ? 2 : 0));
+      const interval = (compact ? 0.15 : 0.1) / (1 + boost + Math.min(speed / 12, 0.5));
+      const count = Math.min(compact ? 3 : 5, Math.floor(motion.spacing / interval) + (landed ? 2 : 0));
       motion.spacing %= interval;
       for (let i = 0; i < count; i++) {
         const behind = radius * 0.65 + i * Math.min(distance / Math.max(1, count), 0.1);
@@ -148,7 +151,7 @@ export function PlayerRollingEffects({ sphere }: { sphere: RefObject<Mesh> }) {
       if (!mesh) continue;
       pool.items.forEach((item, index) => {
         item.age += Math.min(delta, 0.05);
-        const alive = item.life > 0 && item.age < item.life && moving;
+        const alive = item.life > 0 && item.age < item.life;
         const progress = alive ? item.age / item.life : 1;
         motion.transform.position.copy(item.position);
         if (isPuff && alive) {
@@ -169,7 +172,7 @@ export function PlayerRollingEffects({ sphere }: { sphere: RefObject<Mesh> }) {
 
   return createPortal(<group name="Player rolling effects">
     <mesh ref={shadow} geometry={resources.shadowGeometry} material={resources.shadowMaterial} visible={false} renderOrder={1} dispose={null} />
-    <instancedMesh ref={trail} args={[resources.trail.geometry, resources.trail.material, resources.trail.items.length]} frustumCulled={false} renderOrder={2} dispose={null} />
-    <instancedMesh ref={puffs} args={[resources.puffs.geometry, resources.puffs.material, resources.puffs.items.length]} frustumCulled={false} renderOrder={3} dispose={null} />
+    <instancedMesh name="Player ground marks" ref={trail} args={[resources.trail.geometry, resources.trail.material, resources.trail.items.length]} frustumCulled={false} renderOrder={2} dispose={null} />
+    <instancedMesh name="Player ground puffs" ref={puffs} args={[resources.puffs.geometry, resources.puffs.material, resources.puffs.items.length]} frustumCulled={false} renderOrder={3} dispose={null} />
   </group>, scene);
 }

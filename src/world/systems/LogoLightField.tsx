@@ -1,3 +1,4 @@
+import { triggerPopupLayout } from "../triggerPopupLayout";
 import { GroundedPickupVisual, usePickupSurfaces, type PickupSurface } from "../pickupSurface";
 import { routePickupPositions, groundSize, groundCenter } from "../worldLayout";
 import { isCompactVisualBudget } from "../visualQuality";
@@ -16,7 +17,6 @@ import {
 } from "@react-three/rapier";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Color, DoubleSide, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PlaneGeometry, PointLight, SRGBColorSpace, Vector3 } from "three";
-import { activateSpeedBoost, speedBoostColor } from "../../player/speedBoost";
 import { playCollectibleSound } from "../../audio/collectibleSounds";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { destinationPlatformRadius, hubSections, sectionRampApproachLength, sectionRampWidth } from "../hubSections";
@@ -28,7 +28,7 @@ const logoScale = 1.8;
 const floorLogoY = 0.04;
 const worldLogoRotation = -0.35;
 const pickupColliderRadius = 1.55;
-const speedRespawnMs = 28000;
+const collectibleRespawnMs = 28000;
 const healthGroupRespawnMs = 36000;
 const contactCountdownMs = 3000;
 const contactCooldownMs = 1200;
@@ -40,7 +40,7 @@ const collectibleSpacing = 5;
 const placementSearchStep = 1.25;
 const placementSearchDirections = 32;
 
-type LogoKind = "coin" | "speed" | "penalty" | "contact" | "share" | "light" | "dark";
+type LogoKind = "coin" | "penalty" | "contact" | "share" | "light" | "dark";
 
 type PlazaLogo = {
   height?: number;
@@ -68,9 +68,6 @@ const plazaLogos: PlazaLogo[] = [
   { id: "coin-6", kind: "coin", position: [-9, -38] },
   { id: "coin-7", kind: "coin", position: [31, 42] },
   { id: "coin-8", kind: "coin", position: [-49, 37] },
-  { id: "speed-1", kind: "speed", position: [0, -18] },
-  { id: "speed-2", kind: "speed", position: [-24, 10] },
-  { id: "speed-3", kind: "speed", position: [24, 22] },
   { id: "penalty-1", kind: "penalty", position: [42, -15] },
   { id: "penalty-2", kind: "penalty", position: [-39, -20] },
   { id: "penalty-3", kind: "penalty", position: [48, 4] },
@@ -89,8 +86,6 @@ const plazaLogos: PlazaLogo[] = [
   { id: "coin-center-5", kind: "coin", position: [-21, 5], rotationOffset: 0.06, scaleMultiplier: 1.06 },
   { id: "coin-center-6", kind: "coin", position: [7, -25], rotationOffset: -0.17, scaleMultiplier: 0.97 },
   { id: "coin-center-7", kind: "coin", position: [23, 13], rotationOffset: 0.13, scaleMultiplier: 1.1 },
-  { id: "speed-center-1", kind: "speed", position: [-15, 25], rotationOffset: -0.11, scaleMultiplier: 1.05 },
-  { id: "speed-center-2", kind: "speed", position: [26, -10], rotationOffset: 0.09, scaleMultiplier: 0.93 },
   { id: "penalty-center-1", kind: "penalty", position: [-25, -8], rotationOffset: -0.15, scaleMultiplier: 1.04 },
 ];
 
@@ -174,7 +169,6 @@ const accessiblePlazaLogos = resolveLogoPlacements(plazaLogos.map(logo => ({ ...
 
 const logoColors: Record<LogoKind, string> = {
   coin: "#3f7d3a",
-  speed: speedBoostColor,
   penalty: "#991b1b",
   contact: "#2583e8",
   share: "#a855f7",
@@ -187,7 +181,7 @@ function createSharedMaterial(kind: LogoKind) {
   return new MeshStandardMaterial({
     color,
     emissive: color,
-    emissiveIntensity: kind === "light" ? 0.12 : kind === "coin" ? 0.55 : kind === "contact" || kind === "share" ? 0.65 : kind === "dark" ? 0.08 : kind === "speed" ? 0.7 : 0.55,
+    emissiveIntensity: kind === "light" ? 0.12 : kind === "coin" ? 0.55 : kind === "contact" || kind === "share" ? 0.65 : kind === "dark" ? 0.08 : 0.55,
     metalness: 0.04,
     roughness: 0.72,
     toneMapped: false,
@@ -240,7 +234,6 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
   const [healthRespawnGeneration, setHealthRespawnGeneration] = useState(0);
   const materials = useMemo(
     () => ({
-      speed: createSharedMaterial("speed"),
       penalty: createSharedMaterial("penalty"),
       contact: createSharedMaterial("contact"),
       share: createSharedMaterial("share"),
@@ -251,7 +244,6 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
   const templates = useMemo(
     () => ({
       coin: pickupVisuals[0].template,
-      speed: createLogoTemplate(scene, materials.speed),
       penalty: createLogoTemplate(scene, materials.penalty),
       contact: createLogoTemplate(scene, materials.contact),
       share: createLogoTemplate(scene, materials.share),
@@ -431,7 +423,7 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, surface, onCoinColle
         availableRef.current = true;
         logo.object.visible = true;
         setAvailable(true);
-      }, speedRespawnMs);
+      }, collectibleRespawnMs);
     },
     [logo.object],
   );
@@ -456,14 +448,6 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, surface, onCoinColle
         collectAndRespawn(() => {
           playCollectibleSound("penalty");
           onReset();
-        });
-        return;
-      }
-
-      if (logo.kind === "speed") {
-        collectAndRespawn(() => {
-          playCollectibleSound("speed");
-          activateSpeedBoost();
         });
         return;
       }
@@ -542,12 +526,12 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, surface, onCoinColle
       />
       <GroundedPickupVisual surface={surface}>{visual}</GroundedPickupVisual>
       {(logo.kind === "contact" || logo.kind === "share") && !playerStanding && (
-        <BillboardLabel color={logoColors[logo.kind]} fontSize={0.25} position={[0, 1.75, 0]} maxWidth={4}>
+        <BillboardLabel color={logoColors[logo.kind]} fontSize={0.25} position={[0, triggerPopupLayout.labelHeight, 0]} maxWidth={4}>
           {logo.kind === "contact" ? "CONTACT" : "SHARE"}
         </BillboardLabel>
       )}
       {contactCountdown > 0 && (
-        <BillboardLabel color="#ffffff" fontSize={0.25} position={[0, 1.75, 0]} maxWidth={4}>
+        <BillboardLabel color="#ffffff" fontSize={0.25} position={[0, triggerPopupLayout.labelHeight, 0]} maxWidth={4}>
           {`Opening ${logo.kind === "share" ? "Share" : "Contact"} in ${contactCountdown}…`}
         </BillboardLabel>
       )}

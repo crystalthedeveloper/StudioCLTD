@@ -1,6 +1,6 @@
 import {
   Color, DataTexture, InstancedBufferAttribute, InstancedBufferGeometry,
-  LinearFilter, NormalBlending, PlaneGeometry, ShaderMaterial,
+  LinearFilter, NormalBlending, PlaneGeometry, ShaderMaterial, Vector3,
 } from "three";
 
 // Bake the cloud density once; the fragment shader needs only one texture sample.
@@ -17,24 +17,39 @@ function noise(x: number, y: number) {
   return lower * (1 - sy) + upper * sy;
 }
 
-const resolution = 128;
-const pixels = new Uint8Array(resolution * resolution * 4);
-for (let y = 0; y < resolution; y++) for (let x = 0; x < resolution; x++) {
-  const u = x / (resolution - 1), v = y / (resolution - 1);
-  const density = noise(u * 4 + 8, v * 4 + 3) * 0.55
-    + noise(u * 9 + 2, v * 9 + 7) * 0.3 + noise(u * 19, v * 19) * 0.15;
-  const radius = Math.hypot((u - 0.5) * 2, (v - 0.5) * 2);
-  const edge = Math.max(0, 1 - radius * radius);
-  const alpha = Math.pow(edge, 1.5) * Math.max(0, density - 0.22) * 1.6;
-  pixels.set([255, 255, 255, Math.round(Math.min(1, alpha) * 255)], (y * resolution + x) * 4);
+// Shared per quality tier, allocated only when that tier is used.
+const smokeTextures = new Map<number, DataTexture>();
+function getSmokeTexture(compact: boolean) {
+  const resolution = compact ? 64 : 128;
+  const cached = smokeTextures.get(resolution);
+  if (cached) return cached;
+  const pixels = new Uint8Array(resolution * resolution * 4);
+  for (let y = 0; y < resolution; y++) for (let x = 0; x < resolution; x++) {
+    const u = x / (resolution - 1), v = y / (resolution - 1);
+    const nx = (u - 0.5) * 2, ny = (v - 0.5) * 2;
+    const broad = noise(u * 4 + 8, v * 4 + 3);
+    const detail = noise(u * 10 + 2, v * 10 + 7);
+    const fine = noise(u * 23, v * 23);
+    const density = broad * 0.55 + detail * 0.3 + fine * 0.15;
+    const angle = Math.atan2(ny, nx);
+    const boundary = 0.76 + Math.sin(angle * 3 + 0.4) * 0.10 + Math.sin(angle * 5) * 0.06;
+    const radius = Math.hypot(nx, ny) / boundary;
+    const edge = Math.max(0, 1 - radius * radius);
+    // Broken lobes and holes survive layering instead of filling a circular disk.
+    const alpha = Math.pow(edge, 1.7) * Math.pow(Math.max(0, density - 0.24) * 1.65, 1.15);
+    const light = Math.round((0.25 + broad * 0.5 + detail * 0.25) * 255);
+    pixels.set([light, light, light, Math.round(Math.min(1, alpha) * 255)], (y * resolution + x) * 4);
+  }
+  const texture = new DataTexture(pixels, resolution, resolution);
+  texture.minFilter = texture.magFilter = LinearFilter;
+  texture.needsUpdate = true;
+  smokeTextures.set(resolution, texture);
+  return texture;
 }
-const smokeTexture = new DataTexture(pixels, resolution, resolution);
-smokeTexture.minFilter = smokeTexture.magFilter = LinearFilter;
-smokeTexture.needsUpdate = true;
 
-/** One instanced draw, with fewer overlapping wisps on mobile. No lights or postprocessing. */
-export function createPowerSmoke(color: string, compact: boolean, size = 1) {
-  const count = compact ? 10 : 18;
+/** One instanced draw: soft, single-colour wisps with a slow rise and curl. */
+export function createPowerSmoke(color: string, compact: boolean, size = 1, orb = false) {
+  const count = compact ? 12 : 24;
   const plane = new PlaneGeometry(1, 1);
   const geometry = new InstancedBufferGeometry();
   geometry.index = plane.index;
@@ -49,48 +64,75 @@ export function createPowerSmoke(color: string, compact: boolean, size = 1) {
   plane.dispose();
   const material = new ShaderMaterial({
     uniforms: {
-      uSmoke: { value: smokeTexture }, uColor: { value: new Color(color) },
-      uTime: { value: 0 }, uStrength: { value: 0 }, uSize: { value: size },
+      uSmoke: { value: getSmokeTexture(compact) }, uColor: { value: new Color(color) },
+      uOrb: { value: orb ? 1 : 0 },
+      uColors: { value: Array.from({ length: 3 }, () => new Color(color)) },
+      uColorCount: { value: 1 },
+      uDensity: { value: compact ? 1.65 : 1.15 },
+      uTrail: { value: Array.from({ length: 8 }, () => new Vector3()) },
+      uMotion: { value: 0 }, uTime: { value: 0 }, uStrength: { value: 0 }, uSize: { value: size },
     },
     transparent: true, blending: NormalBlending, depthWrite: false,
     depthTest: true, toneMapped: false,
     vertexShader: `
       attribute vec4 aSeed;
-      uniform float uTime;
-      uniform float uSize;
+      uniform float uTime, uSize, uOrb, uMotion, uColorCount;
+      uniform vec3 uTrail[8], uColors[3], uColor;
       varying vec2 vUv;
-      varying float vFade;
+      varying vec3 vColor;
+      varying float vFade, vLife;
       void main() {
-        float life = fract(uTime * (0.29 + aSeed.y * 0.09) + aSeed.x);
-        float sway = uTime * 0.65 + aSeed.z * 19.0;
+        float index = floor(aSeed.x * ${count}.0 + 0.1);
+        float life = fract(uTime * 0.075 + aSeed.x);
+        vLife = life;
+        float curl = uTime * 0.22 + aSeed.z * 6.283;
+        // Each wisp keeps its own hue; no colour averaging or dark shell.
+        int colorIndex = int(mod(index, uColorCount));
+        vColor = uOrb > 0.5 ? uColors[colorIndex] : uColor;
         vec3 center = vec3(
-          (aSeed.y - 0.5) * 0.8 + sin(sway) * 0.12,
-          0.08 + life * 1.95,
-          (aSeed.z - 0.5) * 0.7 + sin(sway * 0.73 + 4.0) * 0.12
+          (aSeed.y - 0.5) * (0.3 + life * 0.6) + sin(curl) * 0.065,
+          0.12 + life * 1.95,
+          (aSeed.z - 0.5) * (0.3 + life * 0.5) + sin(curl * 0.8) * 0.05
         );
-        float size = (0.52 + aSeed.w * 0.18) * (0.75 + life * 0.8);
-        float angle = aSeed.z * 6.28 + sin(sway * 0.4) * 0.28;
-        mat2 rotation = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
-        vec2 corner = rotation * position.xy * vec2(size, size * 1.35);
+        float size = (0.38 + aSeed.w * 0.42) * (0.8 + life * 0.85);
+        vFade = smoothstep(0.0, 0.18, life) * (1.0 - smoothstep(0.68, 1.0, life));
+        if (uOrb > 0.5) {
+          center = vec3((aSeed.y - 0.5) * (0.16 + life * 0.3) + sin(curl) * 0.025,
+            -0.20 + life * 0.48, (aSeed.z - 0.5) * (0.14 + life * 0.28) + sin(curl * 0.8) * 0.02);
+          size = (0.23 + aSeed.w * 0.22) * (0.85 + life * 0.4);
+          // Cover the same trail length at either particle budget.
+          int sampleIndex = int(floor(floor(index / 4.0) * 7.0 / ${count / 4 - 1}.0));
+          center += uTrail[sampleIndex] * life;
+          size *= 1.0 - uMotion * life * 0.2;
+        }
+        // Fixed texture orientation: curling comes from slow drift, never orbiting.
+        float angle = aSeed.w * 6.283;
+        vec2 corner = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * position.xy * vec2(size, size * (0.9 + aSeed.y * 0.4));
         vec4 viewCenter = modelViewMatrix * vec4(center * uSize, 1.0);
+        // Fade before the cloud can enter the camera's near field.
+        vFade *= smoothstep(0.45, 1.0, -viewCenter.z);
         viewCenter.xy += corner * uSize;
         gl_Position = projectionMatrix * viewCenter;
         vUv = uv;
-        vFade = smoothstep(0.0, 0.16, life) * (1.0 - smoothstep(0.55, 1.0, life));
       }
     `,
     fragmentShader: `
       uniform sampler2D uSmoke;
-      uniform vec3 uColor;
-      uniform float uStrength;
+      uniform float uStrength, uDensity;
       varying vec2 vUv;
-      varying float vFade;
+      varying vec3 vColor;
+      varying float vFade, vLife;
       void main() {
-        float density = texture2D(uSmoke, vUv).a;
-        float alpha = density * vFade * uStrength;
+        // Small advection bends the internal cloud without rotating the particle.
+        vec2 flowUv = vUv + vec2(sin(vUv.y * 6.0 + vLife * 2.0), sin(vUv.x * 5.0 - vLife)) * 0.025;
+        vec4 cloud = texture2D(uSmoke, flowUv);
+        float alpha = min(0.58, cloud.a * uDensity) * vFade * uStrength;
         if (alpha < 0.003) discard;
-        // Gentle variation reads as lit smoke, without an opaque luminous shell.
-        gl_FragColor = vec4(uColor * (0.85 + density * 0.55), alpha);
+        // Scalar illumination gives volume while retaining each wisp's own hue.
+        float light = 0.48 + cloud.r * 1.25;
+        vec3 smokeColor = vColor * light;
+        if (dot(vColor, vec3(1.0)) < 0.001) smokeColor = vec3(0.008) * light;
+        gl_FragColor = vec4(smokeColor, alpha);
         #include <colorspace_fragment>
       }
     `,

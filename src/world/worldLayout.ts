@@ -35,8 +35,6 @@ export const routePickupPositions: Record<string, GroundPoint> = {
   'coin-center-1': [-15, 0], 'coin-center-2': [21, -2],
   'coin-center-3': [0, -24], 'coin-center-4': [0, -36],
   'coin-center-5': [-30, 20], 'coin-center-6': [-8, 24], 'coin-center-7': [10, 24],
-  'speed-1': [0, -18], 'speed-2': [-24, -5], 'speed-3': [31, -20],
-  'speed-center-1': [-18, 24], 'speed-center-2': [21, -10],
   'dark-1': [-32, 23], 'dark-2': [27, -42], 'dark-3': [5, -48],
   'penalty-1': [22, 7], 'penalty-2': [-16, -27], 'penalty-3': [22, -32],
   'penalty-center-1': [-14, 16],

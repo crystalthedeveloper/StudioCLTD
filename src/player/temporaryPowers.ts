@@ -1,9 +1,10 @@
+import { effectColors } from "./effectColors";
 import { requestPoweredJump, resetPoweredJump } from "./poweredJump";
 import { gameNow, gameTimers, isGameFocused } from "./gameFocus";
 export const powerModes = {
-  standard: { label: "01", name: "Wind", pickupSize: 0.24, color: "#2F6FAF", impactDuration: 0.24, impactSize: 1 },
-  rapid: { label: "02", name: "Shock", pickupSize: 0.36, color: "#6B3A8E", impactDuration: 0.18, impactSize: 0.65 },
-  power: { label: "03", name: "Fire", pickupSize: 0.5, color: "#B63A3A", impactDuration: 0.34, impactSize: 1.5 },
+  standard: { label: "01", name: "Wind", pickupSize: 0.24, color: effectColors.wind, impactDuration: 0.24, impactSize: 1 },
+  rapid: { label: "02", name: "Shock", pickupSize: 0.36, color: effectColors.shock, impactDuration: 0.18, impactSize: 0.65 },
+  power: { label: "03", name: "Fire", pickupSize: 0.5, color: effectColors.fire, impactDuration: 0.34, impactSize: 1.5 },
 } as const;
 export type PowerMode = keyof typeof powerModes;
 
@@ -23,7 +24,8 @@ export const getActivePowers = () => powerOrder.filter(mode => getPowerRemaining
 // One representative colour for existing hit feedback, never for timer ownership.
 export const getActivePower = () => getActivePowers().slice(-1)[0] ?? null;
 export const isPowerActive = () => getActivePowerMask() !== 0;
-export const hasPowerSpeedBoost = () => getPowerRemainingMs("rapid") > 0;
+/** Any active Power grants the same boost; overlapping Powers never multiply it. */
+export const hasPowerSpeedBoost = () => isPowerActive();
 export const getPowerStatus = (mode: PowerMode) => getPowerRemainingMs(mode) > 0 ? "ACTIVE" : "EMPTY";
 export function collectFixPower(mode: PowerMode) {
   if (!isGameFocused()) return false;

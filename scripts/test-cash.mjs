@@ -17,7 +17,6 @@ const { GameHud } = load('src/ui/GameHud.tsx', {
   'react/jsx-runtime': { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) },
   '../player/gameFocus': { useGameFocus: () => false },
   '../player/temporaryPowers': { powerModes: {}, getFixCharges: () => ({}), getSelectedPower: () => null, getActivePower: () => null, isPowerActive: () => false },
-  '../player/speedBoost': { useSpeedBoostRemainingMs: () => 0, speedBoostDurationMs: 10000 },
   '../audio/gameAudio': { useGameAudioEnabled: () => true },
   '../audio/villainAudio': { getActiveVillainVoiceId: () => null },
 });

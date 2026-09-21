@@ -13,6 +13,8 @@ def encode(source, target, limit):
 for source in sorted((PUBLIC / 'images/optimized').rglob('*')):
     if source.suffix.lower() not in ('.webp', '.jpg', '.png'): continue
     relative = source.relative_to(PUBLIC / 'images/optimized').with_suffix('.webp')
+    # Screen derivatives come only from build-screen-assets.mjs (current sources + hashes).
+    if relative.parts[0] in ('offers', 'performance', 'quickFix', 'siteImprovement', 'tips', 'urgentFix', 'values'): continue
     target = PUBLIC / 'images/mobile' / relative
     target.parent.mkdir(parents=True, exist_ok=True)
     encode(source, target, 512 if relative.parts[0] == 'floor' else 1024)

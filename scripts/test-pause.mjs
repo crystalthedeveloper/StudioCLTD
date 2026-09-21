@@ -25,7 +25,7 @@ function advance(ms) {
 function load(path, deps = {}) {
   const exports = {};
   const code = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
-  vm.runInNewContext(code, { exports, require: (id) => deps[id] ?? {}, window: host, performance: { now: () => wall } });
+  vm.runInNewContext(code, { exports, require: (id) => id === './effectColors' ? load('src/player/effectColors.ts') : deps[id] ?? {}, window: host, performance: { now: () => wall } });
   return exports;
 }
 const focus = load('src/player/gameFocus.ts');

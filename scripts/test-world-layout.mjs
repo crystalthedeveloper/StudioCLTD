@@ -77,7 +77,7 @@ const logos=load('src/world/systems/LogoLightField.tsx', {
   './TransportPads':{transportPadPositions:[[-3,-8],[0,-4],[3,-8],[-3,0],[3,0],[0,4],[-3,8],[3,8]],homeBaseTransportPadPosition:[12,0]},
   '../visualQuality':{isCompactVisualBudget:()=>true},
 }, '\nexport { accessiblePlazaLogos };');
-assert.equal(logos.accessiblePlazaLogos.length,32);
+assert.equal(logos.accessiblePlazaLogos.length,27);
 assert.equal(logos.accessiblePlazaLogos.filter(p=>p.kind==='coin').length,15);
 assert.equal(logos.accessiblePlazaLogos.filter(p=>p.kind==='dark').length,3);
 for (const [x,y,z] of layout.routePowerPositions) assert(Math.abs(groundHeight(x,z)-y)<.02, 'route powers accessible at ground height');

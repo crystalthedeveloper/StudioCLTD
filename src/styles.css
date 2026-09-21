@@ -666,25 +666,7 @@ canvas {
   font-weight: 900;
 }
 
-.game-hud__meter-track {
-  height: 7px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.06);
-}
 
-.game-hud__meter-track i {
-  display: block;
-  width: 0;
-  height: 100%;
-  background: #ffffff;
-  transition: width 140ms linear;
-}
-
-.game-hud__meter-track--speed i {
-  background: #facc15;
-}
 
 @media (max-width: 700px) {
   body aside.game-hud {
@@ -781,24 +763,8 @@ body aside.game-hud .game-hud__left .game-hud__sound-label {
   white-space: nowrap;
 }
 
-body aside.game-hud .game-hud__left .game-hud__speed-meter {
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: auto auto;
-  grid-column: auto;
-  gap: 3px;
-  align-items: center;
-  justify-items: center;
-  width: 92px;
-  min-width: 92px;
-  height: 44px;
-  min-height: 44px;
-  padding: 0 9px;
-}
-
 body aside.game-hud .game-hud__left .game-hud__health,
-body aside.game-hud .game-hud__left .game-hud__stat,
-body aside.game-hud .game-hud__left .game-hud__speed-meter {
+body aside.game-hud .game-hud__left .game-hud__stat {
   box-sizing: border-box;
   border: 0;
   border-radius: 7px;
@@ -868,17 +834,6 @@ body aside.game-hud .game-hud__left .game-hud__stat--cash strong {
   font-weight: 900;
 }
 
-body aside.game-hud .game-hud__left .game-hud__speed-meter > span {
-  color: rgba(247, 249, 252, 0.72);
-  font-size: 8px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-body aside.game-hud .game-hud__left .game-hud__speed-meter .game-hud__meter-track {
-  width: 100%;
-}
-
 body aside.game-hud .game-hud__bottom {
   --direction-row-size: 44px;
   position: fixed;
@@ -944,14 +899,6 @@ body aside.game-hud .game-hud__powers .game-hud__fix {
   body aside.game-hud .game-hud__left .game-hud__guide-button {
     width: 40px;
     min-width: 40px;
-    height: 40px;
-    min-height: 40px;
-  }
-
-  body aside.game-hud .game-hud__left .game-hud__speed-meter {
-    grid-template-columns: 1fr;
-    width: 70px;
-    min-width: 70px;
     height: 40px;
     min-height: 40px;
   }
@@ -1032,14 +979,6 @@ body aside.game-hud .game-hud__powers .game-hud__fix {
   body aside.game-hud .game-hud__left .game-hud__stat--cash strong {
     font-size: min(10px, calc(100cqw / var(--cash-characters)));
   }
-
-  body aside.game-hud .game-hud__left .game-hud__speed-meter {
-    width: 54px;
-    min-width: 54px;
-    height: 38px;
-    min-height: 38px;
-    padding: 0 5px;
-  }
 }
 
 .game-paused .game-shell *,
@@ -1058,7 +997,7 @@ body aside.game-hud .game-hud__powers .game-hud__fix {
   display: grid;
   height: calc(2 * var(--direction-row-size) + 6px);
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: repeat(3, minmax(0, 1fr)) 42px;
+  grid-template-rows: 1fr;
   gap: 2px;
   pointer-events: auto;
 }
@@ -1121,4 +1060,42 @@ body aside.game-hud .game-hud__powers .game-hud__fix {
   margin: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+/* Preserve the status-row footprint while stacking the three Power timers. */
+.game-hud__effect-hub {
+  position: relative;
+  flex-shrink: 0;
+  width: 92px;
+  height: 44px;
+}
+.game-hud__power-stack {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.game-hud .game-hud__power-stack .game-hud__power-bar {
+  height: 24px;
+  min-height: 24px;
+  padding: 0 3px;
+  border-radius: 4px;
+}
+.game-hud__power-stack .game-hud__power-dot-slot { width: 10px; }
+.game-hud__power-stack .game-hud__power-dot { width: 5px; height: 5px; }
+.game-hud__power-stack .game-hud__power-amount { font-size: 8px; }
+@media (max-width: 420px) {
+  .game-hud .game-hud__power-stack .game-hud__power-bar { padding: 0 1px; gap: 1px; }
+  .game-hud__power-stack .game-hud__power-dot-slot { width: 7px; }
+  .game-hud__power-stack .game-hud__power-amount { font-size: 7px; }
+}
+
+@media (max-width: 700px) {
+  .game-hud__effect-hub { width: 70px; height: 40px; }
+}
+@media (max-width: 420px) {
+  .game-hud__effect-hub { width: 54px; height: 38px; }
 }

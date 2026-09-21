@@ -7,7 +7,7 @@ const { Mesh, BoxGeometry, Group, Vector3 } = THREE;
 function load(path, dependencies = {}) {
   const exports = {};
   const code = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
-  vm.runInNewContext(code, { exports, require: id => id === 'three' ? THREE : dependencies[id] ?? {} });
+  vm.runInNewContext(code, { exports, require: id => id === 'three' ? THREE : id === './effectColors' ? load('src/player/effectColors.ts') : dependencies[id] ?? {} });
   return exports;
 }
 

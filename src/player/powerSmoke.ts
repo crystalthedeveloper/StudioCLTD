@@ -48,7 +48,7 @@ function getSmokeTexture(compact: boolean) {
 }
 
 /** One instanced draw: soft, single-colour wisps with a slow rise and curl. */
-export function createPowerSmoke(color: string, compact: boolean, size = 1, orb = false) {
+export function createPowerSmoke(color: string, compact: boolean, size = 1, orb = false, coreColor = color, heat = false) {
   const count = compact ? 12 : 24;
   const plane = new PlaneGeometry(1, 1);
   const geometry = new InstancedBufferGeometry();
@@ -66,6 +66,8 @@ export function createPowerSmoke(color: string, compact: boolean, size = 1, orb 
     uniforms: {
       uSmoke: { value: getSmokeTexture(compact) }, uColor: { value: new Color(color) },
       uOrb: { value: orb ? 1 : 0 },
+      uCoreColor: { value: new Color(coreColor) }, uHeat: { value: heat ? 1 : 0 },
+      uCoreStrength: { value: orb ? 0.72 : 0.42 },
       uColors: { value: Array.from({ length: 3 }, () => new Color(color)) },
       uColorCount: { value: 1 },
       uDensity: { value: compact ? 1.65 : 1.15 },
@@ -95,11 +97,11 @@ export function createPowerSmoke(color: string, compact: boolean, size = 1, orb 
           (aSeed.z - 0.5) * (0.3 + life * 0.5) + sin(curl * 0.8) * 0.05
         );
         float size = (0.38 + aSeed.w * 0.42) * (0.8 + life * 0.85);
-        vFade = smoothstep(0.0, 0.18, life) * (1.0 - smoothstep(0.68, 1.0, life));
+        vFade = smoothstep(0.0, 0.20, life) * (1.0 - smoothstep(0.62, 1.0, life));
         if (uOrb > 0.5) {
           center = vec3((aSeed.y - 0.5) * (0.16 + life * 0.3) + sin(curl) * 0.025,
             -0.20 + life * 0.48, (aSeed.z - 0.5) * (0.14 + life * 0.28) + sin(curl * 0.8) * 0.02);
-          size = (0.23 + aSeed.w * 0.22) * (0.85 + life * 0.4);
+          size = (0.23 + aSeed.w * 0.22) * (0.82 + life * 0.4);
           // Cover the same trail length at either particle budget.
           int sampleIndex = int(floor(floor(index / 4.0) * 7.0 / ${count / 4 - 1}.0));
           center += uTrail[sampleIndex] * life;
@@ -118,7 +120,8 @@ export function createPowerSmoke(color: string, compact: boolean, size = 1, orb 
     `,
     fragmentShader: `
       uniform sampler2D uSmoke;
-      uniform float uStrength, uDensity;
+      uniform float uStrength, uDensity, uOrb, uHeat, uTime, uCoreStrength;
+      uniform vec3 uCoreColor;
       varying vec2 vUv;
       varying vec3 vColor;
       varying float vFade, vLife;
@@ -126,12 +129,34 @@ export function createPowerSmoke(color: string, compact: boolean, size = 1, orb 
         // Small advection bends the internal cloud without rotating the particle.
         vec2 flowUv = vUv + vec2(sin(vUv.y * 6.0 + vLife * 2.0), sin(vUv.x * 5.0 - vLife)) * 0.025;
         vec4 cloud = texture2D(uSmoke, flowUv);
-        float alpha = min(0.58, cloud.a * uDensity) * vFade * uStrength;
+        // Layered translucent density keeps the smoke dark and volumetric instead of flat.
+        float orbDensity = uOrb > 0.5 ? 1.38 : 1.0;
+        float alpha = min(uOrb > 0.5 ? 0.56 : 0.42, cloud.a * uDensity * orbDensity) * vFade * uStrength;
         if (alpha < 0.003) discard;
-        // Scalar illumination gives volume while retaining each wisp's own hue.
-        float light = 0.48 + cloud.r * 1.25;
-        vec3 smokeColor = vColor * light;
-        if (dot(vColor, vec3(1.0)) < 0.001) smokeColor = vec3(0.008) * light;
+        float light = 0.25 + cloud.r * 0.72;
+        // Power colours are deliberately compressed toward charcoal so the scene lighting
+        // contributes the drama instead of a flat saturated billboard.
+        vec3 smokeColor = mix(vec3(0.008, 0.010, 0.012), vColor, 0.34) * light;
+        if (dot(vColor, vec3(1.0)) < 0.001) smokeColor = vec3(0.012, 0.014, 0.017) * (0.5 + cloud.r);
+        // A restrained dim core is visible through the smoke, never a broad glowing centre.
+        {
+          float core = pow(max(0.0, 1.0 - length(vUv * 2.0 - 1.0) * (uOrb > 0.5 ? 4.2 : 5.5)), 2.6);
+          float coreMask = core * uCoreStrength * step(0.02, dot(uCoreColor, vec3(1.0)));
+          smokeColor = mix(smokeColor, uCoreColor * (0.75 + 0.55 * cloud.r), coreMask);
+          alpha += coreMask * 0.075 * uStrength;
+          // A few hairline supernatural wisps and sparks; sparse by construction.
+          float wisp = smoothstep(0.035, 0.0, abs(vUv.x - 0.5 + sin(vUv.y * 15.0 + uTime * 2.0) * 0.07))
+            * smoothstep(0.9, 0.25, vUv.y) * smoothstep(0.18, 0.42, vUv.y);
+          float sparkCell = step(0.985, fract(sin(dot(floor(vUv * 18.0) + floor(uTime * 1.5), vec2(12.7, 39.2))) * 43758.5));
+          if (uOrb > 0.5 && dot(uCoreColor, vec3(1.0)) > 0.04) {
+            smokeColor += uCoreColor * wisp * 0.22;
+            alpha += wisp * 0.045 * uStrength;
+            smokeColor += uCoreColor * sparkCell * 0.7;
+            alpha += sparkCell * 0.12 * uStrength;
+          }
+          // Fire-only heat shimmer: inexpensive UV refraction confined to the core edge.
+          if (uHeat > 0.5) alpha *= 0.97 + 0.03 * sin(uTime * 7.0 + vUv.y * 18.0);
+        }
         gl_FragColor = vec4(smokeColor, alpha);
         #include <colorspace_fragment>
       }

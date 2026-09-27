@@ -1,6 +1,7 @@
 import { useTexture } from "@react-three/drei";
 import { useEffect, useMemo, useRef } from "react";
-import { Color, Group, SRGBColorSpace, Vector3 } from "three";
+import { AdditiveBlending, Color, Group, Mesh, MeshBasicMaterial, SRGBColorSpace, Vector3 } from "three";
+const orbCoreColors = { wind: "#42d66a", shock: "#e0ae43", fire: "#f05a35", none: "#9aa0a6" } as const;
 import { createPowerSmoke } from "./powerSmoke";
 import { getActivePowerMask, powerModes, powerOrder } from "./temporaryPowers";
 import { gameNow, subscribeGameFocus } from "./gameFocus";
@@ -9,6 +10,7 @@ import { isCompactVisualBudget } from "../world/visualQuality";
 
 export function PlayerSmokeOrb(_props: { damageFlashUntil: number }) {
   const root = useRef<Group>(null);
+  const groundGlow = useRef<Mesh>(null);
   const source = useTexture("/images/cltd-logo.svg");
   const logo = useMemo(() => {
     const map = source.clone();
@@ -65,6 +67,19 @@ export function PlayerSmokeOrb(_props: { damageFlashUntil: number }) {
     // Clear unused entries too, so no expired colour remains in the material.
     for (let i = count; i < palette.length; i++) palette[i].copy(palette[0]);
     smoke.material.uniforms.uColorCount.value = count;
+    const core = smoke.material.uniforms.uCoreColor.value as Color;
+    const noPower = count === 1 && palette[0].r < 0.02;
+    core.set(noPower ? orbCoreColors.none : orbCoreColors.wind);
+    if (count && palette[0].g > palette[0].r * 1.35) core.set(orbCoreColors.wind);
+    if (count && palette[0].r > palette[0].g * 1.5) core.set(orbCoreColors.fire);
+    if (count && palette[0].r > 0.7 && palette[0].g > 0.45) core.set(orbCoreColors.shock);
+    smoke.material.uniforms.uCoreStrength.value = noPower ? 0.28 : 0.82;
+    smoke.material.uniforms.uHeat.value = !noPower && palette[0].r > 0.45 && palette[0].r > palette[0].g * 1.5 ? 1 : 0;
+    const glow = groundGlow.current?.material as MeshBasicMaterial | undefined;
+    if (glow) {
+      glow.color.copy(core);
+      glow.opacity = noPower ? 0.035 : 0.075;
+    }
     smoke.material.uniforms.uTime.value = now / 1000;
   });
   return <group ref={root} name="Player smoke orb">
@@ -72,5 +87,9 @@ export function PlayerSmokeOrb(_props: { damageFlashUntil: number }) {
     <sprite name="Floating CLTD logo" scale={[0.48, 0.48, 1]} renderOrder={5}>
       <spriteMaterial map={logo} transparent depthTest depthWrite={false} toneMapped={false} />
     </sprite>
+    <mesh ref={groundGlow} name="Player smoke ground glow" position={[0, -0.58, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
+      <circleGeometry args={[0.52, 20]} />
+      <meshBasicMaterial transparent opacity={0.035} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
+    </mesh>
   </group>;
 }

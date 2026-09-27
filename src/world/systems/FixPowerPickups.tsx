@@ -13,6 +13,7 @@ import { useGameFrame } from "../../player/useGameFrame";
 
 import { isCompactVisualBudget } from "../visualQuality";
 import { PickupSmokeGlow } from "./PickupSmokeGlow";
+import { effectCoreColors } from "../../player/effectColors";
 
 const locations: [number, number, number][] = [
   ...routePowerPositions,
@@ -30,7 +31,9 @@ export function FixPowerPickups() {
   )}</group>;
 }
 function SmokePickup({ x, z, surface, mode }: { x: number; z: number; surface: PickupSurface; mode: PowerMode }) {
-  const smoke = useMemo(() => createPowerSmoke(powerModes[mode].color, isCompactVisualBudget(), 0.52), [mode]);
+  const smoke = useMemo(() => createPowerSmoke(powerModes[mode].color, isCompactVisualBudget(), 0.52, false,
+    mode === "standard" ? effectCoreColors.wind : mode === "rapid" ? effectCoreColors.shock : effectCoreColors.fire,
+    mode === "power"), [mode]);
   const collider = useRef<RapierCollider>(null);
   const available = useRef(true);
   const [visible, setVisible] = useState(true);

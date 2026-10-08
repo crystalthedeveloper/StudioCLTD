@@ -33,7 +33,7 @@ type StudioWorldProps = {
 
 const requiredSectionTriggers: Record<string, number> = {
   tips: 3,
-  offers: 4,
+  offers: 1,
   value: 2,
   "quick-fix": 2,
   "urgent-fix": 2,

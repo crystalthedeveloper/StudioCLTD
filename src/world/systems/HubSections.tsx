@@ -67,7 +67,6 @@ const selectorPadVisualConfig = {
 };
 const selectorRowZ = 5.8;
 const offersPageUrl = "https://www.crystalthedeveloper.ca/offers";
-const white = "#f5f7fb";
 const screenImageTint = "#f0f0f0";
 const screenIdleColor = "#0b1018";
 const screenContentScale = 1.1;
@@ -109,31 +108,17 @@ const serviceScreenImages: Record<string, { bad: string; good: string }> = {
   },
 };
 const tipDisplayOptions = [
-  { id: "navigation", label: "Navigation", imagePath: "/images/optimized/tips/navigation-tip.webp", position: [-3.6, 0.18, 5.5] as [number, number, number] },
-  { id: "content", label: "Content", imagePath: "/images/optimized/tips/content-tip.webp", position: [0, 0.18, 6.3] as [number, number, number] },
-  { id: "images", label: "Images", imagePath: "/images/optimized/tips/images-tip.webp", position: [3.6, 0.18, 5.5] as [number, number, number] },
+  { id: "navigation", label: "Navigation", header: "Make clicks obvious.", body: "Clear navigation helps visitors find the right page quickly and keeps them moving toward action.", position: [-3.6, 0.18, 5.5] as [number, number, number] },
+  { id: "content", label: "Content", header: "Lead with clarity.", body: "Lead with the problem you solve, who you help, and the next step you want visitors to take.", position: [0, 0.18, 6.3] as [number, number, number] },
+  { id: "images", label: "Images", header: "Use visuals well.", body: "Use focused, purposeful imagery that builds trust and makes your offer easier to understand.", position: [3.6, 0.18, 5.5] as [number, number, number] },
 ];
 const valueDisplayOptions = [
-  { id: "trust", label: "Trust", imagePath: "/images/optimized/values/value.webp", position: [-1.8, 0.18, selectorRowZ] as [number, number, number] },
-  { id: "speed", label: "Speed", imagePath: "/images/optimized/values/value-speed.webp", position: [1.8, 0.18, selectorRowZ] as [number, number, number] },
+  { id: "trust", label: "Trust", header: "Build trust first.", body: "Clear communication, thoughtful details, and honest expectations make it easier for the right clients to say yes.", position: [-1.8, 0.18, selectorRowZ] as [number, number, number] },
+  { id: "speed", label: "Speed", header: "Move faster.", body: "A focused plan and practical improvements help your site become clearer, faster, and more useful sooner.", position: [1.8, 0.18, selectorRowZ] as [number, number, number] },
 ];
 const offerOptions = [
-  { id: "1hour", imagePath: "/images/optimized/offers/1hour.webp", name: "1-Hour Block",
-    position: [-8, 0.18, -7.2] as [number, number, number] },
-  { id: "2-5hour", imagePath: "/images/optimized/offers/2-5hour.webp", name: "2.5-Hour Block",
-    position: [-8, 0.18, -2.4] as [number, number, number] },
-  { id: "5hour", imagePath: "/images/optimized/offers/5hour.webp", name: "5-Hour Block",
-    position: [-8, 0.18, 2.4] as [number, number, number] },
-  { id: "audit", imagePath: "/images/optimized/offers/audit.webp", name: "Diagnostic Audit",
-    position: [-8, 0.18, 7.2] as [number, number, number] },
-  { id: "business-sprint", imagePath: "/images/optimized/offers/business-sprint.webp", name: "Business Sprint",
-    position: [8, 0.18, -7.2] as [number, number, number] },
-  { id: "custom-engineering-sprint", imagePath: "/images/optimized/offers/custom-engineering-sprint.webp", name: "Custom Engineering Sprint",
-    position: [8, 0.18, -2.4] as [number, number, number] },
-  { id: "ecommerce-sprint", imagePath: "/images/optimized/offers/ecommerce-sprint.webp", name: "Ecommerce Sprint",
-    position: [8, 0.18, 2.4] as [number, number, number] },
-  { id: "enterprise", imagePath: "/images/optimized/offers/enterprise.webp", name: "Enterprise",
-    position: [8, 0.18, 7.2] as [number, number, number] },
+  { id: "audit", name: "Visit Offers",
+    position: [0, 0.18, selectorRowZ] as [number, number, number] },
 ];
 
 type OfferOption = (typeof offerOptions)[number];
@@ -152,9 +137,6 @@ let websiteVideoTexture: VideoTexture | null = null;
 const requiredScreenImagePaths = Array.from(
   new Set([
     ...Object.values(serviceScreenImages).flatMap((images) => [images.bad, images.good]),
-    ...tipDisplayOptions.map((display) => display.imagePath),
-    ...valueDisplayOptions.map((display) => display.imagePath),
-    ...offerOptions.map((offer) => offer.imagePath),
   ])
 );
 
@@ -522,14 +504,14 @@ function HubSectionDistrict({
       {section.id === "offers" && <OffersSelector selectedOfferId={selectedOffer?.id ?? null} onOfferSelect={onOfferSelect} />}
       {section.id === "tips" && (
         <TipsDisplaySelector
-          selectedImagePath={activeSimpleDisplays.tips ?? null}
-          onSelect={(imagePath) => onSimpleDisplayTrigger("tips", imagePath)}
+          selectedTipId={activeSimpleDisplays.tips ?? null}
+          onSelect={(tipId) => onSimpleDisplayTrigger("tips", tipId)}
         />
       )}
       {section.id === "value" && (
         <ValueDisplaySelector
-          selectedImagePath={activeSimpleDisplays.value ?? null}
-          onSelect={(imagePath) => onSimpleDisplayTrigger("value", imagePath)}
+          selectedValueId={activeSimpleDisplays.value ?? null}
+          onSelect={(valueId) => onSimpleDisplayTrigger("value", valueId)}
         />
       )}
       {section.id === "showcase" && (
@@ -564,6 +546,7 @@ function SectionBillboard({
 }) {
   const isOffers = section.id === "offers";
   const simpleDisplay = section.id === "tips";
+  const isTextScreen = isOffers || simpleDisplay || section.id === "value";
   const selectedSimpleDisplayPath = activeSimpleDisplays[section.id] ?? null;
   const isServiceSection = serviceSectionIds.includes(section.id);
   const isShowcase = section.id === "showcase";
@@ -586,9 +569,9 @@ function SectionBillboard({
         </mesh>
         <mesh castShadow receiveShadow geometry={tvBackingGeometry} position={[0, 0.1, screenBackingZ]} dispose={null}>
           <meshStandardMaterial
-            color="#111827"
+            color={isTextScreen ? "#000000" : "#111827"}
             emissive="#ffffff"
-            emissiveIntensity={isOffers ? 0.07 : 0.045}
+            emissiveIntensity={isTextScreen ? 0 : 0.045}
             metalness={0.08}
             roughness={0.72}
           />
@@ -609,9 +592,11 @@ function SectionBillboard({
         {section.name}
       </Text>
       {isOffers ? (
-        <OffersScreenContent selectedOffer={selectedOffer} />
-      ) : simpleDisplay || section.id === "value" ? (
-        <SimpleDisplayScreen imagePath={selectedSimpleDisplayPath} />
+        selectedOffer ? <OffersScreenContent /> : null
+      ) : simpleDisplay ? (
+        selectedSimpleDisplayPath ? <TipsScreenContent tipId={selectedSimpleDisplayPath} /> : null
+      ) : section.id === "value" ? (
+        selectedSimpleDisplayPath ? <ValueScreenContent valueId={selectedSimpleDisplayPath} /> : null
       ) : isServiceSection ? (
         activeServiceInfoId === section.id ? (
           <ServiceInfoScreen section={section} />
@@ -636,23 +621,6 @@ function SectionBillboard({
         >
           Future screenshot / video surface
         </Text>
-      )}
-      {isOffers && (
-        <>
-          <Text
-            material-depthTest={true}
-            material-depthWrite={true}
-            color={white}
-            font={gameTextFont}
-            fontSize={0.3}
-            anchorX="center"
-            anchorY="middle"
-            position={[0, -2.62, screenTextZ]}
-            maxWidth={8}
-          >
-            {selectedOffer?.name ?? "Select an offer"}
-          </Text>
-        </>
       )}
       </group>
     </group>
@@ -709,70 +677,89 @@ function ScreenPlaybackControl({ children }: { children: ReactNode }) {
   );
 }
 
-/** Contain the complete offer artwork; never crop or stretch it to the TV frame. */
-function offerImageScale(texture: Texture | null): [number, number, number] {
-  const image = texture?.image as { width: number; height: number } | undefined;
-  if (!image?.width || !image.height) return [1, 1, 1];
-  const aspect = image.width / image.height;
-  return aspect > screenContentAspect ? [1, screenContentAspect / aspect, 1] : [aspect / screenContentAspect, 1, 1];
-}
-
-const offerPreviewFrame = new BoxGeometry(3.9, 2.08, 0.12);
-function OfferPreviewScreen({ offer, active }: { offer: OfferOption; active: boolean }) {
-  const texture = useLazyScreenTexture(offer.imagePath, true);
-  const fit = offerImageScale(texture);
-  const leftSide = offer.position[0] < 0;
-  return <group name={`OfferScreen:${offer.id}`} scale={tvSizeScale} position={[leftSide ? -1.5 : 1.5, 2.35 - offerPreviewFrame.parameters.height * 0.5 * (1 - tvSizeScale), 0]}
-    rotation-y={leftSide ? Math.PI / 2 : -Math.PI / 2}>
-    <mesh geometry={offerPreviewFrame} dispose={null}>
-      <meshBasicMaterial color={active ? "#c7ced3" : "#111827"} />
-    </mesh>
-    <mesh geometry={screenContentGeometry} position={[0, 0, 0.07]}
-      scale={[fit[0] * 3.7 / screenContentSize[0], fit[1] * 3.7 / screenContentSize[0], 1]} dispose={null}>
-      <meshBasicMaterial key={texture ? "loaded" : "empty"} color={texture ? "#ffffff" : screenIdleColor} map={texture} toneMapped={false} />
-    </mesh>
-  </group>;
-}
-
-function OffersScreenContent({ selectedOffer }: { selectedOffer: OfferOption | null }) {
-  const texture = useLazyScreenTexture(selectedOffer?.imagePath ?? null, Boolean(selectedOffer));
-
+function OffersScreenContent() {
   return (
-    <mesh key={selectedOffer?.id ?? "offers-empty-screen"} geometry={screenContentGeometry} position={[0, -0.03, screenContentZ]} scale={offerImageScale(texture)} dispose={null}>
-      {texture ? (
-        <meshBasicMaterial
-          key={`offer-image-${selectedOffer?.id}`}
-          color={screenImageTint}
-          depthTest={true}
-          depthWrite={true}
-          map={texture}
-          side={DoubleSide}
-          toneMapped
-        />
-      ) : (
-        <meshBasicMaterial key="offer-empty-screen" color={screenIdleColor} depthTest={true} depthWrite={true} side={DoubleSide} toneMapped />
-      )}
-    </mesh>
+    <group>
+      <Text
+        material-depthTest={true}
+        material-depthWrite={true}
+        color="#ffe600"
+        font={gameTextFont}
+        fontSize={0.58}
+        anchorX="center"
+        anchorY="middle"
+        position={[0, 1.15, screenTextZ]}
+        maxWidth={8.4}
+        textAlign="center"
+        outlineColor="#05070b"
+        outlineWidth={0.032}
+      >
+        Share your challenge.
+      </Text>
+      <Text
+        material-depthTest={true}
+        material-depthWrite={true}
+        color="#ffffff"
+        font={gameTextFont}
+        fontSize={0.38}
+        anchorX="center"
+        anchorY="middle"
+        position={[0, -0.42, screenTextZ]}
+        maxWidth={8.4}
+        lineHeight={1.35}
+        textAlign="center"
+        outlineColor="#05070b"
+        outlineWidth={0.022}
+      >
+        {"I’ll audit your site, outline a clear strategy,\nand give you a transparent, upfront quote\nbefore any work starts."}
+      </Text>
+    </group>
   );
 }
 
-function SimpleDisplayScreen({ imagePath }: { imagePath: string | null }) {
-  const materialRef = useRef<MeshBasicMaterial>(null);
-  const texture = useLazyScreenTexture(imagePath, Boolean(imagePath));
-
-  useEffect(() => {
-    const material = materialRef.current;
-    if (!material) return;
-
-    material.map = texture;
-    material.color.set(texture ? screenImageTint : screenIdleColor);
-    material.needsUpdate = true;
-  }, [texture]);
+function TipsScreenContent({ tipId }: { tipId: string }) {
+  const tip = tipDisplayOptions.find((option) => option.id === tipId);
+  if (!tip) return null;
 
   return (
-    <mesh geometry={screenContentGeometry} position={[0, -0.03, screenContentZ]} dispose={null}>
-      <meshBasicMaterial ref={materialRef} color={screenIdleColor} depthTest={true} depthWrite={true} side={DoubleSide} toneMapped />
-    </mesh>
+    <group name={`TipsScreen:${tip.id}`}>
+      <mesh geometry={screenContentGeometry} position={[0, -0.03, screenContentZ]} dispose={null}>
+        <meshBasicMaterial color="#05070b" depthTest={true} depthWrite={true} side={DoubleSide} toneMapped={false} />
+      </mesh>
+      <Text material-depthTest material-depthWrite color="#ffe600" font={gameTextFont} fontSize={0.58}
+        anchorX="center" anchorY="middle" position={[0, 1.05, screenTextZ]} maxWidth={8.2}
+        textAlign="center" outlineColor="#05070b" outlineWidth={0.03}>
+        {tip.header}
+      </Text>
+      <Text material-depthTest material-depthWrite color="#f1f5f9" font={gameTextFont} fontSize={0.38}
+        anchorX="center" anchorY="middle" position={[0, -0.45, screenTextZ]} maxWidth={7.8}
+        lineHeight={1.4} textAlign="center" outlineColor="#05070b" outlineWidth={0.018}>
+        {tip.body}
+      </Text>
+    </group>
+  );
+}
+
+function ValueScreenContent({ valueId }: { valueId: string }) {
+  const value = valueDisplayOptions.find((option) => option.id === valueId);
+  if (!value) return null;
+
+  return (
+    <group name={`ValueScreen:${value.id}`}>
+      <mesh geometry={screenContentGeometry} position={[0, -0.03, screenContentZ]} dispose={null}>
+        <meshBasicMaterial color="#05070b" depthTest={true} depthWrite={true} side={DoubleSide} toneMapped={false} />
+      </mesh>
+      <Text material-depthTest material-depthWrite color="#ffe600" font={gameTextFont} fontSize={0.58}
+        anchorX="center" anchorY="middle" position={[0, 1.05, screenTextZ]} maxWidth={8.2}
+        textAlign="center" outlineColor="#05070b" outlineWidth={0.03}>
+        {value.header}
+      </Text>
+      <Text material-depthTest material-depthWrite color="#f1f5f9" font={gameTextFont} fontSize={0.38}
+        anchorX="center" anchorY="middle" position={[0, -0.45, screenTextZ]} maxWidth={7.8}
+        lineHeight={1.4} textAlign="center" outlineColor="#05070b" outlineWidth={0.018}>
+        {value.body}
+      </Text>
+    </group>
   );
 }
 
@@ -1215,20 +1202,20 @@ function ShowcaseSelector({
 
 function TipsDisplaySelector({
   onSelect,
-  selectedImagePath,
+  selectedTipId,
 }: {
-  onSelect: (imagePath: string) => void;
-  selectedImagePath: string | null;
+  onSelect: (tipId: string) => void;
+  selectedTipId: string | null;
 }) {
   return (
     <group name="TipsDisplaySelector">
       {tipDisplayOptions.map((option) => (
         <ShowcasePortalPad
           key={option.id}
-          active={selectedImagePath === option.imagePath}
+          active={selectedTipId === option.id}
           label={option.label}
           name={`TipsDisplayPortal:${option.id}`}
-          onPlayerEnter={() => onSelect(option.imagePath)}
+          onPlayerEnter={() => onSelect(option.id)}
           onPlayerExit={() => undefined}
           position={option.position}
         />
@@ -1239,20 +1226,20 @@ function TipsDisplaySelector({
 
 function ValueDisplaySelector({
   onSelect,
-  selectedImagePath,
+  selectedValueId,
 }: {
-  onSelect: (imagePath: string) => void;
-  selectedImagePath: string | null;
+  onSelect: (valueId: string) => void;
+  selectedValueId: string | null;
 }) {
   return (
     <group name="ValueDisplaySelector">
       {valueDisplayOptions.map((option) => (
         <ShowcasePortalPad
           key={option.id}
-          active={selectedImagePath === option.imagePath}
+          active={selectedValueId === option.id}
           label={option.label}
           name={`ValueDisplayPortal:${option.id}`}
-          onPlayerEnter={() => onSelect(option.imagePath)}
+          onPlayerEnter={() => onSelect(option.id)}
           onPlayerExit={() => undefined}
           position={option.position}
         />
@@ -1306,7 +1293,6 @@ function OfferPortalPad({
 
   return (
     <group name={`OfferPortal:${offer.id}`} position={offer.position}>
-      <OfferPreviewScreen offer={offer} active={active} />
       <CylinderCollider
         sensor
         args={[0.28, portalTriggerRadius]}

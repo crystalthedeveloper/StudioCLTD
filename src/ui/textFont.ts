@@ -1,1 +1,1 @@
-export const gameTextFont = "/fonts/studiocltd-text.ttf";
+export const gameTextFont = "/fonts/tradewinds.ttf";

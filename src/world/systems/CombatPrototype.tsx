@@ -4,7 +4,6 @@ import { isCompactVisualBudget } from "../visualQuality";
 import { NearbyAsset } from "../NearbyAsset";
 import { assetForDevice } from "../mobileAssets";
 import { powerModes, type PowerMode, getActivePowers, isPowerActive, resolvePowerContact, resetPowerContact } from "../../player/temporaryPowers";
-import { createPowerSmoke } from "../../player/powerSmoke";
 import { createVillainCombat, villainClips } from "../../villain/villainCombat";
 import { useVillainNavigation } from "../../villain/useVillainNavigation";
 import { useVillainHitReaction } from "../../villain/useVillainHitReaction";
@@ -462,42 +461,61 @@ function BonusVillain({
   );
 }
 
-type VillainSmoke = { mode: PowerMode; id: number; position: Vector3 };
+type VillainBloodBurst = { id: number; position: Vector3 };
 
 function PowerContactEffects() {
-  const [smokeBursts, setSmokeBursts] = useState<VillainSmoke[]>([]);
+  const [bloodBursts, setBloodBursts] = useState<VillainBloodBurst[]>([]);
   const nextId = useRef(0);
   useEffect(() => {
-    const smoke = (position: Vector3, mode: PowerMode) => {
+    const blood = (position: Vector3, _mode: PowerMode) => {
       const id = nextId.current++;
-      setSmokeBursts(current => [...current.slice(-7), { id, mode, position }]);
+      setBloodBursts(current => [...current.slice(-7), { id, position }]);
     };
-    powerImpactListeners.add(smoke);
-    return () => { powerImpactListeners.delete(smoke); };
+    powerImpactListeners.add(blood);
+    return () => { powerImpactListeners.delete(blood); };
   }, []);
   return <group name="PowerContactEffects">
-    {smokeBursts.map(burst => <VillainSmokeBurst key={burst.id} burst={burst}
-      onComplete={() => setSmokeBursts(current => current.filter(({ id }) => id !== burst.id))} />)}
+    {bloodBursts.map(burst => <VillainBloodBurst key={burst.id} burst={burst}
+      onComplete={() => setBloodBursts(current => current.filter(({ id }) => id !== burst.id))} />)}
   </group>;
 }
 
-function VillainSmokeBurst({ onComplete, burst }: { onComplete: () => void; burst: VillainSmoke }) {
-  const { position, mode } = burst;
+function VillainBloodBurst({ onComplete, burst }: { onComplete: () => void; burst: VillainBloodBurst }) {
+  const { position } = burst;
   const elapsedRef = useRef(0);
-  const smoke = useMemo(() => createPowerSmoke(powerModes[mode].color, isCompactVisualBudget(), 0.52), [mode]);
 
   useGameFrame((_, delta) => {
     elapsedRef.current += delta;
     const progress = Math.min(elapsedRef.current / 1.5, 1);
-    smoke.material.uniforms.uTime.value = gameNow() / 1000;
-    smoke.material.uniforms.uStrength.value = Math.max(0, 1 - progress);
     if (progress >= 1) onComplete();
   });
-  useEffect(() => () => { smoke.geometry.dispose(); smoke.material.dispose(); }, [smoke]);
 
   return (
     <group position={position}>
-      <mesh geometry={smoke.geometry} material={smoke.material} frustumCulled={false} position={[0, -0.9, 0]} />
+      <mesh position={[0, -0.8, 0]} scale={[1.55, 0.12, 1.25]}>
+        <sphereGeometry args={[0.42, 12, 6]} />
+        <meshBasicMaterial color="#5b101b" transparent opacity={0.82} depthWrite={false} />
+      </mesh>
+      {[
+        [-0.18, -0.82, 0.08, 0.42, 0.06, 0.18, "#7b1323"],
+        [0.28, -0.81, -0.12, 0.3, 0.05, 0.12, "#951b2b"],
+        [-0.5, -0.8, -0.18, 0.2, 0.035, 0.08, "#6d101d"],
+      ].map(([x, y, z, sx, sy, sz, color], index) => (
+        <mesh key={`pool-${index}`} position={[x as number, y as number, z as number]} scale={[sx as number, sy as number, sz as number]}>
+          <sphereGeometry args={[1, 10, 5]} />
+          <meshBasicMaterial color={color as string} transparent opacity={0.72} depthWrite={false} />
+        </mesh>
+      ))}
+      {[ 
+        [-0.42, -0.48, 0.06, 0.12], [0.38, -0.56, -0.1, 0.1], [-0.18, -0.42, 0.32, 0.08],
+        [0.2, -0.34, -0.34, 0.07], [-0.58, -0.3, -0.2, 0.055], [0.55, -0.25, 0.2, 0.05],
+        [0.06, -0.18, 0.42, 0.042], [-0.3, -0.12, -0.42, 0.035],
+      ].map(([x, y, z, size], index) => (
+        <mesh key={index} position={[x, y, z]} scale={size}>
+          <sphereGeometry args={[1, 8, 6]} />
+          <meshBasicMaterial color="#c32638" transparent opacity={0.78} depthWrite={false} />
+        </mesh>
+      ))}
     </group>
   );
 }

@@ -117,7 +117,7 @@ export function createConcreteMaterial(textures: ConcreteTextures, color: string
         float grainVisible = 1.0 - smoothstep(0.35, 1.2, length(fwidth(snowUv * 24.0)));
         float grain = mix(0.5, snowNoise(snowUv * 24.0), grainVisible);
         float topSurface = smoothstep(0.72, 0.96, vConcreteTop);
-        float snowCoverage = (0.72 + 0.28 * smoothstep(0.30, 0.65, drift + (clumps - 0.5) * 0.20)) * topSurface;
+        float snowCoverage = (0.64 + 0.36 * smoothstep(0.30, 0.68, drift + (clumps - 0.5) * 0.24)) * topSurface;
         float soil = smoothstep(0.38, 0.66, snowNoise(snowUv * 0.12 + 37.0));
         vec3 asphalt = diffuseColor.rgb * 0.7 + vec3(0.018, 0.022, 0.026);
         vec3 frozenDirt = vec3(0.105, 0.081, 0.064) * (0.72 + clumps * 0.5);
@@ -144,9 +144,11 @@ export function createConcreteMaterial(textures: ConcreteTextures, color: string
         float grit = smoothstep(0.72, 0.84, grain) * grainVisible;
         wornGround = mix(wornGround, vec3(0.22, 0.20, 0.17), grit * 0.35);
         float fresh = smoothstep(0.48, 0.78, drift);
-        vec3 snowColor = mix(vec3(0.29, 0.30, 0.30), vec3(0.52, 0.57, 0.61), fresh);
-        snowColor *= 0.86 + clumps * 0.14;
-        snowColor += (grain - 0.5) * 0.035;
+        float snowShade = smoothstep(0.22, 0.78, clumps);
+        // Fresh snow stays cool and luminous; compressed/dirty snow picks up blue-gray shade.
+        vec3 snowColor = mix(vec3(0.38, 0.42, 0.45), vec3(0.78, 0.84, 0.90), fresh);
+        snowColor *= 0.90 + snowShade * 0.16;
+        snowColor += (grain - 0.5) * 0.045;
         diffuseColor.rgb = mix(diffuseColor.rgb, wornGround, topSurface);
         diffuseColor.rgb = mix(diffuseColor.rgb, snowColor, snowCoverage);
         float exposedRoughness = mix(0.58, 0.91, clumps) * (0.85 + roughnessFactor * 0.15);

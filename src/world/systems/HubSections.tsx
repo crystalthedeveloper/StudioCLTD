@@ -113,7 +113,7 @@ const tipDisplayOptions = [
   { id: "images", label: "Images", header: "Use visuals well.", body: "Use focused, purposeful imagery that builds trust and makes your offer easier to understand.", position: [3.6, 0.18, 5.5] as [number, number, number] },
 ];
 const valueDisplayOptions = [
-  { id: "trust", label: "Trust", header: "Build trust first.", body: "Clear communication, thoughtful details, and honest expectations make it easier for the right clients to say yes.", position: [-1.8, 0.18, selectorRowZ] as [number, number, number] },
+  { id: "trust", label: "Trust", header: "TRUST IS EARNED.", body: "I keep things simple, communicate clearly, and deliver what I promise.\nNo confusion. No surprises. Just honest work.", position: [-1.8, 0.18, selectorRowZ] as [number, number, number] },
   { id: "speed", label: "Speed", header: "Move faster.", body: "A focused plan and practical improvements help your site become clearer, faster, and more useful sooner.", position: [1.8, 0.18, selectorRowZ] as [number, number, number] },
 ];
 const offerOptions = [

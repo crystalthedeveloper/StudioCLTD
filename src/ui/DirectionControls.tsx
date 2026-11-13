@@ -1,7 +1,7 @@
 import { PointerEvent, useEffect, useRef } from "react";
 import { setTouchCameraInputBlocked } from "../player/cameraInputGuard";
 import { isGameFocused, subscribeGameFocus } from "../player/gameFocus";
-import { MovementControls, setTouchControls, useKeyboardControls } from "../player/useKeyboardControls";
+import { MovementControls, setTouchControls, toggleCruise, useKeyboardControls } from "../player/useKeyboardControls";
 
 type Direction = keyof MovementControls;
 type DirectionButton = {
@@ -12,6 +12,7 @@ type DirectionButton = {
 };
 
 const releasedControls: MovementControls = {
+  cruise: false,
   forward: false,
   backward: false,
   left: false,
@@ -72,6 +73,10 @@ export function DirectionControls() {
   const pressDirection = (directions: readonly Direction[], event: PointerEvent<HTMLButtonElement>) => {
     blockGameInput(event);
     if (!isGameFocused()) return;
+    if (directions.length === 1 && directions[0] === "forward") {
+      toggleCruise();
+      return;
+    }
     activePointersRef.current.set(event.pointerId, directions);
     event.currentTarget.setPointerCapture(event.pointerId);
     publishControls();

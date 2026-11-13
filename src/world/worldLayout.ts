@@ -1,8 +1,8 @@
 import { destinationPlatformRadius, hubSections, sectionRampApproachLength } from './hubSections';
 
 export type GroundPoint = readonly [number, number];
-export const groundSize = [172, 184] as const;
-export const groundCenter = [0, -22] as const;
+export const groundSize = [92, 720] as const;
+export const groundCenter = [0, -315] as const;
 export const plazaRadius = 18;
 export const walkingPathWidth = 7;
 // Clockwise circuit joins all three districts. North is negative Z.
@@ -41,4 +41,4 @@ export const routePickupPositions: Record<string, GroundPoint> = {
   'light-1': [-10, -20], 'light-2': [18, -24], 'light-3': [-20, -38],
   'light-4': [12, 16], 'light-5': [-15, -8],
 };
-export const bonusRouteSpots: GroundPoint[] = [[-21, 6], [22, 10], [-23, -12], [27, -15], [0, 23]];
+export const bonusRouteSpots: GroundPoint[] = [[-5, -35], [5, -105], [-4, -180], [4, -255], [-5, -330], [5, -405], [-4, -480], [4, -555]];

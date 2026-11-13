@@ -10,6 +10,8 @@ import { isPlayerObject } from "../playerCollision";
 import { padVisualStyle } from "../padVisualStyle";
 import { triggerPopupLayout } from "../triggerPopupLayout";
 import { homeBaseCenter } from "./HomeBase";
+import { groundCenter, groundSize } from "../worldLayout";
+import { roadSurfaceY } from "../roadSurface";
 
 const transportCooldownMs = 1200;
 const arrivalDistanceFromSection = 16;
@@ -23,22 +25,11 @@ const transportSectionIds = [
   "urgent-fix",
   "showcase",
 ] as const;
-const transportSections = transportSectionIds.map((sectionId) => {
-  const section = hubSections.find(({ id }) => id === sectionId);
-  if (!section) throw new Error(`Missing transport section: ${sectionId}`);
-  return section;
-});
-export const transportPadPositions = [
-  [-3, -8],
-  [0, -4],
-  [3, -8],
-  [-3, 0],
-  [3, 0],
-  [0, 4],
-  [-3, 8],
-  [3, 8],
-] as const;
-export const homeBaseTransportPadPosition = [12, 0] as const;
+export const roadHomeBaseTransportPadPosition: readonly [number, number, number] = [
+  0,
+  roadSurfaceY + 0.035,
+  groundCenter[1] - groundSize[1] / 2 + 20,
+];
 
 export type TransportDestination = {
   id: number;
@@ -47,11 +38,12 @@ export type TransportDestination = {
 };
 
 type TransportPadsProps = {
+  unlocked?: boolean;
   onTransport: (destination: TransportDestination) => void;
   restartKey: number;
 };
 
-export function TransportPads({ onTransport, restartKey }: TransportPadsProps) {
+export function TransportPads({ unlocked = false, onTransport, restartKey }: TransportPadsProps) {
   const lastTransportAtRef = useRef(-Infinity);
   const transportIdRef = useRef(0);
   const resources = useMemo(() => {
@@ -117,18 +109,9 @@ export function TransportPads({ onTransport, restartKey }: TransportPadsProps) {
     onTransport({ id: transportIdRef.current, position, yaw });
   };
 
+  if (!unlocked) return null;
   return (
     <group name="PlazaTransportHub">
-      {transportSections.map((section, index) => (
-        <TransportPad
-          key={section.id}
-          geometry={resources.geometry}
-          label={section.name}
-          material={resources.material}
-          onEnter={(event) => transport(section, event)}
-          position={[transportPadPositions[index][0], 0.04, transportPadPositions[index][1]]}
-        />
-      ))}
       <TransportPad
         geometry={resources.geometry}
         label="HOME BASE"
@@ -136,13 +119,13 @@ export function TransportPads({ onTransport, restartKey }: TransportPadsProps) {
         material={resources.homeBaseMaterial}
         glowColor="#FACC15"
         onEnter={(event) => transportDirect([homeBaseCenter[0], homeBaseCenter[1] + 2.2, homeBaseCenter[2] - 6.5], Math.PI, event)}
-        position={[homeBaseTransportPadPosition[0], 0.04, homeBaseTransportPadPosition[1]]}
+        position={roadHomeBaseTransportPadPosition}
       />
       <TransportPad
         geometry={resources.geometry}
         label="Return"
         material={resources.material}
-        onEnter={(event) => transportDirect([0, 2.8, 11], Math.PI, event)}
+        onEnter={(event) => transportDirect([0, 2.8, 11], 0, event)}
         position={[homeBaseCenter[0], homeBaseCenter[1] + 0.04, homeBaseCenter[2] - 10.5]}
       />
     </group>

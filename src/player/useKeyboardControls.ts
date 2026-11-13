@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { isGameFocused, subscribeGameFocus } from "./gameFocus";
 
 export type MovementControls = {
+  cruise: boolean;
   forward: boolean;
   backward: boolean;
   left: boolean;
@@ -9,6 +10,9 @@ export type MovementControls = {
 };
 
 export type KeyboardControls = MovementControls;
+let cruiseEnabled = false;
+export function toggleCruise() { cruiseEnabled = !cruiseEnabled; emitControls(); return cruiseEnabled; }
+export function cancelCruise() { if (!cruiseEnabled) return; cruiseEnabled = false; emitControls(); }
 
 const keyMap: Record<string, keyof MovementControls> = {
   KeyW: "forward",
@@ -22,6 +26,7 @@ const keyMap: Record<string, keyof MovementControls> = {
 };
 
 const initialControls: MovementControls = {
+  cruise: false,
   forward: false,
   backward: false,
   left: false,
@@ -38,6 +43,7 @@ function mergeControls(): MovementControls {
   }
 
   return {
+    cruise: cruiseEnabled,
     forward: keyboardControls.forward || touchControls.forward,
     backward: keyboardControls.backward || touchControls.backward,
     left: keyboardControls.left || touchControls.left,

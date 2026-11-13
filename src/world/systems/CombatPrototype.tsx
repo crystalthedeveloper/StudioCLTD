@@ -15,7 +15,7 @@ import { gameTimers } from "../../player/gameFocus";
 import { useGLTF } from "@react-three/drei";
 import { CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload } from "@react-three/rapier";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Box3, Group, Mesh, Vector3 } from "three";
+import { Box3, Group, Mesh, MeshBasicMaterial, Vector3 } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import { applyCharacterMaterials, villainMaterialProfile } from "../../characters/characterMaterials";
 import { applyNaturalMaterials } from "../../characters/naturalMaterials";
@@ -37,6 +37,7 @@ import { playerWorldState } from "../playerWorldState";
 import { padVisualStyle } from "../padVisualStyle";
 import { triggerPopupLayout } from "../triggerPopupLayout";
 import { fixPulseGeometry, fixRingGeometry, useTriggerPadVisuals } from "../useTriggerPadVisuals";
+import { clampRoadX, roadHalfWidth, roadSurfaceY } from "../roadSurface";
 
 const cooldownMs = 1800;
 const triggerPadRadius = 1.33;
@@ -77,7 +78,10 @@ function createSectionEncounters(): SectionEncounterConfig[] {
       const sectionPosition = new Vector3(...section.position);
       const towardEntrance = new Vector3(section.entrance[0], 0, section.entrance[1]);
       const tangent = new Vector3(-towardEntrance.z, 0, towardEntrance.x);
-      const villainPosition = sectionPosition.clone().add(towardEntrance.clone().multiplyScalar(villainFrontOffset)).add(tangent.clone().multiplyScalar(villainSideOffset));
+      const billboardSide = ["tips", "value", "urgent-fix", "site-improvement"].includes(section.id) ? -1 : 1;
+      // Place the main villain on the road just ahead of its roadside TV,
+      // leaving the full screen face visible from the approach.
+      const villainPosition = new Vector3(0, roadSurfaceY, section.position[2] - 8);
       const padPosition = sectionPosition
         .clone()
         .add(towardEntrance.clone().multiplyScalar(triggerPadFrontOffset))
@@ -87,9 +91,11 @@ function createSectionEncounters(): SectionEncounterConfig[] {
         .add(towardEntrance.clone().multiplyScalar(triggerPadFrontOffset))
         .add(tangent.clone().multiplyScalar(-triggerPadSideOffset));
 
-      villainPosition.y = section.position[1];
-      padPosition.y = section.position[1] + 0.07;
-      infoPadPosition.y = section.position[1] + 0.07;
+      villainPosition.x = clampRoadX(villainPosition.x);
+      padPosition.x = clampRoadX(padPosition.x);
+      infoPadPosition.x = clampRoadX(infoPadPosition.x);
+      padPosition.y = roadSurfaceY + 0.07;
+      infoPadPosition.y = roadSurfaceY + 0.07;
 
       return {
         id: section.id,
@@ -103,8 +109,7 @@ function createSectionEncounters(): SectionEncounterConfig[] {
 }
 
 const sectionEncounters = createSectionEncounters();
-const bonusSpawnSpots = bonusRouteSpots.map(([x, z]) => new Vector3(x, 0.1, z));
-const bonusRoamingLimit = 30;
+const bonusSpawnSpots = bonusRouteSpots.map(([x, z]) => new Vector3(clampRoadX(x), roadSurfaceY, z));
 const bonusRampClearance = 2;
 
 function distanceToBonusRamp(
@@ -129,7 +134,7 @@ function isSafeBonusRoamingPosition(x: number, z: number) {
 }
 
 function getBonusRoamingClearance(x: number, z: number) {
-  let clearance = bonusRoamingLimit - Math.max(Math.abs(x), Math.abs(z));
+  let clearance = Math.min(roadHalfWidth - Math.abs(x), z + 202, 28 - z);
 
   for (const section of hubSections) {
     const [sectionX, , sectionZ] = section.position;
@@ -169,8 +174,8 @@ function poweredContact(id: string, basePosition: Vector3) {
   });
 }
 type CombatPrototypeProps = {
+  activeSectionId: string;
   onVillainReward: (amount: number) => void;
-  onInfoChange: (sectionId: string | null) => void;
   onPlayerDamage: () => void;
   onPlayerDialogue: (text: string) => void;
   onSectionResolved: (sectionId: string) => void;
@@ -179,8 +184,8 @@ type CombatPrototypeProps = {
 };
 
 export function CombatPrototype({
+  activeSectionId,
   onVillainReward,
-  onInfoChange,
   onPlayerDamage,
   onPlayerDialogue,
   onSectionResolved,
@@ -198,9 +203,8 @@ export function CombatPrototype({
   useEffect(() => stopAllVillainAudio(), [restartKey]);
 
   useEffect(() => {
-    onInfoChange(null);
     setVisibleEncounterCount(1);
-  }, [onInfoChange, restartKey]);
+  }, [restartKey]);
 
   useEffect(() => {
     if (visibleEncounterCount >= sectionEncounters.length) return undefined;
@@ -220,15 +224,11 @@ export function CombatPrototype({
         onDefeat={onVillainReward}
         onPlayerDamage={contactDamage}
       />
-      {sectionEncounters.slice(0, visibleEncounterCount).map((encounter) => (
-        <NearbyAsset key={`${encounter.id}:${restartKey}`} position={encounter.platformPosition.toArray()}>
+      {sectionEncounters.map((encounter) => (
+        <NearbyAsset key={`${encounter.id}:${restartKey}`} position={[0, 0, 0]}>
           <SectionPortalEncounter
             encounter={encounter}
-            onInfoClose={() => onInfoChange(null)}
-            onInfoOpen={() => {
-              onInfoChange(encounter.id);
-              onSectionTrigger(encounter.id, "info");
-            }}
+            active={encounter.id === activeSectionId}
             onPlayerDialogue={onPlayerDialogue}
             onPlayerDamage={contactDamage}
             onSectionResolved={onSectionResolved}
@@ -251,6 +251,8 @@ function BonusVillainSystem({
     <group name="BonusVillains">
       <BonusVillain id="bonus:1" initialSpot={0} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} />
       <BonusVillain id="bonus:2" initialSpot={2} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} />
+      <BonusVillain id="bonus:3" initialSpot={4} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} />
+      <BonusVillain id="bonus:4" initialSpot={6} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} />
     </group>
   );
 }
@@ -369,6 +371,12 @@ function BonusVillain({
       && poweredContact(id, positionRef.current)) return;
     if (inRange) onPlayerDamage();
     if (reaction.active()) { combat.setMotion("idle"); return; }
+    const detected = sameLevel && playerDistanceSq <= bonusVillainDetectionRadiusSq;
+    if (!detected) {
+      chasingPlayerRef.current = false;
+      combat.setMotion("idle");
+      return;
+    }
     // Powered players must be approached all the way to body contact. The
     // longer melee attack range otherwise leaves an idle player out of reach.
     if (combat.updateAttack(inRange && !isPowerActive(), true)) {
@@ -376,20 +384,16 @@ function BonusVillain({
       return;
     }
     combat.setMotion("running");
-    if (!sameLevel) chasingPlayerRef.current = false;
-
-    if (chasingPlayerRef.current) {
-      if (playerDistanceSq > bonusVillainChaseReleaseRadiusSq) chasingPlayerRef.current = false;
-    } else if (sameLevel && playerDistanceSq <= bonusVillainDetectionRadiusSq) {
-      chasingPlayerRef.current = true;
-    }
-
+    chasingPlayerRef.current = true;
     if (chasingPlayerRef.current) {
       const distance = Math.sqrt(playerDistanceSq);
       if (distance === 0) return;
 
-      const directionX = playerDx / distance;
-      const directionZ = playerDz / distance;
+      const awayX = positionRef.current.x - playerWorldState.position.x;
+      const awayZ = Math.min(-0.35, positionRef.current.z - playerWorldState.position.z);
+      const awayLength = Math.hypot(awayX, awayZ) || 1;
+      const directionX = isPowerActive() ? awayX / awayLength : playerDx / distance;
+      const directionZ = isPowerActive() ? awayZ / awayLength : playerDz / distance;
       const step = Math.min(distance, Math.min(delta, 1 / 30) * bonusVillainMoveSpeed);
       const playerHeading = Math.atan2(directionX, directionZ);
       const safeHeading = bonusVillainSteeringAngles
@@ -416,40 +420,18 @@ function BonusVillain({
       return;
     }
 
-    const target = bonusSpawnSpots[targetSpotRef.current];
-    const dx = target.x - positionRef.current.x;
-    const dz = target.z - positionRef.current.z;
-    const distance = Math.hypot(dx, dz);
-    if (distance < 0.7) {
-      targetSpotRef.current = (targetSpotRef.current + 2) % bonusSpawnSpots.length;
-      return;
-    }
-    if (distance === 0) return;
-
-    const step = Math.min(distance, Math.min(delta, 1 / 30) * bonusVillainMoveSpeed);
-    const heading = Math.atan2(dx, dz);
-    const nextX = positionRef.current.x + Math.sin(heading) * step;
-    const nextZ = positionRef.current.z + Math.cos(heading) * step;
-    if (!navigation.clear(nextX, positionRef.current.y, nextZ) || !canBonusVillainMove(positionRef.current.x, positionRef.current.z, nextX, nextZ)) {
-      combat.setMotion("idle");
-      targetSpotRef.current = (targetSpotRef.current + 1 + initialSpot) % bonusSpawnSpots.length;
-      return;
-    }
-
-    positionRef.current.x = nextX;
-    positionRef.current.z = nextZ;
-    group.position.copy(positionRef.current);
-    group.rotation.y = heading;
+    // Small villains never patrol; they remain idle until detected.
+    combat.setMotion("idle");
   });
 
   return (
     <>
       <group ref={groupRef} position={positionRef.current} visible={alive}>
-        <group ref={reaction.group}><primitive object={scene} scale={0.68} position={[0, 0.18, 0]} /></group>
+        <group ref={reaction.group}><primitive object={scene} scale={0.68} position={[0, 0.42, 0]} /></group>
       </group>
       {showCashPopup && (
         <BillboardLabel
-          color="#3f7d3a"
+          color="#E4B93F"
           fontSize={0.38}
           position={[cashPopupPositionRef.current.x, cashPopupPositionRef.current.y, cashPopupPositionRef.current.z]}
           maxWidth={2}
@@ -483,15 +465,30 @@ function PowerContactEffects() {
 function VillainBloodBurst({ onComplete, burst }: { onComplete: () => void; burst: VillainBloodBurst }) {
   const { position } = burst;
   const elapsedRef = useRef(0);
+  const ringRef = useRef<Mesh>(null);
+  const flashRef = useRef<Mesh>(null);
 
   useGameFrame((_, delta) => {
     elapsedRef.current += delta;
     const progress = Math.min(elapsedRef.current / 1.5, 1);
+    const burstProgress = Math.min(elapsedRef.current / 0.55, 1);
+    ringRef.current?.scale.setScalar(0.5 + burstProgress * 2.2);
+    flashRef.current?.scale.setScalar(0.3 + burstProgress * 0.9);
+    if (ringRef.current?.material instanceof MeshBasicMaterial) ringRef.current.material.opacity = (1 - burstProgress) * 0.7;
+    if (flashRef.current?.material instanceof MeshBasicMaterial) flashRef.current.material.opacity = (1 - burstProgress) * 0.72;
     if (progress >= 1) onComplete();
   });
 
   return (
     <group position={position}>
+      <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, -0.62, 0]} scale={0.5}>
+        <ringGeometry args={[0.34, 0.48, 24]} />
+        <meshBasicMaterial color="#ffd84a" transparent opacity={0.7} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <mesh ref={flashRef} position={[0, 1.05, 0]} scale={0.3}>
+        <sphereGeometry args={[0.42, 12, 8]} />
+        <meshBasicMaterial color="#fff1a8" transparent opacity={0.72} depthWrite={false} toneMapped={false} />
+      </mesh>
       <mesh position={[0, -0.8, 0]} scale={[1.55, 0.12, 1.25]}>
         <sphereGeometry args={[0.42, 12, 6]} />
         <meshBasicMaterial color="#5b101b" transparent opacity={0.82} depthWrite={false} />
@@ -522,127 +519,48 @@ function VillainBloodBurst({ onComplete, burst }: { onComplete: () => void; burs
 
 function SectionPortalEncounter({
   encounter,
-  onInfoClose,
-  onInfoOpen,
+  active,
   onPlayerDialogue,
   onPlayerDamage,
   onSectionResolved,
   onReward,
 }: {
   encounter: SectionEncounterConfig;
-  onInfoClose: () => void;
-  onInfoOpen: () => void;
+  active: boolean;
   onPlayerDialogue: (text: string) => void;
   onPlayerDamage: () => void;
   onSectionResolved: (sectionId: string) => void;
   onReward: (amount: number) => void;
 }) {
-  const villainPosition = useMemo(() => encounter.villainPosition.clone(), [encounter]);
-  const [villainStatus, setVillainStatus] = useState<VillainStatus>("idle");
-  const [portalActive, setPortalActive] = useState(false);
-  const [infoPortalActive, setInfoPortalActive] = useState(false);
-  const [defeatActive, setDefeatActive] = useState(false);
-  const [villainVisible, setVillainVisible] = useState(true);
-  const voiceEnabled = hasVillainVoice(encounter.id);
-  const lastActivatedRef = useRef(-Infinity);
-  const lastInfoActivatedRef = useRef(0);
-  const wasOnVoicePlatformRef = useRef(false);
-  const sectionResolvedTimerRef = useRef(0);
-  const defeatedRef = useRef(false);
-  useEffect(() => () => stopVillainVoice(encounter.id), [encounter.id]);
-
-  useEffect(() => {
-    return () => {
-      gameTimers.clearTimeout(sectionResolvedTimerRef.current);
-    };
-  }, []);
-
+  const [resolved, setResolved] = useState(false);
+  const voiceNearRef = useRef(false);
+  useGameFrame(() => {
+    const distance = Math.hypot(
+      playerWorldState.position.x - encounter.platformPosition.x,
+      playerWorldState.position.z - encounter.platformPosition.z,
+    );
+    const near = distance < 24;
+    if (near && !voiceNearRef.current && hasVillainVoice(encounter.id)) playVillainVoice(encounter.id);
+    if (!near && voiceNearRef.current) stopVillainVoice(encounter.id);
+    voiceNearRef.current = near;
+  });
   const activatePad = () => {
-    const now = gameNow();
-    if (defeatedRef.current) return;
-    if (now - lastActivatedRef.current < cooldownMs) return;
-
-    defeatedRef.current = true;
+    if (resolved || !active) return;
+    setResolved(true);
+    stopVillainVoice(encounter.id);
     onReward(100);
     triggerFixHaptic();
-    lastActivatedRef.current = now;
-    stopVillainVoice(encounter.id);
-    setPortalActive(true);
-    setDefeatActive(true);
-    setVillainStatus("dead");
-    sectionResolvedTimerRef.current = gameTimers.setTimeout(() => {
-      onSectionResolved(encounter.id);
-    }, 240);
+    onSectionResolved(encounter.id);
   };
-
-  useEffect(() => {
-    powerDefeatHandlers.set(encounter.id, activatePad);
-    return () => { powerDefeatHandlers.delete(encounter.id); };
-  });
-
-  const activateInfoPad = () => {
-    const now = gameNow();
-    if (now - lastInfoActivatedRef.current < 350) return;
-
-    lastInfoActivatedRef.current = now;
-    setInfoPortalActive(true);
-    onInfoOpen();
-  };
-
-  const deactivateInfoPad = () => {
-    setInfoPortalActive(false);
-    onInfoClose();
-  };
-
-  useEffect(() => {
-    if (!portalActive) return;
-
-    const timeout = gameTimers.setTimeout(() => {
-      setPortalActive(false);
-    }, 1000);
-
-    return () => gameTimers.clearTimeout(timeout);
-  }, [portalActive]);
-
-  useEffect(() => {
-    if (!defeatActive) return;
-
-    const timeout = gameTimers.setTimeout(() => {
-      setDefeatActive(false);
-      setVillainVisible(false);
-    }, defeatDurationMs);
-
-    return () => gameTimers.clearTimeout(timeout);
-  }, [defeatActive]);
-
-  useGameFrame(() => {
-    const onVoicePlatform =
-      voiceEnabled &&
-      Math.abs(playerWorldState.position.x - encounter.platformPosition.x) <= destinationPlatformRadius &&
-      Math.abs(playerWorldState.position.z - encounter.platformPosition.z) <= destinationPlatformRadius;
-
-    if (onVoicePlatform !== wasOnVoicePlatformRef.current) {
-      if (onVoicePlatform && !defeatedRef.current) playVillainVoice(encounter.id);
-      else stopVillainVoice(encounter.id);
-    }
-
-    wasOnVoicePlatformRef.current = onVoicePlatform;
-  });
 
   return (
-    <group name={`PortalEncounter:${encounter.id}`}>
-      <TriggerPad label="More Info" position={encounter.infoPadPosition} active={infoPortalActive} onActivate={activateInfoPad} onDeactivate={deactivateInfoPad} />
-      {villainVisible && (
-        <VillainCharacter
-          id={encounter.id}
-          basePosition={villainPosition}
-          platformPosition={encounter.platformPosition}
-          onPowerContact={() => !defeatedRef.current && poweredContact(encounter.id, villainPosition)}
-          onPlayerDamage={() => { if (!defeatedRef.current) onPlayerDamage(); }}
-          dialogue={null}
-          villainStatus={villainStatus}
-        />
-      )}
+    <group name={`SectionTrigger:${encounter.id}`}>
+      <TriggerPad
+        active={resolved}
+        label={resolved ? `✓ ${encounter.name}` : encounter.name}
+        position={encounter.padPosition}
+        onActivate={activatePad}
+      />
     </group>
   );
 }
@@ -685,6 +603,10 @@ export function TriggerPad({ active, label, onActivate, onDeactivate, position }
 
   return (
     <group position={position}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.012, 0]} scale={[2.6, 0.9, 1]}>
+        <planeGeometry args={[1, 1]} />
+        <meshBasicMaterial color={active ? "#e4b93f" : "#8b949e"} transparent opacity={0.42} depthWrite={false} />
+      </mesh>
       <CylinderCollider
         sensor
         args={[0.28, triggerPadRadius]}

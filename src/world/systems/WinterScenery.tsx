@@ -7,6 +7,7 @@ import { isCompactVisualBudget } from '../visualQuality';
 import { createPineModel, createRockModel } from '../scenery/sceneryModels';
 import { createSceneryLayout, selectSceneryItems, scenerySettings } from '../scenery/sceneryLayout';
 import { createSceneryMaterials } from '../scenery/sceneryMaterials';
+import { roadSurfaceY, clampRoadX } from '../roadSurface';
 
 const texturePaths=['/images/scenery/pine-needles.webp','/images/scenery/pine-alpha.webp','/images/scenery/pine-bark.webp','/images/scenery/rock.webp','/images/scenery/rock-normal.webp'];
 export function WinterScenery() {
@@ -48,7 +49,7 @@ export function WinterScenery() {
       const distance=Math.hypot(camera.position.x-item.x,camera.position.z-item.z);
       if(distance>budget.distance)continue;
       const tier=item.kind==='snowbank'?'near':item.kind==='pine'&&distance<budget.shadowDistance?'shadow':distance<budget.lodDistance?'near':'far';
-      scratch.position.set(item.x,0,item.z);scratch.scale.setScalar(item.scale);scratch.rotation.setFromAxisAngle(scratch.up,item.yaw);
+      scratch.position.set(clampRoadX(item.x),roadSurfaceY,item.z);scratch.scale.setScalar(item.scale);scratch.rotation.setFromAxisAngle(scratch.up,item.yaw);
       scratch.matrix.compose(scratch.position,scratch.rotation,scratch.scale);
       batches.forEach((batch,i)=>{
         if(batch.kind!==item.kind||batch.tier!==tier||(batch.variant>=0&&batch.variant!==item.variant))return;

@@ -356,7 +356,7 @@ canvas {
   position: fixed;
   inset: 0;
   z-index: 70;
-  background: rgba(2, 4, 10, 0.58);
+  background: rgba(2, 4, 10, 0.38);
   display: grid;
   place-items: center;
   padding: 24px;
@@ -835,7 +835,7 @@ body aside.game-hud .game-hud__left .game-hud__stat--cash {
 body aside.game-hud .game-hud__left .game-hud__stat--cash strong {
   max-width: 100%;
   font-variant-numeric: tabular-nums;
-  color: #3f7d3a;
+  color: #E4B93F;
   font-size: min(18px, calc(100cqw / var(--cash-characters)));
   font-weight: 900;
 }

@@ -10,6 +10,7 @@ import { useGLTF, useTexture } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
 import {
   BallCollider,
+  CuboidCollider,
   IntersectionEnterPayload,
   IntersectionExitPayload,
   RapierCollider,
@@ -20,8 +21,9 @@ import { Color, DoubleSide, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial
 import { playCollectibleSound } from "../../audio/collectibleSounds";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { destinationPlatformRadius, hubSections, sectionRampApproachLength, sectionRampWidth } from "../hubSections";
-import { homeBaseTransportPadPosition, transportPadPositions } from "./TransportPads";
+import { roadHomeBaseTransportPadPosition } from "./TransportPads";
 import { homeBaseCenter } from "./HomeBase";
+import { clampRoadX, roadSurfaceY } from "../roadSurface";
 
 const logoPath = "/logo/logo-optimized.glb";
 const logoScale = 1.8;
@@ -130,11 +132,7 @@ function isOpenCollectiblePosition(position: readonly [number, number], placed: 
     if (bridgeDistance < sectionRampWidth / 2 + bridgeClearance) return false;
   }
 
-  if (transportPadPositions.some(([padX, padZ]) => Math.hypot(x - padX, z - padZ) < transportPadClearance)) {
-    return false;
-  }
-
-  if (Math.hypot(x - homeBaseTransportPadPosition[0], z - homeBaseTransportPadPosition[1]) < transportPadClearance) {
+  if (Math.hypot(x - roadHomeBaseTransportPadPosition[0], z - roadHomeBaseTransportPadPosition[2]) < transportPadClearance) {
     return false;
   }
 
@@ -165,10 +163,14 @@ function resolveLogoPlacements(logos: readonly PlazaLogo[]) {
   }, []);
 }
 
-const accessiblePlazaLogos = resolveLogoPlacements(plazaLogos.map(logo => ({ ...logo, position: routePickupPositions[logo.id] ?? logo.position })));
+const accessiblePlazaLogos = resolveLogoPlacements(plazaLogos.map((logo, index) => ({
+  ...logo,
+  position: [clampRoadX((index % 5 - 2) * 2.8), -18 - index * 7] as [number, number],
+  height: roadSurfaceY + 0.04,
+})));
 
 const logoColors: Record<LogoKind, string> = {
-  coin: "#3f7d3a",
+  coin: "#E4B93F",
   penalty: "#991b1b",
   contact: "#2583e8",
   share: "#a855f7",
@@ -203,6 +205,7 @@ function createLogoTemplate(source: Group, material: MeshStandardMaterial) {
 }
 
 type LogoLightFieldProps = {
+  activeSectionId: string;
   onCoinCollect: () => void;
   onHealthCollect: () => boolean;
   onReset: () => void;
@@ -210,7 +213,7 @@ type LogoLightFieldProps = {
   restartKey: number;
 };
 
-export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, onReset, restartKey }: LogoLightFieldProps) {
+export function LogoLightField({ activeSectionId, onCoinCollect, onHealthCollect, onOpenShare, onReset, restartKey }: LogoLightFieldProps) {
   const { scene } = useGLTF(assetForDevice(logoPath));
   const pickupTextures = useTexture(["/images/pickups/dollar.svg", "/images/pickups/heart.svg"]);
   const pickupVisuals = useMemo(() => pickupTextures.map((texture) => {
@@ -254,12 +257,32 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
   );
 
   const logos = useMemo(
-    () =>
-      [...accessiblePlazaLogos, ...homeBaseLogos].map((logo) => ({
+    () => {
+      const roadMoney = accessiblePlazaLogos.map((logo, index) => {
+        const section = hubSections[Math.min(hubSections.length - 1, Math.floor(index / 3))];
+        const lane = index % 3;
+        return { ...logo, position: [clampRoadX((lane - 1) * 4.2), section.position[2] - 10 - lane * 10] as [number, number], height: roadSurfaceY + 0.04 };
+      });
+      const restartRelocated = [...roadMoney, ...homeBaseLogos].map((logo, index) => {
+        if (logo.kind !== "penalty" && logo.kind !== "light") return logo;
+        // Keep red and white road logos in the safe road zone, but give them a
+        // fresh deterministic spot each full restart instead of reusing the
+        // same old-world coordinates.
+        let seed = (restartKey + 1) * 1103515245 + (index + 17) * 12345;
+        const next = () => {
+          seed = (seed * 1664525 + 1013904223) >>> 0;
+          return seed / 4294967296;
+        };
+        const lane = next() * 2 - 1;
+        const forwardOffset = (next() - 0.5) * 14;
+        return { ...logo, position: [clampRoadX(lane * 4.1), logo.position[1] + forwardOffset] as [number, number] };
+      });
+      return restartRelocated.map((logo) => ({
         ...logo,
         object: templates[logo.kind].clone(true),
-      })),
-    [templates],
+      }));
+    },
+    [activeSectionId, restartKey, templates],
   );
   const surfaceLocations = useMemo(() => logos.map(logo =>
     [logo.position[0], (logo.height ?? floorLogoY) - floorLogoY, logo.position[1]] as const), [logos]);
@@ -496,7 +519,9 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, surface, onCoinColle
   );
   const visual = (
     <>
-      {logo.kind === "coin" || logo.kind === "dark" ? (
+      {logo.kind === "coin" ? (
+        <GoldBarVisual scale={logo.scaleMultiplier ?? 1} />
+      ) : logo.kind === "dark" ? (
         <PickupIconVisual object={logo.object}
           scale={logo.scaleMultiplier ?? 1} />
       ) : logo.kind === "contact" || logo.kind === "share" ? (
@@ -511,7 +536,12 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, surface, onCoinColle
   );
 
   if (logo.kind === "light") {
-    return <group position={[logo.position[0], logo.height ?? floorLogoY, logo.position[1]]}>{visual}</group>;
+    return (
+      <RigidBody type="fixed" colliders={false} position={[logo.position[0], logo.height ?? floorLogoY, logo.position[1]]} name={`WhiteLogoObstacle:${logo.id}`}>
+        <CuboidCollider args={[1.1, 0.65, 0.32]} position={[0, 0.65, 0]} />
+        {visual}
+      </RigidBody>
+    );
   }
 
   return (
@@ -526,17 +556,36 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, surface, onCoinColle
       />
       <GroundedPickupVisual surface={surface}>{visual}</GroundedPickupVisual>
       {(logo.kind === "contact" || logo.kind === "share") && !playerStanding && (
-        <BillboardLabel color={logoColors[logo.kind]} fontSize={0.25} position={[0, triggerPopupLayout.labelHeight, 0]} maxWidth={4}>
+        <BillboardLabel color={logoColors[logo.kind]} fontSize={0.25} position={[0, triggerPopupLayout.labelHeight + 0.42, 0]} maxWidth={4}>
           {logo.kind === "contact" ? "CONTACT" : "SHARE"}
         </BillboardLabel>
       )}
       {contactCountdown > 0 && (
-        <BillboardLabel color="#ffffff" fontSize={0.25} position={[0, triggerPopupLayout.labelHeight, 0]} maxWidth={4}>
+        <BillboardLabel color="#ffffff" fontSize={0.25} position={[0, triggerPopupLayout.labelHeight + 0.42, 0]} maxWidth={4}>
           {`Opening ${logo.kind === "share" ? "Share" : "Contact"} in ${contactCountdown}…`}
         </BillboardLabel>
       )}
     </RigidBody>
   );
+}
+
+function GoldBarVisual({ scale }: { scale: number }) {
+  const texture = useTexture("/images/pickups/gold-bar.svg");
+  texture.colorSpace = SRGBColorSpace;
+  return <group name="GoldBar" scale={scale * 0.5}>
+    <mesh castShadow receiveShadow>
+      <boxGeometry args={[0.78, 0.34, 0.34]} />
+      <meshStandardMaterial color="#E4B93F" emissive="#E4B93F" emissiveIntensity={0.4} metalness={0.72} roughness={0.25} />
+    </mesh>
+    <mesh position={[0, 0, 0.176]}>
+      <planeGeometry args={[0.7, 0.3]} />
+      <meshBasicMaterial map={texture} transparent side={DoubleSide} toneMapped={false} />
+    </mesh>
+    <mesh position={[0, 0, -0.176]} rotation={[0, Math.PI, 0]}>
+      <planeGeometry args={[0.7, 0.3]} />
+      <meshBasicMaterial map={texture} transparent side={DoubleSide} toneMapped={false} />
+    </mesh>
+  </group>;
 }
 
 /** Cash and health stay upright; the parent rests their lower edge on the surface. */

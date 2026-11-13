@@ -63,30 +63,6 @@ export function installFootstepAudioUnlock() {
   };
 }
 
-export function playConcreteFootstep(variation: number) {
-  const state = getActiveGameAudioState();
-  if (!state) return;
-
-  const source = state.context.createBufferSource();
-  const filter = state.context.createBiquadFilter();
-  const gain = state.context.createGain();
-  const now = state.context.currentTime;
-
-  source.buffer = state.noise;
-  source.playbackRate.value = 0.88 + variation * 0.14;
-  filter.type = "bandpass";
-  filter.frequency.value = 260 + variation * 90;
-  filter.Q.value = 0.72;
-  gain.gain.setValueAtTime(0.022, now);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.075);
-
-  source.connect(filter);
-  filter.connect(gain);
-  gain.connect(state.masterGain);
-  source.start(now);
-  source.stop(now + 0.08);
-}
-
 export function getActiveGameAudioState() {
   const state = audioState;
   if (!isGameFocused() || !state || state.context.state !== "running" || !isGameAudioEnabled()) return null;

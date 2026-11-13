@@ -1,5 +1,4 @@
-import { useGameFrame } from "./useGameFrame";
-import { useThree } from "@react-three/fiber";
+import { useThree, useFrame } from "@react-three/fiber";
 import { MutableRefObject, useRef } from "react";
 import { MathUtils, Vector3 } from "three";
 import { RapierRigidBody } from "@react-three/rapier";
@@ -14,11 +13,11 @@ type ThirdPersonCameraProps = {
 };
 
 const cameraSettings = {
-  distance: 4.35,
-  height: 0.02,
-  targetHeight: 1.0,
+  distance: 5.4,
+  height: 0.68,
+  targetHeight: 0.86,
   pitch: -0.04,
-  shoulderOffset: 0.5,
+  shoulderOffset: 0,
   framingLookOffset: 0.06,
   minPitch: MathUtils.degToRad(-35),
   maxPitch: MathUtils.degToRad(55),
@@ -56,7 +55,9 @@ export function ThirdPersonCamera({
   const smoothedPitchRef = useRef(cameraSettings.pitch);
   const hasCameraStateRef = useRef(false);
 
-  useGameFrame((_, delta) => {
+  // Keep the exact chase-camera pose rendered while paused/startup as well as
+  // during gameplay, preventing a camera jump when Play is clicked.
+  useFrame((_, delta) => {
     const body = targetRef.current;
     if (!body) return;
     const frameDelta = Math.min(delta, maxFrameDelta);

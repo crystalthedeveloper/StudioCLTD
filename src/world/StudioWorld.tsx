@@ -6,6 +6,7 @@ import { GroundFog } from "./systems/GroundFog";
 import { FixPowerPickups } from "./systems/FixPowerPickups";
 import { Environment } from "@react-three/drei";
 import { useEffect, useRef, useState } from "react";
+import { hubSections, levelOrder } from "./hubSections";
 import { WinterScenery } from "./systems/WinterScenery";
 import { CharacterController } from "../player/CharacterController";
 import { DialogueMessage } from "../ui/DialogueBubble";
@@ -32,13 +33,13 @@ type StudioWorldProps = {
 };
 
 const requiredSectionTriggers: Record<string, number> = {
-  tips: 3,
+  tips: 1,
   offers: 1,
-  value: 2,
-  "quick-fix": 2,
-  "urgent-fix": 2,
-  performance: 2,
-  "site-improvement": 2,
+  value: 1,
+  "quick-fix": 1,
+  "urgent-fix": 1,
+  performance: 1,
+  "site-improvement": 1,
   showcase: 1,
 };
 
@@ -50,7 +51,11 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
   const [activeServiceInfoId, setActiveServiceInfoId] = useState<string | null>(null);
   const [serviceResolutions, setServiceResolutions] = useState<Record<string, boolean>>({});
   const [playerDialogue, setPlayerDialogue] = useState<DialogueMessage | null>(null);
+  const [activeLevelIndex, setActiveLevelIndex] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0);
   const [transportDestination, setTransportDestination] = useState<TransportDestination | null>(null);
+  const activeSectionId = levelOrder[activeLevelIndex];
+  const checkpoint = [0, 1.34, hubSections[activeLevelIndex]?.position[2] + 45] as [number, number, number];
 
   useEffect(() => {
     activatedSectionTriggersRef.current = {};
@@ -58,11 +63,14 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
     setActiveServiceInfoId(null);
     setServiceResolutions({});
     setPlayerDialogue(null);
-    setTransportDestination(null);
+    setActiveLevelIndex(0);
+    setCompletedCount(0);
+    return undefined;
   }, [restartKey]);
 
 
   const recordSectionTrigger = (sectionId: string, triggerId: string) => {
+    if (sectionId !== activeSectionId) return;
     if (completedSectionsRef.current.has(sectionId)) return;
 
     const activatedTriggers = activatedSectionTriggersRef.current[sectionId] ?? new Set<string>();
@@ -73,7 +81,13 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
     if (requiredTriggerCount === undefined || activatedTriggers.size < requiredTriggerCount) return;
 
     completedSectionsRef.current.add(sectionId);
+    setCompletedCount((count) => Math.min(8, count + 1));
     onSectionComplete();
+    setActiveLevelIndex((current) => {
+      const next = Math.min(levelOrder.length - 1, current + 1);
+      const nextSection = levelOrder[next];
+      return next;
+    });
   };
 
   const createDialogue = (text: string): DialogueMessage => {
@@ -95,15 +109,17 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
       {!isCompactVisualBudget() && <Environment preset="warehouse" background={false} environmentIntensity={0.16} />}
       <ModularTerrain material={groundMaterial} />
       <HomeBase material={groundMaterial} />
+      <TransportPads unlocked={completedCount === 8} onTransport={setTransportDestination} restartKey={restartKey} />
       <LogoLightField
+        activeSectionId={activeSectionId}
         onCoinCollect={onCoinCollect}
         onHealthCollect={onHealthCollect}
         onOpenShare={onOpenShare}
         onReset={onReset}
         restartKey={restartKey}
       />
-      <TransportPads onTransport={setTransportDestination} restartKey={restartKey} />
       <HubSections
+        activeSectionId={activeSectionId}
         activeServiceInfoId={activeServiceInfoId}
         onSectionTrigger={recordSectionTrigger}
         restartKey={restartKey}
@@ -112,10 +128,10 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
       <CombatPrototype
         key={`combat:${restartKey}`}
         onVillainReward={onVillainReward}
-        onInfoChange={setActiveServiceInfoId}
         onPlayerDamage={onPlayerDamage}
         restartKey={restartKey}
         onSectionTrigger={recordSectionTrigger}
+        activeSectionId={activeSectionId}
         onPlayerDialogue={(text) => setPlayerDialogue(createDialogue(text))}
         onSectionResolved={(sectionId) => {
           recordSectionTrigger(sectionId, "resolved");
@@ -130,6 +146,7 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
         dialogue={playerDialogue}
         restartKey={restartKey}
         transportDestination={transportDestination}
+        checkpoint={checkpoint}
       />
     </>
   );

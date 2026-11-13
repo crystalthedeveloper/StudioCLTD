@@ -32,13 +32,13 @@ export function sceneryClearance(x:number,z:number,radius:number,tall:boolean,fe
   for (const p of routePowerPositions) if(Math.hypot(x-p[0],z-p[2])<radius+5) return false;
   return true;
 }
-const clusters = [[-77,-85],[-76,-62],[-78,-15],[-75,20],[-64,58],[-13,58],[19,59],[73,48],[79,22],[78,-80],[53,-103],[-9,-108],[-52,-105],[-56,-65],[35,-77]];
+const clusters = [[-14,-25],[14,-25],[-15,-95],[15,-95],[-14,-170],[14,-170],[-15,-245],[15,-245],[-14,-320],[14,-320],[-15,-395],[15,-395],[-14,-470],[14,-470],[-15,-545],[15,-545]];
 export function createSceneryLayout(): SceneryItem[] {
   const random=seededRandom(91017), items:SceneryItem[]=[];
   const add=(kind:SceneryItem['kind'],x:number,z:number,scale:number)=>{
     const radius=scale*(kind==='pine'?2.8:kind==='rock'?1.55:2);
     if(!sceneryClearance(x,z,radius,kind==='pine')) return;
-    if(items.some(item=>Math.hypot(x-item.x,z-item.z)<radius+item.radius+.4)) return;
+    if(items.some(item=>Math.hypot(x-item.x,z-item.z)<radius+item.radius+1.6)) return;
     items.push({kind,x,z,scale,radius,yaw:random()*Math.PI*2,variant:Math.floor(random()*3)});
   };
   for(const [cx,cz] of clusters) {
@@ -68,7 +68,7 @@ export function createSceneryLayout(): SceneryItem[] {
   for(const target of foreground) {
     const radius=target.scale*(target.kind==='pine'?2.8:target.kind==='snowbank'?2:1.55);
     if(!sceneryClearance(target.x,target.z,radius,target.kind==='pine',true)) continue;
-    if(items.some(item=>Math.hypot(target.x-item.x,target.z-item.z)<radius+item.radius+.4)) continue;
+    if(items.some(item=>Math.hypot(target.x-item.x,target.z-item.z)<radius+item.radius+1.6)) continue;
     const item=items.filter(item=>item.kind===target.kind&&!item.featured)
       .sort((a,b)=>Math.hypot(b.x,b.z)-Math.hypot(a.x,a.z))[0];
     if(item) Object.assign(item,target,{radius,featured:true});

@@ -10,7 +10,8 @@ export type PowerMode = keyof typeof powerModes;
 
 export const powerDurations = { standard: 6000, rapid: 10000, power: 15000 } as const;
 export const fixPowerRespawnMs = 20000;
-export const powerOrder: PowerMode[] = ["standard", "rapid", "power"];
+// Legacy definitions remain type-compatible, but only Shock is exposed or active.
+export const powerOrder: PowerMode[] = ["rapid"];
 export const powerCashRewards: Record<PowerMode, number> = { standard: 3, rapid: 10, power: 20 };
 const activeUntil: Record<PowerMode, number> = { standard: 0, rapid: 0, power: 0 };
 const expiry: Partial<Record<PowerMode, number>> = {};

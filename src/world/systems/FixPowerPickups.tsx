@@ -15,16 +15,12 @@ import { isCompactVisualBudget } from "../visualQuality";
 import { PickupSmokeGlow } from "./PickupSmokeGlow";
 import { effectCoreColors } from "../../player/effectColors";
 
-const locations: [number, number, number][] = [
-  ...routePowerPositions,
-  ...hubSections.map(({ position: [x, y, z], entrance: [dx, dz] }): [number, number, number] =>
-    [x + dx * 9 - dz * 5, y, z + dz * 9 + dx * 5]),
-  [homeBaseCenter[0] - 5, homeBaseCenter[1], homeBaseCenter[2]],
-  [homeBaseCenter[0] + 5, homeBaseCenter[1], homeBaseCenter[2]],
-];
-
 const pickupRadius = 0.24;
 export function FixPowerPickups() {
+  const locations: [number, number, number][] = hubSections.flatMap(({ position: [, y, z] }, sectionIndex) => [
+    [-3.8 + (sectionIndex % 2) * 1.2, y, z - 20],
+    [3.8 - (sectionIndex % 2) * 1.2, y, z - 52],
+  ]);
   const surfaces = usePickupSurfaces(locations);
   return <group name="FixPowerPickups">{locations.map(([x, , z], index) =>
     <SmokePickup key={index} x={x} z={z} surface={surfaces[index]} mode={powerOrder[index % powerOrder.length]} />

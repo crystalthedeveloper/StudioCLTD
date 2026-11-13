@@ -1,7 +1,8 @@
 import { createContactDamageGate } from "./player/contactDamage";
 import { isCompactVisualBudget } from "./world/visualQuality";
 import { createGuidePauseSession } from "./player/guidePauseSession";
-import { handlePowerShortcut, resetTemporaryPowers } from "./player/temporaryPowers";
+import { resetTemporaryPowers } from "./player/temporaryPowers";
+import { cancelCruise, toggleCruise } from "./player/useKeyboardControls";
 import { gameNow } from "./player/gameFocus";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useProgress } from "@react-three/drei";
@@ -55,6 +56,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   }, []);
 
   const resetGameSession = useCallback(() => {
+    cancelCruise();
     contactDamageGate.reset();
     previousCompletedSectionCountRef.current = 0;
     setCash(0);
@@ -102,7 +104,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
       if (target instanceof HTMLElement && target.closest("input, textarea, [contenteditable=true]")) return;
       if (event.code === "Space" && target instanceof HTMLElement && target.closest("button:not(.game-hud__fix):not(.game-hud__power-bar)")) return;
       event.preventDefault();
-      handlePowerShortcut(event.code);
+      if (event.code === "Space") toggleCruise();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => {
@@ -342,7 +344,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
             <button type="button" onClick={focusGame} className="studio-button game-focus-hint" aria-describedby="game-pause-instructions">
               Click to Play
             </button>
-            <p id="game-pause-instructions">Press ESC to pause</p>
+            {playRequestedRef.current && <p id="game-pause-instructions">Press ESC to pause</p>}
           </div>
         </div>
       )}

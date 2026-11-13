@@ -1,7 +1,7 @@
 import { formatCash } from "./formatCash";
 import { GameGuide } from "./GameGuide";
 import { PowerMeter } from "./PowerMeter";
-import { powerModes, type PowerMode, jumpWithPower, isPowerActive, subscribePowers } from "../player/temporaryPowers";
+import { powerOrder, type PowerMode, jumpWithPower, isPowerActive, subscribePowers } from "../player/temporaryPowers";
 import { useGameFocus } from "../player/gameFocus";
 import { setGameAudioEnabled, useGameAudioEnabled } from "../audio/gameAudio";
 import { getActiveVillainVoiceId, subscribeVillainVoice } from "../audio/villainAudio";
@@ -133,7 +133,7 @@ export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onClose
 
         <div className="game-hud__effect-hub" role="group" aria-label="Power timers">
           <div className="game-hud__power-stack">
-            {(Object.keys(powerModes) as PowerMode[]).map((mode) => <PowerMeter key={mode} mode={mode} />)}
+            {powerOrder.map((mode: PowerMode) => <PowerMeter key={mode} mode={mode} />)}
           </div>
         </div>
       </div>

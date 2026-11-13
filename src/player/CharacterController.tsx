@@ -1,28 +1,29 @@
 import { registerPoweredJump, resetPoweredJump } from "./poweredJump";
 import { hasPowerSpeedBoost } from "./temporaryPowers";
 import { useGameFrame } from "./useGameFrame";
-import { BallCollider, RigidBody, RapierRigidBody, useRapier } from "@react-three/rapier";
+import { CuboidCollider, RigidBody, RapierRigidBody, useRapier, type RapierCollider } from "@react-three/rapier";
 import { useEffect, useMemo, useRef } from "react";
 import { MathUtils, Vector3 } from "three";
 import { playerCenterHeightReduction, playerSphereRadius } from "./playerDimensions";
 import { PlayerCharacter } from "./PlayerCharacter";
 import { ThirdPersonCamera } from "./ThirdPersonCamera";
 import { CharacterAnimationState } from "./playerTypes";
-import { useKeyboardControls } from "./useKeyboardControls";
+import { useKeyboardControls, cancelCruise } from "./useKeyboardControls";
 import { DialogueMessage } from "../ui/DialogueBubble";
 import { playerWorldState } from "../world/playerWorldState";
 import type { TransportDestination } from "../world/systems/TransportPads";
-import { installFootstepAudioUnlock, playConcreteFootstep } from "./footsteps";
+import { installFootstepAudioUnlock } from "./footsteps";
 
 const moveDirection = new Vector3();
 const playerForward = new Vector3();
 const targetVelocity = { x: 0, z: 0 };
 const nextVelocity = { x: 0, y: 0, z: 0 };
-const baseRunSpeed = 13.2;
-const boostedRunSpeed = 18.4;
-const turnSpeed = 1.75;
-const forwardBackSmoothing = 11;
-const forwardBackStopSmoothing = 12;
+const baseRunSpeed = 23;
+const boostedRunSpeed = 30;
+const reverseSpeed = 18;
+const turnSpeed = 2.2;
+const acceleration = 9;
+const braking = 15;
 const maxFrameDelta = 1 / 30;
 const groundedRayDistance = playerSphereRadius + 0.13;
 
@@ -31,6 +32,7 @@ type CharacterControllerProps = {
   dialogue: DialogueMessage | null;
   restartKey: number;
   transportDestination: TransportDestination | null;
+  checkpoint: [number, number, number];
 };
 
 export function CharacterController({
@@ -38,8 +40,10 @@ export function CharacterController({
   dialogue,
   restartKey,
   transportDestination,
+  checkpoint,
 }: CharacterControllerProps) {
   const bodyRef = useRef<RapierRigidBody | null>(null);
+  const colliderRef = useRef<RapierCollider | null>(null);
   const { rapier, world } = useRapier();
   const yawRef = useRef(0);
   const cameraYawRef = useRef(0);
@@ -48,12 +52,12 @@ export function CharacterController({
   const movementDirectionRef = useRef(new Vector3());
   const animationStateRef = useRef<CharacterAnimationState>("idle");
   const forwardBackSpeedRef = useRef(0);
-  const lastFootstepAtRef = useRef(-Infinity);
-  const footstepVariationRef = useRef(0);
   const groundRay = useMemo(() => new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 }), [rapier]);
   const jumpInProgress = useRef(false);
   const leftGround = useRef(false);
-  const spawn = useMemo<[number, number, number]>(() => [0, 2.8 - playerCenterHeightReduction, 8], []);
+  const spawn = useMemo<[number, number, number]>(() => [0, 1.34, 18], []);
+  const checkpointRef = useRef<[number, number, number]>(spawn);
+  const teleportTimerRef = useRef<number | null>(null);
 
   const touchingGround = () => {
     const body = bodyRef.current;
@@ -66,6 +70,7 @@ export function CharacterController({
       rapier.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, body);
     return hit !== null && hit.normal.y > 0.5;
   };
+  useEffect(() => { checkpointRef.current = checkpoint; }, [checkpoint]);
   useEffect(() => registerPoweredJump({
     launch: () => {
       const body = bodyRef.current;
@@ -92,7 +97,6 @@ export function CharacterController({
     forwardBackSpeedRef.current = 0;
     movementDirectionRef.current.set(0, 0, 0);
     animationStateRef.current = "idle";
-    lastFootstepAtRef.current = -Infinity;
     playerWorldState.position.set(spawn[0], spawn[1], spawn[2]);
 
     if (!body) return;
@@ -111,14 +115,21 @@ export function CharacterController({
     leftGround.current = false;
     const [x, destinationY, z] = transportDestination.position;
     const y = destinationY - playerCenterHeightReduction;
+    checkpointRef.current = [x, y, z];
     yawRef.current = transportDestination.yaw;
     cameraYawRef.current = transportDestination.yaw;
     forwardBackSpeedRef.current = 0;
     movementDirectionRef.current.set(0, 0, 0);
     playerWorldState.position.set(x, y, z);
     body.setTranslation({ x, y, z }, true);
+    body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
     body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    body.wakeUp();
+    colliderRef.current?.setEnabled(false);
+    if (teleportTimerRef.current !== null) window.clearTimeout(teleportTimerRef.current);
+    teleportTimerRef.current = window.setTimeout(() => { colliderRef.current?.setEnabled(true); body.wakeUp(); teleportTimerRef.current = null; }, 120);
+    return () => { if (teleportTimerRef.current !== null) window.clearTimeout(teleportTimerRef.current); };
   }, [transportDestination]);
 
   useGameFrame(({ clock }, delta) => {
@@ -138,29 +149,27 @@ export function CharacterController({
     const velocity = body.linvel();
     const translation = body.translation();
     playerWorldState.position.set(translation.x, translation.y, translation.z);
-    const hasForwardBackInput = controls.forward !== controls.backward;
+    if (controls.backward) cancelCruise();
+    const throttle = Number(controls.forward || (controls as typeof controls & { cruise?: boolean }).cruise) - Number(controls.backward);
     const turnInput = Number(controls.left) - Number(controls.right);
     const forwardBackSpeed = hasPowerSpeedBoost() ? boostedRunSpeed : baseRunSpeed;
-
-    if (turnInput !== 0) {
-      yawRef.current += turnInput * turnSpeed * frameDelta;
+    const speed = forwardBackSpeedRef.current;
+    const steeringGrip = Math.min(1, Math.abs(speed) / 3.2);
+    const highSpeedStability = 1 - 0.28 * Math.min(1, Math.abs(speed) / forwardBackSpeed);
+    if (turnInput !== 0 && steeringGrip > 0.02) {
+      yawRef.current += turnInput * turnSpeed * steeringGrip * highSpeedStability * (speed < 0 ? -1 : 1) * frameDelta;
     }
 
     playerForward.set(-Math.sin(yawRef.current), 0, -Math.cos(yawRef.current));
 
-    const forwardBackInput = Number(controls.forward) - Number(controls.backward);
-    const targetForwardBackSpeed = forwardBackInput * forwardBackSpeed;
-    const speedSmoothing = hasForwardBackInput ? forwardBackSmoothing : forwardBackStopSmoothing;
-    forwardBackSpeedRef.current = MathUtils.damp(
-      forwardBackSpeedRef.current,
-      targetForwardBackSpeed,
-      speedSmoothing,
-      frameDelta
-    );
-
-    if (!hasForwardBackInput && Math.abs(forwardBackSpeedRef.current) < 0.04) {
-      forwardBackSpeedRef.current = 0;
-    }
+    // Direction changes target the requested signed speed immediately. The
+    // damped rate carries the car smoothly through zero without a double press.
+    const targetSpeed = throttle > 0 ? forwardBackSpeed : throttle < 0 ? -Math.max(reverseSpeed, forwardBackSpeed) : 0;
+    const reversingAgainstMotion = throttle < 0 && speed > 0;
+    const acceleratingAgainstMotion = throttle > 0 && speed < 0;
+    const rate = throttle === 0 ? braking : (reversingAgainstMotion || acceleratingAgainstMotion ? braking : acceleration);
+    forwardBackSpeedRef.current = MathUtils.damp(speed, targetSpeed, rate, frameDelta);
+    if (Math.abs(forwardBackSpeedRef.current) < 0.04 && throttle === 0) forwardBackSpeedRef.current = 0;
 
     moveDirection.set(0, 0, 0);
     moveDirection.addScaledVector(playerForward, forwardBackSpeedRef.current);
@@ -179,16 +188,6 @@ export function CharacterController({
       undefined,
       body,
     ) !== null;
-    if (isMoving && horizontalSpeed > 0.8 && grounded) {
-      const cadence = hasPowerSpeedBoost() ? 0.3 : 0.42;
-      if (clock.elapsedTime - lastFootstepAtRef.current >= cadence) {
-        lastFootstepAtRef.current = clock.elapsedTime;
-        footstepVariationRef.current = (footstepVariationRef.current + 0.37) % 1;
-        playConcreteFootstep(footstepVariationRef.current);
-      }
-    } else {
-      lastFootstepAtRef.current = clock.elapsedTime;
-    }
     targetVelocity.x = isMoving ? moveDirection.x : 0;
     targetVelocity.z = isMoving ? moveDirection.z : 0;
 
@@ -197,12 +196,10 @@ export function CharacterController({
     }
     movementDirectionRef.current.copy(moveDirection);
 
-    const accelerationRate = isMoving ? 8.5 : 10;
-    const acceleration = 1 - Math.exp(-frameDelta * accelerationRate);
-
-    nextVelocity.x = MathUtils.lerp(velocity.x, targetVelocity.x, acceleration);
+    const velocityBlend = 1 - Math.exp(-frameDelta * (isMoving ? 12 : 16));
+    nextVelocity.x = MathUtils.lerp(velocity.x, targetVelocity.x, velocityBlend);
     nextVelocity.y = velocity.y;
-    nextVelocity.z = MathUtils.lerp(velocity.z, targetVelocity.z, acceleration);
+    nextVelocity.z = MathUtils.lerp(velocity.z, targetVelocity.z, velocityBlend);
 
     body.setLinvel(nextVelocity, true);
 
@@ -211,9 +208,12 @@ export function CharacterController({
       jumpInProgress.current = false;
       leftGround.current = false;
       forwardBackSpeedRef.current = 0;
-      body.setTranslation({ x: spawn[0], y: spawn[1], z: spawn[2] }, true);
+      const [x, y, z] = checkpointRef.current;
+      body.setTranslation({ x, y, z }, true);
+      body.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
       body.setLinvel({ x: 0, y: 0, z: 0 }, true);
       body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      body.wakeUp();
     }
 
     const nextState: CharacterAnimationState = isMoving ? "run" : "idle";
@@ -240,7 +240,7 @@ export function CharacterController({
         angularDamping={1}
         canSleep={false}
       >
-        <BallCollider args={[playerSphereRadius]} friction={0} restitution={0} />
+        <CuboidCollider ref={colliderRef} args={[0.68, 0.42, 1.3]} friction={0} restitution={0} />
         <PlayerCharacter
           animationStateRef={animationStateRef}
           damageFlashUntil={damageFlashUntil}

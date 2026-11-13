@@ -38,7 +38,7 @@ type VillainCharacterProps = {
 const lookDirection = new Vector3();
 const rotationDamping = 5.5;
 const modelFacingOffset = 0;
-const modelYOffset = 0.28;
+const modelYOffset = 0.42;
 const villainMaterialTuningVersion = 3;
 const poweredContactRadiusSq = 1.35 * 1.35;
 
@@ -142,21 +142,27 @@ export function VillainCharacter({ id, basePosition, platformPosition, onPlayerD
     const onPlatform = Math.abs(player.x - platformPosition.x) <= destinationPlatformRadius
       && Math.abs(player.z - platformPosition.z) <= destinationPlatformRadius
       && Math.abs(player.y - (platformPosition.y + 1)) < 1.6;
-    const chasing = onPlatform;
+    const detected = onPlatform;
+    if (!detected) {
+      combat.setMotion("idle");
+      return;
+    }
     // Powered attacks require actual collider contact, handled above.
     const attacking = combat.updateAttack(contact.touching(), true);
     if (attacking) destination.copy(player);
     else {
-      if (chasing) destination.copy(player);
-      else {
-        destination.copy(home);
-        // Once home, remain at the exact original position instead of patrolling.
-        if (basePosition.distanceToSquared(home) <= 0.0001) {
-          basePosition.copy(home);
-          bodyRef.current?.setNextKinematicTranslation(home);
-          combat.setMotion("idle");
-          return;
-        }
+      if (isPowerActive()) {
+        // Main villains flee toward the end of their road section rather than
+        // turning back toward the car. Keep the escape point on-road.
+        destination.set(MathUtils.clamp(basePosition.x, -7.2, 7.2), platformPosition.y, platformPosition.z - 18);
+      } else {
+        // Without a Power, use the established chase/attack behavior.
+        destination.copy(player);
+      }
+      if (!isPowerActive() && attacking) {
+        destination.copy(player);
+      } else if (!isPowerActive()) {
+        destination.copy(player);
       }
       const heading = Math.atan2(destination.x - basePosition.x, destination.z - basePosition.z);
       const step = Math.min(Math.hypot(destination.x - basePosition.x, destination.z - basePosition.z), Math.min(delta, 1 / 30) * 2.1);

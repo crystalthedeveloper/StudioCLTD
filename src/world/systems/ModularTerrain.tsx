@@ -1,5 +1,4 @@
 import { groundSize, groundCenter } from "../worldLayout";
-import { PlazaPaths } from "./PlazaPaths";
 import { NearbyAsset } from "../NearbyAsset";
 import { isCompactVisualBudget } from "../visualQuality";
 import { assetForDevice } from "../mobileAssets";
@@ -238,26 +237,32 @@ export function useSharedGroundMaterial() {
 }
 
 export function ModularTerrain({ material }: { material: MeshStandardMaterial }) {
-  const floorGeometry = useMemo(() => createConcreteFloorGeometry(...groundSize), []);
+  const floorGeometry = useMemo(() => createConcreteFloorGeometry(20, 720), []);
   useEffect(() => () => floorGeometry.dispose(), [floorGeometry]);
 
   return (
     <group name="WeatheredConcreteTerrain">
       <RigidBody name="StudioCLTDFloor" type="fixed" colliders={false}>
         <CuboidCollider
-          position={[groundCenter[0], -0.09, groundCenter[1]]}
-          args={[groundSize[0] / 2, 0.09, groundSize[1] / 2]}
+          position={[0, 0.72, -315]}
+          args={[10, 0.12, 360]}
           friction={0}
           restitution={0.18}
         />
       </RigidBody>
-      <mesh position={[groundCenter[0], 0, groundCenter[1]]} rotation-x={-Math.PI / 2} receiveShadow>
+      <mesh position={[0, 0.84, -315]} rotation-x={-Math.PI / 2} receiveShadow>
         <primitive object={floorGeometry} attach="geometry" />
         <primitive object={material} attach="material" dispose={null} />
       </mesh>
-      <PlazaPaths material={material} />
-      {hubSections.map((section) => (
-        <DestinationPlatform key={section.id} material={material} section={section} />
+      <mesh position={[0, 0.846, -315]} rotation-x={-Math.PI / 2}>
+        <planeGeometry args={[16, 720]} />
+        <meshStandardMaterial color="#252d35" roughness={0.94} metalness={0.02} />
+      </mesh>
+      {Array.from({ length: 26 }, (_, index) => (
+        <mesh key={`lane-mark-${index}`} position={[0, 0.853, 30 - index * 25]} rotation-x={-Math.PI / 2}>
+          <planeGeometry args={[0.12, 8]} />
+          <meshBasicMaterial color="#d7d9d3" transparent opacity={0.42} />
+        </mesh>
       ))}
     </group>
   );

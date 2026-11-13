@@ -35,8 +35,10 @@ import { padVisualStyle } from "../padVisualStyle";
 import { triggerPopupLayout } from "../triggerPopupLayout";
 import { portalPulseGeometry, portalRingGeometry, useTriggerPadVisuals } from "../useTriggerPadVisuals";
 import { serviceInfoText } from "../serviceInfo";
+import { playVillainVoice } from "../../audio/villainAudio";
 
 type HubSectionsProps = {
+  activeSectionId: string;
   activeServiceInfoId: string | null;
   onSectionTrigger: (sectionId: string, triggerId: string) => void;
   restartKey: number | string;
@@ -108,16 +110,13 @@ const serviceScreenImages: Record<string, { bad: string; good: string }> = {
   },
 };
 const tipDisplayOptions = [
-  { id: "navigation", label: "Navigation", header: "Make clicks obvious.", body: "Clear navigation helps visitors find the right page quickly and keeps them moving toward action.", position: [-3.6, 0.18, 5.5] as [number, number, number] },
-  { id: "content", label: "Content", header: "Lead with clarity.", body: "Lead with the problem you solve, who you help, and the next step you want visitors to take.", position: [0, 0.18, 6.3] as [number, number, number] },
-  { id: "images", label: "Images", header: "Use visuals well.", body: "Use focused, purposeful imagery that builds trust and makes your offer easier to understand.", position: [3.6, 0.18, 5.5] as [number, number, number] },
+  { id: "navigation", label: "Tips", header: "Make clicks obvious.", body: "Clear navigation helps visitors find the right page quickly and keeps them moving toward action.", position: [0, 0.18, 5.8] as [number, number, number] },
 ];
 const valueDisplayOptions = [
-  { id: "trust", label: "Trust", header: "TRUST IS EARNED.", body: "I keep things simple, communicate clearly, and deliver what I promise.\nNo confusion. No surprises. Just honest work.", position: [-1.8, 0.18, selectorRowZ] as [number, number, number] },
-  { id: "speed", label: "Speed", header: "Move faster.", body: "A focused plan and practical improvements help your site become clearer, faster, and more useful sooner.", position: [1.8, 0.18, selectorRowZ] as [number, number, number] },
+  { id: "trust", label: "Value", header: "TRUST IS EARNED.", body: "I keep things simple, communicate clearly, and deliver what I promise.\nNo confusion. No surprises.", position: [0, 0.18, 5.8] as [number, number, number] },
 ];
 const offerOptions = [
-  { id: "audit", name: "Visit Offers",
+  { id: "audit", name: "Offers",
     position: [0, 0.18, selectorRowZ] as [number, number, number] },
 ];
 
@@ -258,7 +257,7 @@ function getShowcaseVideoElement() {
     const useMobileVideo = window.matchMedia("(max-width: 768px)").matches;
     video.src = useMobileVideo ? "/videos/showcase-mobile.mp4" : "/videos/showcase.mp4";
     video.crossOrigin = "anonymous";
-    video.loop = true;
+    video.loop = false;
     video.muted = true;
     video.playsInline = true;
     video.autoplay = false;
@@ -341,7 +340,7 @@ function getWebsiteVideoTexture(video: HTMLVideoElement) {
   return websiteVideoTexture;
 }
 
-export function HubSections({ activeServiceInfoId, onSectionTrigger, restartKey, serviceResolutions }: HubSectionsProps) {
+export function HubSections({ activeSectionId, activeServiceInfoId, onSectionTrigger, restartKey, serviceResolutions }: HubSectionsProps) {
   const displayTimersRef = useRef<Record<string, number>>({});
   const [activeSimpleDisplays, setActiveSimpleDisplays] = useState<Record<string, string>>({});
   const [billboardScale, setBillboardScale] = useState(1);
@@ -351,6 +350,8 @@ export function HubSections({ activeServiceInfoId, onSectionTrigger, restartKey,
   const [showcaseVideoState, setShowcaseVideoState] = useState<ShowcaseVideoState>({
     playing: false,
   });
+  const [showcaseCompleted, setShowcaseCompleted] = useState(false);
+  const showcaseCompletedRef = useRef(false);
 
   useEffect(() => {
     const mobileQuery = window.matchMedia("(max-width: 768px)");
@@ -371,29 +372,20 @@ export function HubSections({ activeServiceInfoId, onSectionTrigger, restartKey,
   }, []);
 
   useEffect(() => {
-    if (!selectedOfferId) return undefined;
-
-    const clearOfferTimer = gameTimers.setTimeout(() => {
-      setSelectedOfferId(null);
-    }, offerDisplayMs);
-
-    return () => {
-      gameTimers.clearTimeout(clearOfferTimer);
-    };
-  }, [selectedOfferId]);
-
-  useEffect(() => {
     Object.values(displayTimersRef.current).forEach((timer) => gameTimers.clearTimeout(timer));
     displayTimersRef.current = {};
     setVisibleSectionCount(2);
     setActiveSimpleDisplays({});
     setSelectedOfferId(null);
     setShowcaseVideoState({ playing: false });
+    setShowcaseCompleted(false);
+    showcaseCompletedRef.current = false;
 
     if (showcaseVideoElement) {
       pauseShowcaseVideo(showcaseVideoElement, true);
     }
   }, [restartKey]);
+
 
   useEffect(() => {
     if (visibleSectionCount >= hubSections.length) return undefined;
@@ -406,6 +398,8 @@ export function HubSections({ activeServiceInfoId, onSectionTrigger, restartKey,
   }, [visibleSectionCount]);
 
   const showSimpleDisplay = (sectionId: string, imagePath: string) => {
+    if (sectionId !== activeSectionId) return;
+    playVillainVoice(sectionId);
     onSectionTrigger(sectionId, imagePath);
     const existingTimer = displayTimersRef.current[sectionId];
     if (existingTimer) gameTimers.clearTimeout(existingTimer);
@@ -415,8 +409,7 @@ export function HubSections({ activeServiceInfoId, onSectionTrigger, restartKey,
       [sectionId]: imagePath,
     }));
 
-    if (sectionId === "tips") return;
-
+    if (sectionId === "tips" || sectionId === "value") return;
     displayTimersRef.current[sectionId] = gameTimers.setTimeout(() => {
       setActiveSimpleDisplays((current) =>
         Object.fromEntries(Object.entries(current).filter(([id]) => id !== sectionId)),
@@ -427,7 +420,7 @@ export function HubSections({ activeServiceInfoId, onSectionTrigger, restartKey,
 
   return (
     <group name="HubSections">
-      {hubSections.slice(0, visibleSectionCount).map((section) => (
+      {hubSections.map((section) => (
         <NearbyAsset key={`${section.id}:${restartKey}`} position={section.position}>
           <HubSectionDistrict
             activeServiceInfoId={activeServiceInfoId}
@@ -438,9 +431,10 @@ export function HubSections({ activeServiceInfoId, onSectionTrigger, restartKey,
             activeSimpleDisplays={activeSimpleDisplays}
             selectedOffer={offerOptions.find((offer) => offer.id === selectedOfferId) ?? null}
             showcaseVideoState={showcaseVideoState}
+            showcaseCompleted={showcaseCompleted}
             onOfferSelect={(offerId) => {
-              setSelectedOfferId(offerId);
-              if (offerId) onSectionTrigger("offers", offerId);
+              setSelectedOfferId((current) => current === offerId ? null : offerId);
+              if (offerId && section.id === activeSectionId) onSectionTrigger("offers", offerId);
             }}
             onSimpleDisplayTrigger={showSimpleDisplay}
             onShowcasePause={() => {
@@ -448,8 +442,19 @@ export function HubSections({ activeServiceInfoId, onSectionTrigger, restartKey,
               setShowcaseVideoState((current) => (current.playing ? { ...current, playing: false } : current));
             }}
             onShowcasePlay={() => {
+              if (section.id !== activeSectionId) return;
+              if (showcaseVideoState.playing) return;
+              const video = getShowcaseVideoElement();
+              const finish = () => {
+                video.removeEventListener("ended", finish);
+                if (!showcaseCompletedRef.current) {
+                  showcaseCompletedRef.current = true;
+                  setShowcaseCompleted(true);
+                  onSectionTrigger("showcase", "play");
+                }
+              };
+              video.addEventListener("ended", finish, { once: true });
               setShowcaseVideoState({ playing: true });
-              onSectionTrigger("showcase", "play");
             }}
           />
         </NearbyAsset>
@@ -471,6 +476,7 @@ function HubSectionDistrict({
   section,
   selectedOffer,
   showcaseVideoState,
+  showcaseCompleted,
 }: {
   activeServiceInfoId: string | null;
   activeSimpleDisplays: Record<string, string>;
@@ -484,6 +490,7 @@ function HubSectionDistrict({
   section: HubSection;
   selectedOffer: OfferOption | null;
   showcaseVideoState: ShowcaseVideoState;
+  showcaseCompleted: boolean;
 }) {
   const rotation = useMemo(() => {
     return Math.atan2(section.entrance[0], section.entrance[1]);
@@ -517,6 +524,7 @@ function HubSectionDistrict({
       {section.id === "showcase" && (
         <ShowcaseSelector
           isPlaying={showcaseVideoState.playing}
+          completed={showcaseCompleted}
           onPlayerEnter={onShowcasePlay}
           onPlayerExit={onShowcasePause}
         />
@@ -544,6 +552,8 @@ function SectionBillboard({
   selectedOffer: OfferOption | null;
   showcaseVideoState: ShowcaseVideoState;
 }) {
+  const billboardSide = ["tips", "value", "urgent-fix", "site-improvement"].includes(section.id) ? -1 : 1;
+  const billboardX = billboardSide * 12;
   const isOffers = section.id === "offers";
   const simpleDisplay = section.id === "tips";
   const isTextScreen = isOffers || simpleDisplay || section.id === "value";
@@ -552,15 +562,12 @@ function SectionBillboard({
   const isShowcase = section.id === "showcase";
 
   return (
-    <group name={`Billboard:${section.id}`} position={[0, screenGroupHeight(billboardScale, billboardYOffset), 0]}>
-      <RigidBody type="fixed" colliders={false} position={[0, billboardYOffset, 0]}>
-        <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
-      </RigidBody>
+    <group name={`Billboard:${section.id}`} position={[billboardX, screenGroupHeight(billboardScale, billboardYOffset), 0]} rotation-y={Math.PI + billboardSide * MathUtils.degToRad(140)}>
       <group name={`BillboardVisual:${section.id}`} position={[0, billboardYOffset - tvCentreDrop(billboardScale), 0]} scale={billboardScale * tvSizeScale}>
         <LocalLightSpill position={[0, -1.8, -0.8]} intensity={5} distance={10} />
         <mesh castShadow receiveShadow geometry={tvFrameGeometry} position={[0, 0, -0.08]} dispose={null}>
           <meshStandardMaterial
-            color="#101621"
+            color={serviceResolutions[section.id] ? "#d6a928" : "#101621"}
             emissive="#000000"
             emissiveIntensity={0}
             metalness={0.12}
@@ -589,7 +596,7 @@ function SectionBillboard({
         outlineColor="#05070b"
         outlineWidth={0.018}
       >
-        {section.name}
+        {serviceResolutions[section.id] ? `✓ ${section.name}` : section.name}
       </Text>
       {isOffers ? (
         selectedOffer ? <OffersScreenContent /> : null
@@ -701,17 +708,17 @@ function OffersScreenContent() {
         material-depthWrite={true}
         color="#ffffff"
         font={gameTextFont}
-        fontSize={0.38}
+        fontSize={0.44}
         anchorX="center"
         anchorY="middle"
         position={[0, -0.42, screenTextZ]}
-        maxWidth={8.4}
-        lineHeight={1.35}
+        maxWidth={7.0}
+        lineHeight={1.28}
         textAlign="center"
         outlineColor="#05070b"
         outlineWidth={0.022}
       >
-        {"I’ll audit your site, outline a clear strategy,\nand give you a transparent, upfront quote\nbefore any work starts."}
+        {"I’ll audit your site, outline a clear strategy, and give you a transparent quote before work starts."}
       </Text>
     </group>
   );
@@ -727,13 +734,13 @@ function TipsScreenContent({ tipId }: { tipId: string }) {
         <meshBasicMaterial color="#05070b" depthTest={true} depthWrite={true} side={DoubleSide} toneMapped={false} />
       </mesh>
       <Text material-depthTest material-depthWrite color="#ffe600" font={gameTextFont} fontSize={0.58}
-        anchorX="center" anchorY="middle" position={[0, 1.05, screenTextZ]} maxWidth={8.2}
+        anchorX="center" anchorY="middle" position={[0, 1.22, screenTextZ]} maxWidth={8.2}
         textAlign="center" outlineColor="#05070b" outlineWidth={0.03}>
         {tip.header}
       </Text>
-      <Text material-depthTest material-depthWrite color="#f1f5f9" font={gameTextFont} fontSize={0.38}
-        anchorX="center" anchorY="middle" position={[0, -0.45, screenTextZ]} maxWidth={7.8}
-        lineHeight={1.4} textAlign="center" outlineColor="#05070b" outlineWidth={0.018}>
+      <Text material-depthTest material-depthWrite color="#f1f5f9" font={gameTextFont} fontSize={0.44}
+        anchorX="center" anchorY="middle" position={[0, -0.45, screenTextZ]} maxWidth={6.7}
+        lineHeight={1.28} textAlign="center" outlineColor="#05070b" outlineWidth={0.018}>
         {tip.body}
       </Text>
     </group>
@@ -750,13 +757,13 @@ function ValueScreenContent({ valueId }: { valueId: string }) {
         <meshBasicMaterial color="#05070b" depthTest={true} depthWrite={true} side={DoubleSide} toneMapped={false} />
       </mesh>
       <Text material-depthTest material-depthWrite color="#ffe600" font={gameTextFont} fontSize={0.58}
-        anchorX="center" anchorY="middle" position={[0, 1.05, screenTextZ]} maxWidth={8.2}
+        anchorX="center" anchorY="middle" position={[0, 1.22, screenTextZ]} maxWidth={8.2}
         textAlign="center" outlineColor="#05070b" outlineWidth={0.03}>
         {value.header}
       </Text>
-      <Text material-depthTest material-depthWrite color="#f1f5f9" font={gameTextFont} fontSize={0.38}
-        anchorX="center" anchorY="middle" position={[0, -0.45, screenTextZ]} maxWidth={7.8}
-        lineHeight={1.4} textAlign="center" outlineColor="#05070b" outlineWidth={0.018}>
+      <Text material-depthTest material-depthWrite color="#f1f5f9" font={gameTextFont} fontSize={0.44}
+        anchorX="center" anchorY="middle" position={[0, -0.45, screenTextZ]} maxWidth={6.7}
+        lineHeight={1.28} textAlign="center" outlineColor="#05070b" outlineWidth={0.018}>
         {value.body}
       </Text>
     </group>
@@ -820,7 +827,9 @@ function ServiceImageScreen({
 
 function ShowcaseScreenContent({ isPlaying: requestedPlaying }: { isPlaying: boolean }) {
   const { ref: screenRef, visible } = useScreenVisibility();
-  const isPlaying = requestedPlaying && visible;
+  // Playback is triggered by a direct Player overlap, so do not gate the
+  // media lifecycle on camera visibility (especially on mobile).
+  const isPlaying = requestedPlaying;
   const materialRef = useRef<MeshBasicMaterial>(null);
   const screenOpacityRef = useRef(0);
   const [videoTexture, setVideoTexture] = useState<VideoTexture | null>(() => showcaseVideoTexture);
@@ -1125,6 +1134,7 @@ function OffersSelector({
 
   const startCountdown = (offer: OfferOption) => {
     clearCountdownTimers();
+    // Toggle the screen immediately; the countdown continues independently.
     onOfferSelect(offer.id);
     setCountdownOfferId(offer.id);
     countdownSecondsRef.current = 3;
@@ -1179,10 +1189,12 @@ function OffersSelector({
 }
 
 function ShowcaseSelector({
+  completed = false,
   isPlaying,
   onPlayerEnter,
   onPlayerExit,
 }: {
+  completed?: boolean;
   isPlaying: boolean;
   onPlayerEnter: () => void;
   onPlayerExit: () => void;
@@ -1191,6 +1203,7 @@ function ShowcaseSelector({
     <group name="ShowcaseSelector">
       <ShowcasePortalPad
         active={isPlaying}
+        completedExternally={completed}
         label="Play Showcase"
         name="ShowcasePortal:play"
         onPlayerEnter={onPlayerEnter}
@@ -1264,6 +1277,7 @@ function OfferPortalPad({
   const { pulseRef, ringRef } = useTriggerPadVisuals(active, offerPadVisualConfig);
   const playerInsideRef = useRef(false);
   const [playerInside, setPlayerInside] = useState(false);
+  const [completed, setCompleted] = useState(false);
   const activatedThisEntryRef = useRef(false);
   const lastActivatedAtRef = useRef(-Infinity);
   const isPlayerEvent = (event: IntersectionEnterPayload | IntersectionExitPayload) => {
@@ -1280,6 +1294,7 @@ function OfferPortalPad({
     if (now - lastActivatedAtRef.current < portalActivationCooldownMs) return;
     lastActivatedAtRef.current = now;
     activatedThisEntryRef.current = true;
+    setCompleted(true);
     onPlayerEnter();
   };
 
@@ -1300,20 +1315,20 @@ function OfferPortalPad({
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
-      <LocalLightSpill intensity={active ? 2.2 : 0.6} distance={4} />
+      <LocalLightSpill intensity={completed ? 2.2 : active ? 2.2 : 0.6} distance={4} />
       <mesh ref={ringRef} geometry={portalRingGeometry} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]} dispose={null}>
-        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.5} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={completed ? "#E4B93F" : padVisualStyle.color} transparent opacity={0.5} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh ref={pulseRef} geometry={portalPulseGeometry} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       {!playerInside && <BillboardLabel
-        color={padVisualStyle.labelColor}
+        color={completed ? "#E4B93F" : padVisualStyle.labelColor}
         fontSize={offer.name.length > 18 ? 0.2 : 0.24}
         position={[0, triggerPopupLayout.labelHeight, 0]}
         maxWidth={2.8}
       >
-        {offer.name}
+        {completed ? `✓ ${offer.name}` : offer.name}
       </BillboardLabel>}
       {countdownSeconds > 0 && (
         <BillboardLabel
@@ -1331,6 +1346,7 @@ function OfferPortalPad({
 
 function ShowcasePortalPad({
   active,
+  completedExternally = false,
   label,
   name,
   onPlayerEnter,
@@ -1338,6 +1354,7 @@ function ShowcasePortalPad({
   position = [0, 0.18, selectorRowZ],
 }: {
   active: boolean;
+  completedExternally?: boolean;
   label: string;
   name: string;
   onPlayerEnter: () => void;
@@ -1347,6 +1364,8 @@ function ShowcasePortalPad({
   const { pulseRef, ringRef } = useTriggerPadVisuals(active, selectorPadVisualConfig);
   const playerInsideRef = useRef(false);
   const [playerInside, setPlayerInside] = useState(false);
+  const [completedState, setCompletedState] = useState(false);
+  const completed = completedExternally || completedState;
   const activatedThisEntryRef = useRef(false);
   const lastActivatedAtRef = useRef(-Infinity);
   const isPlayerEvent = (event: IntersectionEnterPayload | IntersectionExitPayload) =>
@@ -1356,6 +1375,7 @@ function ShowcasePortalPad({
     if (playerInsideRef.current) return;
     playerInsideRef.current = true;
     setPlayerInside(true);
+    if (!completedExternally) setCompletedState(true);
     activatedThisEntryRef.current = false;
 
     const now = gameNow();
@@ -1392,21 +1412,21 @@ function ShowcasePortalPad({
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
-      <LocalLightSpill intensity={active ? 2.2 : 0.6} distance={4} />
+      <LocalLightSpill intensity={completed ? 2.8 : active ? 2.2 : 0.6} distance={4} />
       <mesh ref={ringRef} geometry={portalRingGeometry} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]} dispose={null}>
-        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.52} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={completed ? "#e4b93f" : padVisualStyle.color} transparent opacity={completed ? 0.72 : 0.52} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh ref={pulseRef} geometry={portalPulseGeometry} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
-      {!playerInside && <BillboardLabel
-        color={padVisualStyle.labelColor}
+      <BillboardLabel
+        color={completed ? "#e4b93f" : padVisualStyle.labelColor}
         fontSize={0.28}
         position={[0, triggerPopupLayout.labelHeight, 0]}
         maxWidth={3}
       >
-        {label}
-      </BillboardLabel>}
+        {completed ? `✓ ${label}` : label}
+      </BillboardLabel>
     </group>
   );
 }

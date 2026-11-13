@@ -67,7 +67,7 @@ const selectorPadVisualConfig = {
   ringOpacity: (active: boolean, activationGlow: number) => 0.58 + (active ? 0.2 : 0) + activationGlow * 0.16,
   pulseOpacity: (active: boolean, activationGlow: number) => active ? 0.1 + activationGlow * 0.1 : activationGlow * 0.12,
 };
-const selectorRowZ = 5.8;
+const selectorRowZ = 11.7;
 const offersPageUrl = "https://www.crystalthedeveloper.ca/offers";
 const screenImageTint = "#f0f0f0";
 const screenIdleColor = "#0b1018";
@@ -110,10 +110,10 @@ const serviceScreenImages: Record<string, { bad: string; good: string }> = {
   },
 };
 const tipDisplayOptions = [
-  { id: "navigation", label: "Tips", header: "Make clicks obvious.", body: "Clear navigation helps visitors find the right page quickly and keeps them moving toward action.", position: [0, 0.18, 5.8] as [number, number, number] },
+  { id: "navigation", label: "Tips", header: "Make clicks obvious.", body: "Clear navigation helps visitors find the right page quickly and keeps them moving toward action.", position: [0, 0.18, 11.7] as [number, number, number] },
 ];
 const valueDisplayOptions = [
-  { id: "trust", label: "Value", header: "TRUST IS EARNED.", body: "I keep things simple, communicate clearly, and deliver what I promise.\nNo confusion. No surprises.", position: [0, 0.18, 5.8] as [number, number, number] },
+  { id: "trust", label: "Value", header: "TRUST IS EARNED.", body: "I keep things simple, communicate clearly, and deliver what I promise.\nNo confusion. No surprises.", position: [0, 0.18, 11.7] as [number, number, number] },
 ];
 const offerOptions = [
   { id: "audit", name: "Offers",

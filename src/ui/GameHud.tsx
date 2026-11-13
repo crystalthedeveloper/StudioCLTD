@@ -1,7 +1,7 @@
 import { formatCash } from "./formatCash";
 import { GameGuide } from "./GameGuide";
 import { PowerMeter } from "./PowerMeter";
-import { powerOrder, type PowerMode, jumpWithPower, isPowerActive, subscribePowers } from "../player/temporaryPowers";
+import { powerOrder, type PowerMode } from "../player/temporaryPowers";
 import { useGameFocus } from "../player/gameFocus";
 import { setGameAudioEnabled, useGameAudioEnabled } from "../audio/gameAudio";
 import { getActiveVillainVoiceId, subscribeVillainVoice } from "../audio/villainAudio";
@@ -29,7 +29,6 @@ const villainVoiceLabels: Record<string, string> = {
 export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onCloseGuide, health, onOpenWebsite, onRestart, cash }: GameHudProps) {
   const formattedCash = formatCash(cash);
   const gameFocused = useGameFocus();
-  const activationReady = useSyncExternalStore(subscribePowers, isPowerActive);
   const audioEnabled = useGameAudioEnabled();
   const activeVillainVoiceId = useSyncExternalStore(
     subscribeVillainVoice,
@@ -140,20 +139,6 @@ export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onClose
 
       {gameFocused && <div className="game-hud__bottom">
         <DirectionControls />
-        <div className="game-hud__powers" role="group" aria-label="Active powers. Pickups activate immediately; Space or Jump jumps.">
-          <button
-            type="button"
-            className="studio-button game-hud__fix"
-            aria-label="Jump while powered"
-            title="Jump while powered (Space)"
-            disabled={!activationReady}
-            onClick={jumpWithPower}
-          >
-            <img className="game-hud__fix-logo" src="/images/cltd-logo.svg" alt="" aria-hidden="true" draggable={false} />
-            <small>JUMP</small>
-          </button>
-        </div>
-
       </div>}
 
       {guideOpen && <GameGuide onClose={onCloseGuide} />}

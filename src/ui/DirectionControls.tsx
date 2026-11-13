@@ -20,9 +20,7 @@ const releasedControls: MovementControls = {
 };
 
 const directionButtons: DirectionButton[] = [
-  { directions: ["forward", "left"], id: "forward-left", label: "Forward and left", symbol: "↖" },
   { directions: ["forward"], id: "forward", label: "Forward", symbol: "↑" },
-  { directions: ["forward", "right"], id: "forward-right", label: "Forward and right", symbol: "↗" },
   { directions: ["left"], id: "left", label: "Turn or move left", symbol: "←" },
   { directions: ["backward"], id: "backward", label: "Backward", symbol: "↓" },
   { directions: ["right"], id: "right", label: "Turn or move right", symbol: "→" },

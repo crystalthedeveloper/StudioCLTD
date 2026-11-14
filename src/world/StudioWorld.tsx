@@ -133,6 +133,7 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
       <CharacterController
         damageFlashUntil={damageFlashUntil}
         dialogue={playerDialogue}
+        onReset={onReset}
         restartKey={restartKey}
         transportDestination={transportDestination}
         checkpoint={checkpoint}

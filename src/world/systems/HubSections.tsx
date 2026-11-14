@@ -260,9 +260,10 @@ function getShowcaseVideoElement() {
     video.muted = true;
     video.playsInline = true;
     video.autoplay = false;
-    video.preload = "metadata";
+    video.preload = "auto";
     video.setAttribute("playsinline", "");
     video.setAttribute("webkit-playsinline", "");
+    video.load();
 
     showcaseVideoElement = video;
   }
@@ -846,6 +847,11 @@ function ShowcaseScreenContent({ isPlaying: requestedPlaying }: { isPlaying: boo
     const attachTextureWhenReady = () => {
       if (disposed || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
       setVideoTexture(getShowcaseVideoTexture(video));
+      if (isPlaying && video.paused) {
+        void playShowcaseVideo(video, false).then((playing) => {
+          if (!disposed) setShowTapToPlay(!playing);
+        });
+      }
     };
 
     video.addEventListener("loadeddata", attachTextureWhenReady);

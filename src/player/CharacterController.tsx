@@ -30,6 +30,7 @@ const groundedRayDistance = playerSphereRadius + 0.13;
 type CharacterControllerProps = {
   damageFlashUntil: number;
   dialogue: DialogueMessage | null;
+  onReset: () => void;
   restartKey: number;
   transportDestination: TransportDestination | null;
   checkpoint: [number, number, number];
@@ -38,6 +39,7 @@ type CharacterControllerProps = {
 export function CharacterController({
   damageFlashUntil,
   dialogue,
+  onReset,
   restartKey,
   transportDestination,
   checkpoint,
@@ -58,6 +60,7 @@ export function CharacterController({
   const spawn = useMemo<[number, number, number]>(() => [0, 1.34, 18], []);
   const checkpointRef = useRef<[number, number, number]>(spawn);
   const teleportTimerRef = useRef<number | null>(null);
+  const fallResetPendingRef = useRef(false);
 
   const touchingGround = () => {
     const body = bodyRef.current;
@@ -92,6 +95,7 @@ export function CharacterController({
     resetPoweredJump();
     jumpInProgress.current = false;
     leftGround.current = false;
+    fallResetPendingRef.current = false;
     yawRef.current = 0;
     cameraYawRef.current = 0;
     forwardBackSpeedRef.current = 0;
@@ -204,6 +208,8 @@ export function CharacterController({
     body.setLinvel(nextVelocity, true);
 
     if (translation.y < -10) {
+      if (fallResetPendingRef.current) return;
+      fallResetPendingRef.current = true;
       resetPoweredJump();
       jumpInProgress.current = false;
       leftGround.current = false;
@@ -214,6 +220,7 @@ export function CharacterController({
       body.setLinvel({ x: 0, y: 0, z: 0 }, true);
       body.setAngvel({ x: 0, y: 0, z: 0 }, true);
       body.wakeUp();
+      onReset();
     }
 
     const nextState: CharacterAnimationState = isMoving ? "run" : "idle";

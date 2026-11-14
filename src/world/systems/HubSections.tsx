@@ -443,15 +443,11 @@ export function HubSections({ activeServiceInfoId, onSectionTrigger, restartKey,
             onShowcasePlay={() => {
               if (showcaseVideoState.playing) return;
               const video = getShowcaseVideoElement();
-              const finish = () => {
-                video.removeEventListener("ended", finish);
-                if (!showcaseCompletedRef.current) {
-                  showcaseCompletedRef.current = true;
-                  setShowcaseCompleted(true);
-                  onSectionTrigger("showcase", "play");
-                }
-              };
-              video.addEventListener("ended", finish, { once: true });
+              if (!showcaseCompletedRef.current) {
+                showcaseCompletedRef.current = true;
+                setShowcaseCompleted(true);
+                onSectionTrigger("showcase", "play");
+              }
               setShowcaseVideoState({ playing: true });
             }}
           />

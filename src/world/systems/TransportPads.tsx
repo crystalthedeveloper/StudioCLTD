@@ -10,8 +10,8 @@ import { isPlayerObject } from "../playerCollision";
 import { padVisualStyle } from "../padVisualStyle";
 import { triggerPopupLayout } from "../triggerPopupLayout";
 import { homeBaseCenter } from "./HomeBase";
-import { groundCenter, groundSize } from "../worldLayout";
-import { roadSurfaceY } from "../roadSurface";
+import { roadPoint } from "../roadSurface";
+import { brandYellow } from "../../player/effectColors";
 
 const transportCooldownMs = 1200;
 const arrivalDistanceFromSection = 16;
@@ -25,11 +25,8 @@ const transportSectionIds = [
   "urgent-fix",
   "showcase",
 ] as const;
-export const roadHomeBaseTransportPadPosition: readonly [number, number, number] = [
-  0,
-  roadSurfaceY + 0.035,
-  groundCenter[1] - groundSize[1] / 2 + 20,
-];
+const homeBaseRoadPoint = roadPoint(0, -800, 0.035);
+export const roadHomeBaseTransportPadPosition: readonly [number, number, number] = homeBaseRoadPoint;
 
 export type TransportDestination = {
   id: number;
@@ -57,8 +54,8 @@ export function TransportPads({ unlocked = false, onTransport, restartKey }: Tra
       toneMapped: false,
     });
     const homeBaseMaterial = new MeshStandardMaterial({
-      color: "#FACC15",
-      emissive: "#FACC15",
+      color: brandYellow,
+      emissive: brandYellow,
       emissiveIntensity: 1.35,
       metalness: 0.05,
       roughness: 0.36,
@@ -115,9 +112,9 @@ export function TransportPads({ unlocked = false, onTransport, restartKey }: Tra
       <TransportPad
         geometry={resources.geometry}
         label="HOME BASE"
-        labelColor="#FACC15"
+        labelColor={brandYellow}
         material={resources.homeBaseMaterial}
-        glowColor="#FACC15"
+        glowColor={brandYellow}
         onEnter={(event) => transportDirect([homeBaseCenter[0], homeBaseCenter[1] + 2.2, homeBaseCenter[2] - 6.5], Math.PI, event)}
         position={roadHomeBaseTransportPadPosition}
       />

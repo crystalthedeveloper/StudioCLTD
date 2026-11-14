@@ -1,5 +1,5 @@
 import { hubSections, destinationPlatformRadius, sectionRampApproachLength } from '../hubSections';
-import { groundSize, groundCenter, walkingRoutes, walkingPathWidth, routePickupPositions, routePowerPositions, plazaRadius } from '../worldLayout';
+import { groundSize, groundCenter, walkingRoutes, walkingPathWidth, routePickupPositions, routePowerPositions, plazaRadius, isInsideTriggerExclusion } from '../worldLayout';
 import { seededRandom } from './sceneryModels';
 
 export const scenerySettings = {
@@ -14,6 +14,7 @@ export function segmentDistance(x:number,z:number,a:readonly number[],b:readonly
   return Math.hypot(x-a[0]-t*dx,z-a[1]-t*dz);
 }
 export function sceneryClearance(x:number,z:number,radius:number,tall:boolean,featured = false) {
+  if (isInsideTriggerExclusion(x, z, radius)) return false;
   if (Math.abs(x-groundCenter[0])+radius>groundSize[0]/2-1 || Math.abs(z-groundCenter[1])+radius>groundSize[1]/2-1) return false;
   if (Math.hypot(x,z)<plazaRadius+radius+(featured?4:6)) return false;
   for (const route of walkingRoutes) for (let i=1;i<route.length;i++) {

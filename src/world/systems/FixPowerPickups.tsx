@@ -14,17 +14,24 @@ import { useGameFrame } from "../../player/useGameFrame";
 import { isCompactVisualBudget } from "../visualQuality";
 import { PickupSmokeGlow } from "./PickupSmokeGlow";
 import { effectCoreColors } from "../../player/effectColors";
+import { roadPoint } from "../roadSurface";
+import { isInsideTriggerExclusion } from "../worldLayout";
 
 const pickupRadius = 0.24;
 export function FixPowerPickups() {
-  const locations: [number, number, number][] = hubSections.flatMap(({ position: [, y, z] }, sectionIndex) => [
-    [-3.8 + (sectionIndex % 2) * 1.2, y, z - 20],
-    [3.8 - (sectionIndex % 2) * 1.2, y, z - 52],
+  const locations: [number, number, number][] = hubSections.flatMap(({ position: [, , z] }, sectionIndex) => [
+    powerPoint(-3.8 + (sectionIndex % 2) * 1.2, z - 20),
+    powerPoint(3.8 - (sectionIndex % 2) * 1.2, z - 30),
   ]);
   const surfaces = usePickupSurfaces(locations);
   return <group name="FixPowerPickups">{locations.map(([x, , z], index) =>
     <SmokePickup key={index} x={x} z={z} surface={surfaces[index]} mode={powerOrder[index % powerOrder.length]} />
   )}</group>;
+}
+function powerPoint(localX: number, z: number): [number, number, number] {
+  let point = roadPoint(localX, z, 0.12);
+  if (isInsideTriggerExclusion(point[0], point[2], 0.8)) point = roadPoint(localX, z - 10, 0.12);
+  return [...point] as [number, number, number];
 }
 function SmokePickup({ x, z, surface, mode }: { x: number; z: number; surface: PickupSurface; mode: PowerMode }) {
   const smoke = useMemo(() => createPowerSmoke(powerModes[mode].color, isCompactVisualBudget(), 0.52, false,

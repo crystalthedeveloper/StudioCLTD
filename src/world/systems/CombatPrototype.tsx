@@ -37,7 +37,8 @@ import { playerWorldState } from "../playerWorldState";
 import { padVisualStyle } from "../padVisualStyle";
 import { triggerPopupLayout } from "../triggerPopupLayout";
 import { fixPulseGeometry, fixRingGeometry, useTriggerPadVisuals } from "../useTriggerPadVisuals";
-import { clampRoadX, roadHalfWidth, roadSurfaceY } from "../roadSurface";
+import { clampRoadX, roadCenterX, roadHalfWidth, roadHeight, roadPoint, roadSurfaceY } from "../roadSurface";
+import { brandYellow } from "../../player/effectColors";
 
 const cooldownMs = 1800;
 const triggerPadRadius = 1.33;
@@ -46,12 +47,13 @@ const encounterSectionIds = ["quick-fix", "urgent-fix", "performance", "site-imp
 const defeatDurationMs = 1700;
 const villainFrontOffset = 2.8;
 const villainSideOffset = 5.1;
-const triggerPadFrontOffset = 47.58;
-const triggerPadSideOffset = 0;
+// Keep service triggers in the same front-of-TV position as Tips and Value.
+const triggerPadFrontOffset = 11.7;
 const bonusVillainContactRadiusSq = 1 * 1;
 const bonusVillainDetectionRadiusSq = 8 * 8;
 const bonusVillainChaseReleaseRadiusSq = 11 * 11;
-const bonusVillainMoveSpeed = 2.1;
+const bonusVillainMoveSpeed = 1.2;
+const bonusVillainVisualScale = 0.48;
 const bonusVillainSteeringAngles = [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, Math.PI] as const;
 
 const fixPadVisualConfig = {
@@ -78,10 +80,14 @@ function createSectionEncounters(): SectionEncounterConfig[] {
       const sectionPosition = new Vector3(...section.position);
       const towardEntrance = new Vector3(section.entrance[0], 0, section.entrance[1]);
       const tangent = new Vector3(-towardEntrance.z, 0, towardEntrance.x);
+      // SectionBillboard uses local +X for the right-side group; the road
+      // tangent points in the opposite local direction here.
+      const triggerPadSideOffset = ["quick-fix", "urgent-fix", "performance", "site-improvement"].includes(section.id) ? -5.4 : 5.4;
       const billboardSide = ["tips", "value", "urgent-fix", "site-improvement"].includes(section.id) ? -1 : 1;
       // Place the main villain on the road just ahead of its roadside TV,
       // leaving the full screen face visible from the approach.
-      const villainPosition = new Vector3(0, roadSurfaceY, section.position[2] - 8);
+      const villainRoadPoint = roadPoint(0, section.position[2] - 8);
+      const villainPosition = new Vector3(...villainRoadPoint);
       const padPosition = sectionPosition
         .clone()
         .add(towardEntrance.clone().multiplyScalar(triggerPadFrontOffset))
@@ -91,11 +97,9 @@ function createSectionEncounters(): SectionEncounterConfig[] {
         .add(towardEntrance.clone().multiplyScalar(triggerPadFrontOffset))
         .add(tangent.clone().multiplyScalar(-triggerPadSideOffset));
 
-      villainPosition.x = clampRoadX(villainPosition.x);
-      padPosition.x = clampRoadX(padPosition.x);
-      infoPadPosition.x = clampRoadX(infoPadPosition.x);
-      padPosition.y = roadSurfaceY + 0.07;
-      infoPadPosition.y = roadSurfaceY + 0.07;
+      villainPosition.x = clampRoadX(villainPosition.x, villainPosition.z);
+      padPosition.y = roadHeight(padPosition.z) + 0.07;
+      infoPadPosition.y = roadHeight(infoPadPosition.z) + 0.07;
 
       return {
         id: section.id,
@@ -109,7 +113,7 @@ function createSectionEncounters(): SectionEncounterConfig[] {
 }
 
 const sectionEncounters = createSectionEncounters();
-const bonusSpawnSpots = bonusRouteSpots.map(([x, z]) => new Vector3(clampRoadX(x), roadSurfaceY, z));
+const bonusSpawnSpots = bonusRouteSpots.map(([x, z]) => new Vector3(...roadPoint(x, z)));
 const bonusRampClearance = 2;
 
 function distanceToBonusRamp(
@@ -134,7 +138,7 @@ function isSafeBonusRoamingPosition(x: number, z: number) {
 }
 
 function getBonusRoamingClearance(x: number, z: number) {
-  let clearance = Math.min(roadHalfWidth - Math.abs(x), z + 202, 28 - z);
+  let clearance = Math.min(roadHalfWidth - Math.abs(x - roadCenterX(z)), z + 828, 28 - z);
 
   for (const section of hubSections) {
     const [sectionX, , sectionZ] = section.position;
@@ -247,10 +251,9 @@ function BonusVillainSystem({
 }) {
   return (
     <group name="BonusVillains">
-      <BonusVillain id="bonus:1" initialSpot={0} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} />
-      <BonusVillain id="bonus:2" initialSpot={2} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} />
-      <BonusVillain id="bonus:3" initialSpot={4} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} />
-      <BonusVillain id="bonus:4" initialSpot={6} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} />
+      {bonusSpawnSpots.map((_, index) => (
+        <BonusVillain key={`bonus:${index + 1}`} id={`bonus:${index + 1}`} initialSpot={index} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} />
+      ))}
     </group>
   );
 }
@@ -357,13 +360,13 @@ function BonusVillain({
     const playerDx = playerWorldState.position.x - positionRef.current.x;
     const playerDz = playerWorldState.position.z - positionRef.current.z;
     const playerDistanceSq = playerDx * playerDx + playerDz * playerDz;
-    const sameLevel = Math.abs(playerWorldState.position.y - (positionRef.current.y + 1)) < 1.5;
+    const sameLevel = Math.abs(playerWorldState.position.y - (positionRef.current.y + 0.7)) < 1.15;
     const inRange = sameLevel && playerDistanceSq <= bonusVillainContactRadiusSq && navigation.sight(positionRef.current, playerWorldState.position);
     // Sphere against the bonus villain's body volume, not its chase radius.
     const bodyDx = Math.max(Math.abs(playerDx) - 0.3, 0);
     const bodyDz = Math.max(Math.abs(playerDz) - 0.3, 0);
-    const bodyDy = Math.max(positionRef.current.y + 0.18 - playerWorldState.position.y,
-      playerWorldState.position.y - (positionRef.current.y + 1.8), 0);
+    const bodyDy = Math.max(positionRef.current.y + 0.12 - playerWorldState.position.y,
+      playerWorldState.position.y - (positionRef.current.y + 1.2), 0);
     const touchingBody = bodyDx * bodyDx + bodyDy * bodyDy + bodyDz * bodyDz <= playerSphereRadius ** 2;
     if (touchingBody
       && poweredContact(id, positionRef.current)) return;
@@ -407,6 +410,7 @@ function BonusVillain({
       if (safeHeading !== undefined) {
         positionRef.current.x += Math.sin(safeHeading) * step;
         positionRef.current.z += Math.cos(safeHeading) * step;
+        positionRef.current.y = roadHeight(positionRef.current.z);
         group.position.copy(positionRef.current);
         const turnDelta = Math.atan2(
           Math.sin(safeHeading - group.rotation.y),
@@ -425,11 +429,11 @@ function BonusVillain({
   return (
     <>
       <group ref={groupRef} position={positionRef.current} visible={alive}>
-        <group ref={reaction.group}><primitive object={scene} scale={0.68} position={[0, 0.42, 0]} /></group>
+        <group ref={reaction.group}><primitive object={scene} scale={bonusVillainVisualScale} position={[0, 0.3, 0]} /></group>
       </group>
       {showCashPopup && (
         <BillboardLabel
-          color="#E4B93F"
+          color={brandYellow}
           fontSize={0.38}
           position={[cashPopupPositionRef.current.x, cashPopupPositionRef.current.y, cashPopupPositionRef.current.z]}
           maxWidth={2}
@@ -463,30 +467,15 @@ function PowerContactEffects() {
 function VillainBloodBurst({ onComplete, burst }: { onComplete: () => void; burst: VillainBloodBurst }) {
   const { position } = burst;
   const elapsedRef = useRef(0);
-  const ringRef = useRef<Mesh>(null);
-  const flashRef = useRef<Mesh>(null);
 
   useGameFrame((_, delta) => {
     elapsedRef.current += delta;
     const progress = Math.min(elapsedRef.current / 1.5, 1);
-    const burstProgress = Math.min(elapsedRef.current / 0.55, 1);
-    ringRef.current?.scale.setScalar(0.5 + burstProgress * 2.2);
-    flashRef.current?.scale.setScalar(0.3 + burstProgress * 0.9);
-    if (ringRef.current?.material instanceof MeshBasicMaterial) ringRef.current.material.opacity = (1 - burstProgress) * 0.7;
-    if (flashRef.current?.material instanceof MeshBasicMaterial) flashRef.current.material.opacity = (1 - burstProgress) * 0.72;
     if (progress >= 1) onComplete();
   });
 
   return (
     <group position={position}>
-      <mesh ref={ringRef} rotation-x={-Math.PI / 2} position={[0, -0.62, 0]} scale={0.5}>
-        <ringGeometry args={[0.34, 0.48, 24]} />
-        <meshBasicMaterial color="#ffd84a" transparent opacity={0.7} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <mesh ref={flashRef} position={[0, 1.05, 0]} scale={0.3}>
-        <sphereGeometry args={[0.42, 12, 8]} />
-        <meshBasicMaterial color="#fff1a8" transparent opacity={0.72} depthWrite={false} toneMapped={false} />
-      </mesh>
       <mesh position={[0, -0.8, 0]} scale={[1.55, 0.12, 1.25]}>
         <sphereGeometry args={[0.42, 12, 6]} />
         <meshBasicMaterial color="#5b101b" transparent opacity={0.82} depthWrite={false} />
@@ -603,7 +592,7 @@ export function TriggerPad({ active, label, onActivate, onDeactivate, position }
     <group position={position}>
       <mesh rotation-x={-Math.PI / 2} position={[0, 0.012, 0]} scale={[2.6, 0.9, 1]}>
         <planeGeometry args={[1, 1]} />
-        <meshBasicMaterial color={active ? "#e4b93f" : "#8b949e"} transparent opacity={0.42} depthWrite={false} />
+        <meshBasicMaterial color={active ? brandYellow : "#8b949e"} transparent opacity={0.42} depthWrite={false} />
       </mesh>
       <CylinderCollider
         sensor
@@ -621,7 +610,7 @@ export function TriggerPad({ active, label, onActivate, onDeactivate, position }
       </mesh>
       {label && !playerInside && (
         <BillboardLabel
-          color={padVisualStyle.labelColor}
+          color={active ? brandYellow : padVisualStyle.labelColor}
           fontSize={label === "More Info" ? 0.24 : 0.28}
           position={[0, triggerPopupLayout.labelHeight, 0]}
           maxWidth={2.5}

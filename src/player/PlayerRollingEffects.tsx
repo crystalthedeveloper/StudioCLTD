@@ -56,7 +56,7 @@ export function PlayerRollingEffects({ sphere }: { sphere: RefObject<Object3D> }
   const motion = useMemo(() => ({
     rolling: createRollingMotion(), position: new Vector3(), previous: new Vector3(),
     normal: new Vector3(0, 1, 0), up: new Vector3(0, 1, 0), forward: new Vector3(0, 0, 1),
-    direction: new Vector3(), previousDirection: new Vector3(), contact: new Vector3(),
+    direction: new Vector3(), previousDirection: new Vector3(), lateral: new Vector3(), contact: new Vector3(),
     rotation: new Quaternion(), transform: new Object3D(),
     ray: new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 }),
     initialized: false, grounded: false, speed: 0, spacing: 0,
@@ -135,15 +135,16 @@ export function PlayerRollingEffects({ sphere }: { sphere: RefObject<Object3D> }
       motion.spacing %= interval;
       for (let i = 0; i < count; i++) {
         const behind = radius * 0.65 + i * Math.min(distance / Math.max(1, count), 0.1);
+        motion.lateral.set(-motion.direction.z, 0, motion.direction.x).multiplyScalar(i % 2 === 0 ? 0.62 : -0.62);
         const puff = resources.puffs.items[resources.puffs.cursor++ % resources.puffs.items.length];
-        puff.age = 0; puff.life = 0.32 + Math.random() * 0.12;
-        puff.size = (0.045 + Math.random() * 0.035) * (1 + boost * 0.3);
-        puff.position.copy(motion.contact).addScaledVector(motion.direction, -behind).addScaledVector(motion.normal, 0.045);
-        puff.velocity.copy(motion.direction).multiplyScalar(-0.18 - Math.random() * 0.16)
-          .addScaledVector(motion.normal, 0.16 + Math.random() * 0.12);
+        puff.age = 0; puff.life = 0.24 + Math.random() * 0.1;
+        puff.size = (0.032 + Math.random() * 0.024) * (1 + boost * 0.25);
+        puff.position.copy(motion.contact).add(motion.lateral).addScaledVector(motion.direction, -behind).addScaledVector(motion.normal, 0.035);
+        puff.velocity.copy(motion.direction).multiplyScalar(-0.1 - Math.random() * 0.1)
+          .addScaledVector(motion.normal, 0.1 + Math.random() * 0.08);
         const mark = resources.trail.items[resources.trail.cursor++ % resources.trail.items.length];
         mark.age = 0; mark.life = 0.3; mark.size = radius * 0.75;
-        mark.position.copy(motion.contact).addScaledVector(motion.direction, -behind).addScaledVector(motion.normal, 0.013);
+        mark.position.copy(motion.contact).add(motion.lateral).addScaledVector(motion.direction, -behind).addScaledVector(motion.normal, 0.013);
         mark.rotation.copy(motion.rotation);
       }
     }

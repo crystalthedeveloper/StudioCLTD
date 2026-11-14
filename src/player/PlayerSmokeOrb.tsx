@@ -1,7 +1,8 @@
 import { useTexture } from "@react-three/drei";
 import { useEffect, useMemo, useRef } from "react";
 import { Color, Group, SRGBColorSpace, Vector3 } from "three";
-const orbCoreColors = { wind: "#42d66a", shock: "#e0ae43", fire: "#f05a35", none: "#9aa0a6" } as const;
+import { brandYellow } from "./effectColors";
+const orbCoreColors = { wind: "#42d66a", shock: brandYellow, fire: "#f05a35", none: "#9aa0a6" } as const;
 import { createPowerSmoke } from "./powerSmoke";
 import { getActivePowerMask, powerModes, powerOrder } from "./temporaryPowers";
 import { gameNow, subscribeGameFocus } from "./gameFocus";

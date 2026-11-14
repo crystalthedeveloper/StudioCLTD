@@ -1,10 +1,25 @@
-import { destinationPlatformRadius, hubSections, sectionRampApproachLength } from './hubSections';
+import { destinationPlatformRadius, hubSections, roadCenterX, sectionRampApproachLength } from './hubSections';
 
 export type GroundPoint = readonly [number, number];
-export const groundSize = [92, 720] as const;
-export const groundCenter = [0, -315] as const;
+export const groundSize = [92, 900] as const;
+export const groundCenter = [0, -390] as const;
 export const plazaRadius = 18;
 export const walkingPathWidth = 7;
+export const triggerExclusionRadius = 5.2;
+export function sectionTriggerPoint(section: (typeof hubSections)[number]): GroundPoint {
+  const side = ["quick-fix", "urgent-fix", "performance", "site-improvement"].includes(section.id) ? 5.4 : -5.4;
+  const forward = 11.7;
+  const [dx, dz] = section.entrance;
+  return [
+    section.position[0] + dz * side + dx * forward,
+    section.position[2] - dx * side + dz * forward,
+  ];
+}
+export const sectionTriggerPoints = hubSections.map(sectionTriggerPoint);
+export const homeBaseTransportPoint: GroundPoint = [roadCenterX(-800), -800];
+export function isInsideTriggerExclusion(x: number, z: number, radius = 0) {
+  return [...sectionTriggerPoints, homeBaseTransportPoint].some(([triggerX, triggerZ]) => Math.hypot(x - triggerX, z - triggerZ) < triggerExclusionRadius + radius);
+}
 // Clockwise circuit joins all three districts. North is negative Z.
 export const walkingLoop: GroundPoint[] = [
   [-24, 16], [-24, 0], [-28, -36], [-30, -48], [10, -56],
@@ -41,4 +56,9 @@ export const routePickupPositions: Record<string, GroundPoint> = {
   'light-1': [-10, -20], 'light-2': [18, -24], 'light-3': [-20, -38],
   'light-4': [12, 16], 'light-5': [-15, -8],
 };
-export const bonusRouteSpots: GroundPoint[] = [[-5, -35], [5, -105], [-4, -180], [4, -255], [-5, -330], [5, -405], [-4, -480], [4, -555]];
+export const bonusRouteSpots: GroundPoint[] = [
+  [-3.2, -45], [3.2, -95], [-2.8, -145], [2.8, -195],
+  [-3.2, -245], [3.2, -295], [-2.8, -345], [2.8, -395],
+  [-3.2, -445], [3.2, -495], [-2.8, -545], [2.8, -595],
+  [-3.2, -645], [2.8, -695], [-3.2, -745], [2.8, -795],
+];

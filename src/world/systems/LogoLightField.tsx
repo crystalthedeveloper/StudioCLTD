@@ -1,6 +1,6 @@
 import { triggerPopupLayout } from "../triggerPopupLayout";
 import { GroundedPickupVisual, usePickupSurfaces, type PickupSurface } from "../pickupSurface";
-import { routePickupPositions, groundSize, groundCenter } from "../worldLayout";
+import { routePickupPositions, groundSize, groundCenter, isInsideTriggerExclusion } from "../worldLayout";
 import { isCompactVisualBudget } from "../visualQuality";
 import { assetForDevice } from "../mobileAssets";
 import { useGameFrame } from "../../player/useGameFrame";
@@ -23,7 +23,8 @@ import { BillboardLabel } from "../../ui/BillboardLabel";
 import { destinationPlatformRadius, hubSections, sectionRampApproachLength, sectionRampWidth } from "../hubSections";
 import { roadHomeBaseTransportPadPosition } from "./TransportPads";
 import { homeBaseCenter } from "./HomeBase";
-import { clampRoadX, roadSurfaceY } from "../roadSurface";
+import { clampRoadX, roadPoint, roadSurfaceY } from "../roadSurface";
+import { brandYellow } from "../../player/effectColors";
 
 const logoPath = "/logo/logo-optimized.glb";
 const logoScale = 1.8;
@@ -110,6 +111,7 @@ function distanceToSegment(
 
 function isOpenCollectiblePosition(position: readonly [number, number], placed: readonly PlazaLogo[]) {
   const [x, z] = position;
+  if (isInsideTriggerExclusion(x, z, pickupColliderRadius)) return false;
   if (Math.abs(x - groundCenter[0]) > groundSize[0] / 2 - 6 || Math.abs(z - groundCenter[1]) > groundSize[1] / 2 - 6) return false;
 
   for (const section of hubSections) {
@@ -165,12 +167,12 @@ function resolveLogoPlacements(logos: readonly PlazaLogo[]) {
 
 const accessiblePlazaLogos = resolveLogoPlacements(plazaLogos.map((logo, index) => ({
   ...logo,
-  position: [clampRoadX((index % 5 - 2) * 2.8), -18 - index * 7] as [number, number],
+  position: [clampRoadX((index % 5 - 2) * 2.8, -18 - index * 7), -18 - index * 7] as [number, number],
   height: roadSurfaceY + 0.04,
 })));
 
 const logoColors: Record<LogoKind, string> = {
-  coin: "#E4B93F",
+  coin: brandYellow,
   penalty: "#991b1b",
   contact: "#2583e8",
   share: "#a855f7",
@@ -260,7 +262,9 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
       const roadMoney = accessiblePlazaLogos.map((logo, index) => {
         const section = hubSections[Math.min(hubSections.length - 1, Math.floor(index / 3))];
         const lane = index % 3;
-        return { ...logo, position: [clampRoadX((lane - 1) * 4.2), section.position[2] - 10 - lane * 10] as [number, number], height: roadSurfaceY + 0.04 };
+        const z = section.position[2] - 10 - lane * 10;
+        const point = roadPoint((lane - 1) * 4.2, z, 0.04);
+        return { ...logo, position: [point[0], z] as [number, number], height: point[1] };
       });
       const restartRelocated = [...roadMoney, ...homeBaseLogos].map((logo, index) => {
         if (logo.kind !== "penalty" && logo.kind !== "light") return logo;
@@ -274,7 +278,9 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
         };
         const lane = next() * 2 - 1;
         const forwardOffset = (next() - 0.5) * 14;
-        return { ...logo, position: [clampRoadX(lane * 4.1), logo.position[1] + forwardOffset] as [number, number] };
+        const z = logo.position[1] + forwardOffset;
+        const point = roadPoint(lane * 4.1, z, 0.04);
+        return { ...logo, position: [point[0], z] as [number, number], height: point[1] };
       });
       return restartRelocated.map((logo) => ({
         ...logo,
@@ -574,7 +580,7 @@ function GoldBarVisual({ scale }: { scale: number }) {
   return <group name="GoldBar" scale={scale * 0.5}>
     <mesh castShadow receiveShadow>
       <boxGeometry args={[0.78, 0.34, 0.34]} />
-      <meshStandardMaterial color="#E4B93F" emissive="#E4B93F" emissiveIntensity={0.4} metalness={0.72} roughness={0.25} />
+      <meshStandardMaterial color={brandYellow} emissive={brandYellow} emissiveIntensity={0.4} metalness={0.72} roughness={0.25} />
     </mesh>
     <mesh position={[0, 0, 0.176]}>
       <planeGeometry args={[0.7, 0.3]} />

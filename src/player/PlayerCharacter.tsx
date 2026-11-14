@@ -26,6 +26,7 @@ export function PlayerCharacter({ dialogue, yawRef }: PlayerCharacterProps) {
     clone.traverse((object) => {
       if (!(object instanceof Mesh)) return;
       object.castShadow = true; object.receiveShadow = true;
+      if (/stripe|racing|roof.?line|hood.?line|decal/i.test(object.name)) object.visible = false;
       if (object.material instanceof MeshStandardMaterial) object.material = object.material.clone();
     });
     const raw = new Box3().setFromObject(clone);
@@ -73,7 +74,16 @@ export function PlayerCharacter({ dialogue, yawRef }: PlayerCharacterProps) {
   });
   body.traverse((object) => {
     if (!(object instanceof Mesh) || !(object.material instanceof MeshStandardMaterial)) return;
-    const protectedPart = /wheel|tire|tyre|rim|window|glass|head|light|interior/i.test(object.name);
+    const windowPart = /window|glass|windshield|windscreen/i.test(object.name);
+    if (windowPart) {
+      object.material.color.set("#030507");
+      object.material.emissive.set("#000000");
+      object.material.emissiveIntensity = 0;
+      object.material.roughness = 0.2;
+      object.material.metalness = 0.18;
+      return;
+    }
+    const protectedPart = /wheel|tire|tyre|rim|head|light|interior/i.test(object.name);
     if (protectedPart) return;
     object.material.color.set(primary ? powerModes[primary].color : "#101318");
     object.material.emissive.set(primary ? powerModes[primary].color : "#000000");

@@ -36,6 +36,7 @@ import { triggerPopupLayout } from "../triggerPopupLayout";
 import { portalPulseGeometry, portalRingGeometry, useTriggerPadVisuals } from "../useTriggerPadVisuals";
 import { serviceInfoText } from "../serviceInfo";
 import { playVillainVoice } from "../../audio/villainAudio";
+import { brandYellow } from "../../player/effectColors";
 
 type HubSectionsProps = {
   activeServiceInfoId: string | null;
@@ -47,8 +48,9 @@ type HubSectionsProps = {
 const offerCountdownMs = 3000;
 const offerDisplayMs = 10000;
 const simpleDisplayMs = 10000;
-const mobileBillboardScale = 0.78;
-const tvSizeScale = 0.9;
+const mobileBillboardScale = 1;
+const tvSizeScale = 0.64;
+const tvVerticalLift = 1.15;
 // Lower the visual centre by the lost half-height to preserve its bottom edge.
 const tvCentreDrop = (scale: number) => 2.9 * scale * (1 - tvSizeScale);
 const mobileBillboardYOffset = -0.55;
@@ -66,7 +68,10 @@ const selectorPadVisualConfig = {
   ringOpacity: (active: boolean, activationGlow: number) => 0.58 + (active ? 0.2 : 0) + activationGlow * 0.16,
   pulseOpacity: (active: boolean, activationGlow: number) => active ? 0.1 + activationGlow * 0.1 : activationGlow * 0.12,
 };
+// Keep interaction pads in the established reachable driving lane in front of the TV.
 const selectorRowZ = 11.7;
+const completedTriggerColor = brandYellow;
+const roadsideOffsetForSection = (sectionId: string) => ["quick-fix", "urgent-fix", "performance", "site-improvement"].includes(sectionId) ? 5.4 : -5.4;
 const offersPageUrl = "https://www.crystalthedeveloper.ca/offers";
 const screenImageTint = "#f0f0f0";
 const screenIdleColor = "#0b1018";
@@ -84,7 +89,7 @@ const tvFrameGeometry = new BoxGeometry(10.4, 5.8, 0.32);
 // Both screen groups are already children of their local floor/platform origin.
 // Compensate for the existing responsive scale/offset without resizing the TV.
 function screenGroupHeight(scale: number, offset: number) {
-  return 0.5 + tvFrameGeometry.parameters.height * 0.5 * scale - offset;
+  return 0.5 + tvFrameGeometry.parameters.height * 0.5 * scale - offset + tvVerticalLift;
 }
 // Inset the emissive backing beneath the media, including its +0.1 Y offset.
 // The old 4.85 height exposed a bright 0.014-unit strip above every screen.
@@ -109,10 +114,10 @@ const serviceScreenImages: Record<string, { bad: string; good: string }> = {
   },
 };
 const tipDisplayOptions = [
-  { id: "navigation", label: "Tips", header: "Make clicks obvious.", body: "Clear navigation helps visitors find the right page quickly and keeps them moving toward action.", position: [0, 0.18, 11.7] as [number, number, number] },
+  { id: "navigation", label: "Tips", header: "Make clicks obvious.", body: "Clear navigation helps visitors find the right page quickly and keeps them moving toward action.", position: [0, 0.18, selectorRowZ] as [number, number, number] },
 ];
 const valueDisplayOptions = [
-  { id: "trust", label: "Value", header: "TRUST IS EARNED.", body: "I keep things simple, communicate clearly, and deliver what I promise.\nNo confusion. No surprises.", position: [0, 0.18, 11.7] as [number, number, number] },
+  { id: "trust", label: "Value", header: "TRUST IS EARNED.", body: "I keep things simple, communicate clearly, and deliver what I promise.\nNo confusion. No surprises.", position: [0, 0.18, selectorRowZ] as [number, number, number] },
 ];
 const offerOptions = [
   { id: "audit", name: "Offers",
@@ -486,6 +491,7 @@ function HubSectionDistrict({
   showcaseVideoState: ShowcaseVideoState;
   showcaseCompleted: boolean;
 }) {
+  const roadsideOffset = roadsideOffsetForSection(section.id);
   const rotation = useMemo(() => {
     return Math.atan2(section.entrance[0], section.entrance[1]);
   }, [section.entrance]);
@@ -502,6 +508,7 @@ function HubSectionDistrict({
         selectedOffer={selectedOffer}
         showcaseVideoState={showcaseVideoState}
       />
+      <group name={`RoadsideSectionTriggers:${section.id}`} position={[roadsideOffset, 0, 0]}>
       {section.id === "offers" && <OffersSelector selectedOfferId={selectedOffer?.id ?? null} onOfferSelect={onOfferSelect} />}
       {section.id === "tips" && (
         <TipsDisplaySelector
@@ -523,6 +530,7 @@ function HubSectionDistrict({
           onPlayerExit={onShowcasePause}
         />
       )}
+      </group>
     </group>
   );
 }
@@ -546,8 +554,7 @@ function SectionBillboard({
   selectedOffer: OfferOption | null;
   showcaseVideoState: ShowcaseVideoState;
 }) {
-  const billboardSide = ["tips", "value", "urgent-fix", "site-improvement"].includes(section.id) ? -1 : 1;
-  const billboardX = billboardSide * 12;
+  const roadsideOffset = roadsideOffsetForSection(section.id);
   const isOffers = section.id === "offers";
   const simpleDisplay = section.id === "tips";
   const isTextScreen = isOffers || simpleDisplay || section.id === "value";
@@ -556,12 +563,12 @@ function SectionBillboard({
   const isShowcase = section.id === "showcase";
 
   return (
-    <group name={`Billboard:${section.id}`} position={[billboardX, screenGroupHeight(billboardScale, billboardYOffset), 0]} rotation-y={Math.PI + billboardSide * MathUtils.degToRad(140)}>
+    <group name={`Billboard:${section.id}`} position={[roadsideOffset, screenGroupHeight(billboardScale, billboardYOffset), selectorRowZ * 1.6]} rotation-y={Math.PI}>
       <group name={`BillboardVisual:${section.id}`} position={[0, billboardYOffset - tvCentreDrop(billboardScale), 0]} scale={billboardScale * tvSizeScale}>
         <LocalLightSpill position={[0, -1.8, -0.8]} intensity={5} distance={10} />
         <mesh castShadow receiveShadow geometry={tvFrameGeometry} position={[0, 0, -0.08]} dispose={null}>
           <meshStandardMaterial
-            color={serviceResolutions[section.id] ? "#d6a928" : "#101621"}
+            color="#101621"
             emissive="#000000"
             emissiveIntensity={0}
             metalness={0.12}
@@ -590,7 +597,7 @@ function SectionBillboard({
         outlineColor="#05070b"
         outlineWidth={0.018}
       >
-        {serviceResolutions[section.id] ? `✓ ${section.name}` : section.name}
+        {section.name}
       </Text>
       {isOffers ? (
         selectedOffer ? <OffersScreenContent /> : null
@@ -684,7 +691,7 @@ function OffersScreenContent() {
       <Text
         material-depthTest={true}
         material-depthWrite={true}
-        color="#ffe600"
+            color={brandYellow}
         font={gameTextFont}
         fontSize={0.58}
         anchorX="center"
@@ -727,7 +734,7 @@ function TipsScreenContent({ tipId }: { tipId: string }) {
       <mesh geometry={screenContentGeometry} position={[0, -0.03, screenContentZ]} dispose={null}>
         <meshBasicMaterial color="#05070b" depthTest={true} depthWrite={true} side={DoubleSide} toneMapped={false} />
       </mesh>
-      <Text material-depthTest material-depthWrite color="#ffe600" font={gameTextFont} fontSize={0.58}
+      <Text material-depthTest material-depthWrite color={brandYellow} font={gameTextFont} fontSize={0.58}
         anchorX="center" anchorY="middle" position={[0, 1.22, screenTextZ]} maxWidth={8.2}
         textAlign="center" outlineColor="#05070b" outlineWidth={0.03}>
         {tip.header}
@@ -750,7 +757,7 @@ function ValueScreenContent({ valueId }: { valueId: string }) {
       <mesh geometry={screenContentGeometry} position={[0, -0.03, screenContentZ]} dispose={null}>
         <meshBasicMaterial color="#05070b" depthTest={true} depthWrite={true} side={DoubleSide} toneMapped={false} />
       </mesh>
-      <Text material-depthTest material-depthWrite color="#ffe600" font={gameTextFont} fontSize={0.58}
+      <Text material-depthTest material-depthWrite color={brandYellow} font={gameTextFont} fontSize={0.58}
         anchorX="center" anchorY="middle" position={[0, 1.22, screenTextZ]} maxWidth={8.2}
         textAlign="center" outlineColor="#05070b" outlineWidth={0.03}>
         {value.header}
@@ -1316,13 +1323,13 @@ function OfferPortalPad({
       />
       <LocalLightSpill intensity={completed ? 2.2 : active ? 2.2 : 0.6} distance={4} />
       <mesh ref={ringRef} geometry={portalRingGeometry} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]} dispose={null}>
-        <meshBasicMaterial color={completed ? "#E4B93F" : padVisualStyle.color} transparent opacity={0.5} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={completed ? completedTriggerColor : padVisualStyle.color} transparent opacity={0.5} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh ref={pulseRef} geometry={portalPulseGeometry} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       {!playerInside && <BillboardLabel
-        color={completed ? "#E4B93F" : padVisualStyle.labelColor}
+        color={completed ? completedTriggerColor : padVisualStyle.labelColor}
         fontSize={offer.name.length > 18 ? 0.2 : 0.24}
         position={[0, triggerPopupLayout.labelHeight, 0]}
         maxWidth={2.8}
@@ -1413,13 +1420,13 @@ function ShowcasePortalPad({
       />
       <LocalLightSpill intensity={completed ? 2.8 : active ? 2.2 : 0.6} distance={4} />
       <mesh ref={ringRef} geometry={portalRingGeometry} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]} dispose={null}>
-        <meshBasicMaterial color={completed ? "#e4b93f" : padVisualStyle.color} transparent opacity={completed ? 0.72 : 0.52} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={completed ? completedTriggerColor : padVisualStyle.color} transparent opacity={completed ? 0.72 : 0.52} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh ref={pulseRef} geometry={portalPulseGeometry} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false} dispose={null}>
         <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
       </mesh>
       <BillboardLabel
-        color={completed ? "#e4b93f" : padVisualStyle.labelColor}
+        color={completed ? completedTriggerColor : padVisualStyle.labelColor}
         fontSize={0.28}
         position={[0, triggerPopupLayout.labelHeight, 0]}
         maxWidth={3}

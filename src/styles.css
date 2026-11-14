@@ -4,6 +4,10 @@
   font-display: swap;
 }
 
+:root {
+  --brand-yellow: #FFD60A;
+}
+
 .studio-button {
   border-radius: 0;
 }
@@ -835,7 +839,7 @@ body aside.game-hud .game-hud__left .game-hud__stat--cash {
 body aside.game-hud .game-hud__left .game-hud__stat--cash strong {
   max-width: 100%;
   font-variant-numeric: tabular-nums;
-  color: #E4B93F;
+  color: var(--brand-yellow);
   font-size: min(18px, calc(100cqw / var(--cash-characters)));
   font-weight: 900;
 }

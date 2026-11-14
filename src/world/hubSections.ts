@@ -11,16 +11,40 @@ export type HubSection = {
 export const destinationPlatformRadius = 11;
 export const sectionRampApproachLength = 8;
 export const sectionRampWidth = 4.2;
+export const sharedRoadSurfaceY = 0.84;
+const roadStartZ = 28;
+const roadTurnScale = Math.PI / 160;
+export function roadCenterX(z: number) {
+  const distance = roadStartZ - z;
+  return 8.5 * Math.sin(distance * roadTurnScale) + 2.8 * Math.sin(distance * roadTurnScale * 0.47);
+}
+export function roadHeight(z: number) {
+  const distance = roadStartZ - z;
+  return sharedRoadSurfaceY + distance * 0.0014 + 0.42 * Math.sin(distance * Math.PI / 280) + 0.18 * Math.sin(distance * Math.PI / 124);
+}
+export function roadTangent(z: number) {
+  const step = 0.1;
+  const dx = roadCenterX(z - step) - roadCenterX(z + step);
+  const dz = -step * 2;
+  const length = Math.hypot(dx, dz);
+  const tangentX = dx / length;
+  return [tangentX, Math.sign(dz) * Math.sqrt(Math.max(0, 1 - tangentX * tangentX))] as const;
+}
+export function roadPoint(localX: number, z: number, yOffset = 0) {
+  const tangent = roadTangent(z);
+  return [roadCenterX(z) - tangent[1] * localX, roadHeight(z) + yOffset, z] as const;
+}
 
 export const hubSections: HubSection[] = [
-  { id: "tips", name: "Tips", icon: "T", position: [0, 0.55, -60], entrance: [0, 1], color: "#63d8ff", accent: "#1aa7ff" },
-  { id: "offers", name: "Offers", icon: "O", position: [0, 0.55, -135], entrance: [0, 1], color: "#E8ECEF", accent: "#ff9f1c" },
-  { id: "value", name: "Value", icon: "V", position: [0, 0.55, -210], entrance: [0, 1], color: "#7dffb2", accent: "#26d07c" },
-  { id: "quick-fix", name: "Quick Fix", icon: "Q", position: [0, 0.55, -285], entrance: [0, 1], color: "#ffbc75", accent: "#ff6b35" },
-  { id: "urgent-fix", name: "Urgent Fix", icon: "U", position: [0, 0.55, -360], entrance: [0, 1], color: "#ff5d5d", accent: "#d7263d" },
-  { id: "performance", name: "Performance", icon: "P", position: [0, 0.55, -435], entrance: [0, 1], color: "#c77dff", accent: "#8a2be2" },
-  { id: "site-improvement", name: "Site Improvement", icon: "S", position: [0, 0.55, -510], entrance: [0, 1], color: "#70e4ff", accent: "#2a9df4" },
-  { id: "showcase", name: "Showcase", icon: "SC", position: [0, 0.55, -585], entrance: [0, 1], color: "#E8ECEF", accent: "#E8ECEF" },
+  ...[
+    ["tips", "Tips", "T", -80, "#63d8ff", "#1aa7ff"], ["offers", "Offers", "O", -180, "#E8ECEF", "#ff9f1c"],
+    ["value", "Value", "V", -280, "#7dffb2", "#26d07c"], ["quick-fix", "Quick Fix", "Q", -380, "#ffbc75", "#ff6b35"],
+    ["urgent-fix", "Urgent Fix", "U", -480, "#ff5d5d", "#d7263d"], ["performance", "Performance", "P", -580, "#c77dff", "#8a2be2"],
+    ["site-improvement", "Site Improvement", "S", -680, "#70e4ff", "#2a9df4"], ["showcase", "Showcase", "SC", -780, "#E8ECEF", "#E8ECEF"],
+  ].map(([id, name, icon, z, color, accent]) => {
+    const tangent = roadTangent(Number(z));
+    return { id: String(id), name: String(name), icon: String(icon), position: [roadCenterX(Number(z)), roadHeight(Number(z)) - 0.29, Number(z)] as [number, number, number], entrance: [tangent[0], tangent[1]] as [number, number], color: String(color), accent: String(accent) };
+  }),
 ];
 
 export const levelOrder = hubSections.map(({ id }) => id);

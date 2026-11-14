@@ -19,6 +19,7 @@ import { SpaceSky } from "./systems/SpaceSky";
 import { WorldLights } from "./systems/WorldLights";
 import { TransportPads } from "./systems/TransportPads";
 import type { TransportDestination } from "./systems/TransportPads";
+import { roadPoint } from "./roadSurface";
 
 type StudioWorldProps = {
   damageFlashUntil: number;
@@ -54,7 +55,8 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
   const [completedCount, setCompletedCount] = useState(0);
   const [transportDestination, setTransportDestination] = useState<TransportDestination | null>(null);
   // Section triggers are all live simultaneously; completion is keyed by ID.
-  const checkpoint = [0, 1.34, hubSections[0].position[2] + 45] as [number, number, number];
+  const checkpointPoint = roadPoint(0, hubSections[0].position[2] + 45, 0.5);
+  const checkpoint = checkpointPoint as [number, number, number];
 
   useEffect(() => {
     activatedSectionTriggersRef.current = {};

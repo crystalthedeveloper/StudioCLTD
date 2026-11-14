@@ -1,11 +1,10 @@
-import { groundSize, groundCenter } from "../worldLayout";
 import { NearbyAsset } from "../NearbyAsset";
 import { isCompactVisualBudget } from "../visualQuality";
 import { assetForDevice } from "../mobileAssets";
 import { WINTER_THEME_ENABLED } from "../winterTheme";
 import { RoundedBoxGeometry } from "three-stdlib";
 import { useTexture } from "@react-three/drei";
-import { CuboidCollider, RigidBody } from "@react-three/rapier";
+import { CuboidCollider, RigidBody, TrimeshCollider } from "@react-three/rapier";
 import { useEffect, useMemo } from "react";
 import {
   BufferGeometry,
@@ -20,6 +19,8 @@ import {
   Vector2,
 } from "three";
 import { destinationPlatformRadius, hubSections, sectionRampApproachLength, sectionRampWidth } from "../hubSections";
+import { roadCenterX, roadHalfWidth, roadHeight, roadPoint, roadTangent } from "../roadSurface";
+import { isInsideTriggerExclusion } from "../worldLayout";
 
 
 export const concreteTexturePaths: string[] = [
@@ -33,7 +34,53 @@ const rampThickness = 0.36;
 // Box surfaces retain this shared world-space scale. The main ground plane uses
 // a tighter UV multiplier so its broad surface reads at the same visual density.
 const concreteTextureWorldSize = 14;
-const groundTextureScale = 1.12;
+const damagedRoadSectionZs = [-380, -480, -580, -680];
+function isWebsiteFixRoadSegment(z: number) {
+  return damagedRoadSectionZs.some((center) => Math.abs(z - center) < 52);
+}
+
+function createRoadMaterial() {
+  const material = new MeshStandardMaterial({ color: "#252d35", roughness: 0.94, metalness: 0.02 });
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = "varying vec3 vRoadWorldPosition;\n" + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace(
+      "#include <worldpos_vertex>",
+      "#include <worldpos_vertex>\n  vRoadWorldPosition = worldPosition.xyz;",
+    );
+    shader.fragmentShader = "varying vec3 vRoadWorldPosition;\n" + shader.fragmentShader;
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <color_fragment>",
+      `#include <color_fragment>
+      float damagedRoad = 0.0;
+      ${damagedRoadSectionZs.map((z) => `damagedRoad = max(damagedRoad, 1.0 - smoothstep(30.0, 52.0, abs(vRoadWorldPosition.z - ${z.toFixed(1)})));`).join("\n      ")}
+      vec2 crackCell = floor(vRoadWorldPosition.xz * 0.72);
+      vec2 crackLocal = fract(vRoadWorldPosition.xz * 0.72) - 0.5;
+      float crackNoise = fract(sin(dot(crackCell, vec2(127.1, 311.7))) * 43758.5453);
+      float crackLine = smoothstep(0.055, 0.0, abs(crackLocal.x + sin(crackLocal.y * 9.0 + crackNoise * 6.28) * 0.14))
+        * smoothstep(0.18, 0.04, abs(crackLocal.y));
+      float stain = smoothstep(0.68, 0.92, fract(sin(dot(crackCell + 17.0, vec2(41.7, 93.1))) * 15731.17));
+      float roadCenter = 8.5 * sin((28.0 - vRoadWorldPosition.z) * 0.019635) + 2.8 * sin((28.0 - vRoadWorldPosition.z) * 0.009229);
+      float roadEdge = smoothstep(5.4, 8.1, abs(vRoadWorldPosition.x - roadCenter));
+      vec3 coldAsphalt = diffuseColor.rgb * vec3(0.78, 0.82, 0.88);
+      float horrorRoad = 1.0 - damagedRoad;
+      float scratch = smoothstep(0.035, 0.0, abs(fract(vRoadWorldPosition.z * 0.18 + crackNoise * 4.0) - 0.5))
+        * smoothstep(0.8, 0.2, abs(vRoadWorldPosition.x - roadCenter) / 8.5);
+      vec3 abandonedAsphalt = diffuseColor.rgb * vec3(0.46, 0.50, 0.57);
+      abandonedAsphalt *= 1.0 - stain * 0.22;
+      abandonedAsphalt += vec3(0.012, 0.014, 0.018) * scratch;
+      vec3 wornAsphalt = diffuseColor.rgb * vec3(0.42, 0.43, 0.47);
+      wornAsphalt += vec3(0.018, 0.014, 0.012) * crackLine;
+      wornAsphalt *= 1.0 - stain * 0.16;
+      diffuseColor.rgb = mix(diffuseColor.rgb, coldAsphalt, 0.38);
+      diffuseColor.rgb = mix(diffuseColor.rgb, abandonedAsphalt, horrorRoad * 0.72);
+      diffuseColor.rgb = mix(diffuseColor.rgb, wornAsphalt, damagedRoad * 0.94);
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.14, 0.018, 0.018), damagedRoad * roadEdge * 0.34);
+      diffuseColor.rgb *= 1.0 - crackLine * damagedRoad * 0.38;`,
+    );
+  };
+  material.customProgramCacheKey = () => "damaged-road-texture-v1";
+  return material;
+}
 
 function configureFloorTexture(texture: Texture, repeat: number) {
   texture.wrapS = RepeatWrapping;
@@ -210,21 +257,6 @@ export function createConcreteBoxGeometry(width: number, height: number, depth: 
   return applyWorldScaleBoxUvs(new RoundedBoxGeometry(width, height, depth, 1, Math.min(0.06, height / 6)), offsetX, offsetZ);
 }
 
-function createConcreteFloorGeometry(width: number, depth: number) {
-  const geometry = new PlaneGeometry(width, depth);
-  const positions = geometry.getAttribute("position");
-  const uvs = geometry.getAttribute("uv");
-  for (let index = 0; index < positions.count; index += 1) {
-    uvs.setXY(
-      index,
-      positions.getX(index) * groundTextureScale,
-      positions.getY(index) * groundTextureScale,
-    );
-  }
-  uvs.needsUpdate = true;
-  return geometry;
-}
-
 /** One owner loads/configures/disposes the material used by all ground meshes. */
 export function useSharedGroundMaterial() {
   const textures = useTexture(concreteTexturePaths.map(assetForDevice));
@@ -237,34 +269,99 @@ export function useSharedGroundMaterial() {
 }
 
 export function ModularTerrain({ material }: { material: MeshStandardMaterial }) {
-  const floorGeometry = useMemo(() => createConcreteFloorGeometry(20, 720), []);
-  useEffect(() => () => floorGeometry.dispose(), [floorGeometry]);
+  const roadMaterial = useMemo(createRoadMaterial, []);
+  useEffect(() => () => roadMaterial.dispose(), [roadMaterial]);
 
   return (
     <group name="WeatheredConcreteTerrain">
-      <RigidBody name="StudioCLTDFloor" type="fixed" colliders={false}>
-        <CuboidCollider
-          position={[0, 0.72, -315]}
-          args={[10, 0.12, 360]}
-          friction={0}
-          restitution={0.18}
-        />
-      </RigidBody>
-      <mesh position={[0, 0.84, -315]} rotation-x={-Math.PI / 2} receiveShadow>
-        <primitive object={floorGeometry} attach="geometry" />
-        <primitive object={material} attach="material" dispose={null} />
-      </mesh>
-      <mesh position={[0, 0.846, -315]} rotation-x={-Math.PI / 2}>
-        <planeGeometry args={[16, 720]} />
-        <meshStandardMaterial color="#252d35" roughness={0.94} metalness={0.02} />
-      </mesh>
-      {Array.from({ length: 26 }, (_, index) => (
-        <mesh key={`lane-mark-${index}`} position={[0, 0.853, 30 - index * 25]} rotation-x={-Math.PI / 2}>
-          <planeGeometry args={[0.12, 8]} />
-          <meshBasicMaterial color="#d7d9d3" transparent opacity={0.42} />
-        </mesh>
-      ))}
+      <group name="SharedCurvedRoad">
+        <RoadCollision />
+        <RoadBloodDecals />
+        {Array.from({ length: 168 }, (_, index) => {
+          const z = 28 - index * 5;
+          const nextZ = z - 5;
+          const x = roadCenterX(z);
+          const y = roadHeight(z);
+          const nextY = roadHeight(nextZ);
+          // Slight overlap removes hard seams between adjacent curved road pieces.
+          const length = Math.hypot(5, nextY - y) + 5.2;
+          const yaw = Math.atan2(roadTangent(z)[0], roadTangent(z)[1]);
+          const pitch = Math.atan2(nextY - y, 10);
+          return (
+            <RigidBody key={`road-segment:${index}`} type="fixed" colliders={false} position={[x, y - 0.09, z]} rotation={[pitch, yaw, 0]}>
+              <mesh receiveShadow>
+                <boxGeometry args={[roadHalfWidth * 2, 0.18, length]} />
+                <primitive object={roadMaterial} attach="material" dispose={null} />
+              </mesh>
+              <mesh position={[0, 0.095, 0]}>
+                <boxGeometry args={[0.12, 0.012, 3.5]} />
+                <meshBasicMaterial color="#d7d9d3" transparent opacity={isWebsiteFixRoadSegment(z) ? 0.42 : 0.25} />
+              </mesh>
+            </RigidBody>
+          );
+        })}
+      </group>
     </group>
+  );
+}
+
+function RoadBloodDecals() {
+  const decals = useMemo(() => [
+    [-3.5, -126, 0.28, 0.2], [3.8, -226, -0.42, 0.3], [-2.8, -326, 0.18, 0.24],
+    [3.2, -426, 0.55, 0.26], [-3.8, -526, -0.3, 0.22], [2.7, -626, 0.4, 0.3],
+    [-3.1, -726, -0.5, 0.24],
+  ].filter(([localX, z]) => {
+    const point = roadPoint(localX, z);
+    return !isInsideTriggerExclusion(point[0], point[2], 1.2);
+  }), []);
+  return (
+    <group name="RoadBloodDecals">
+      {decals.map(([localX, z, rotation, scale], index) => {
+        const point = roadPoint(localX, z, 0.07);
+        const tangent = roadTangent(z);
+        return (
+          <mesh key={`blood-decal:${index}`} position={point} rotation={[-Math.PI / 2, Math.atan2(tangent[0], tangent[1]), rotation]} scale={[scale * 2.4, scale, 1]}>
+            <planeGeometry args={[1, 1]} />
+            <meshBasicMaterial color="#751522" transparent opacity={0.72} depthWrite={false} polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2} toneMapped={false} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+function RoadCollision() {
+  const args = useMemo(() => {
+    const sampleCount = 169;
+    const colliderHalfWidth = roadHalfWidth + 0.8;
+    const vertices = new Float32Array(sampleCount * 2 * 3);
+    const indices = new Uint32Array((sampleCount - 1) * 6);
+    for (let index = 0; index < sampleCount; index += 1) {
+      const z = 28 - index * 5;
+      const left = roadPoint(-colliderHalfWidth, z, -0.045);
+      const right = roadPoint(colliderHalfWidth, z, -0.045);
+      const vertex = index * 6;
+      vertices[vertex] = left[0]; vertices[vertex + 1] = left[1]; vertices[vertex + 2] = left[2];
+      vertices[vertex + 3] = right[0]; vertices[vertex + 4] = right[1]; vertices[vertex + 5] = right[2];
+      if (index >= sampleCount - 1) continue;
+      const next = index * 6;
+      const currentLeft = index * 2;
+      const nextLeft = (index + 1) * 2;
+      const triangle = index * 6;
+      indices[triangle] = currentLeft;
+      indices[triangle + 1] = currentLeft + 1;
+      indices[triangle + 2] = nextLeft + 1;
+      indices[triangle + 3] = currentLeft;
+      indices[triangle + 4] = nextLeft + 1;
+      indices[triangle + 5] = nextLeft;
+    }
+    return [vertices, indices] as [Float32Array, Uint32Array];
+  }, []);
+
+  return (
+    <RigidBody name="ContinuousCurvedRoadCollision" type="fixed" colliders={false}>
+      <TrimeshCollider args={args} friction={0} restitution={0.05} />
+    </RigidBody>
   );
 }
 

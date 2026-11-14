@@ -51,6 +51,7 @@ export function SpaceSky() {
   const nearCloudGroupRef = useRef<Group>(null);
   const middleCloudGroupRef = useRef<Group>(null);
   const farCloudGroupRef = useRef<Group>(null);
+  const lowerCloudGroupRef = useRef<Group>(null);
   const skyGroupRef = useRef<Group>(null);
   const scene = useThree((state) => state.scene);
   const invalidate = useThree((state) => state.invalidate);
@@ -84,6 +85,7 @@ export function SpaceSky() {
     if (nearCloudGroupRef.current) nearCloudGroupRef.current.rotation.y += frameDelta * 0.0028;
     if (middleCloudGroupRef.current) middleCloudGroupRef.current.rotation.y -= frameDelta * 0.0019;
     if (farCloudGroupRef.current) farCloudGroupRef.current.rotation.y += frameDelta * 0.0012;
+    if (lowerCloudGroupRef.current) lowerCloudGroupRef.current.rotation.y -= frameDelta * 0.0008;
   });
 
   return (
@@ -114,6 +116,18 @@ export function SpaceSky() {
           <spriteMaterial map={cloudTexture} color="#9ea5ac" opacity={0.202} transparent alphaTest={0.01} depthWrite={false} fog={false} toneMapped={false} rotation={0.11} />
         </sprite>
       </group>}
+
+      <group ref={lowerCloudGroupRef} name="BelowRoadStormLayers">
+        <sprite position={[-120, -34, -220]} scale={[320, 92, 1]} renderOrder={-90}>
+          <spriteMaterial map={cloudTexture} color="#303945" opacity={0.34} transparent alphaTest={0.01} depthWrite={false} fog={false} toneMapped={false} rotation={0.04} />
+        </sprite>
+        <sprite position={[170, -58, -470]} scale={[360, 108, 1]} renderOrder={-90}>
+          <spriteMaterial map={cloudTexture} color="#1d2530" opacity={0.42} transparent alphaTest={0.01} depthWrite={false} fog={false} toneMapped={false} rotation={-0.06} />
+        </sprite>
+        <sprite position={[-80, -88, -760]} scale={[430, 130, 1]} renderOrder={-90}>
+          <spriteMaterial map={cloudTexture} color="#111722" opacity={0.5} transparent alphaTest={0.01} depthWrite={false} fog={false} toneMapped={false} rotation={0.08} />
+        </sprite>
+      </group>
 
       <group ref={planetsRef} name="CosmicPlanets">
       <mesh position={[68, 42, -210]} rotation={[0.08, -0.48, 0]}>

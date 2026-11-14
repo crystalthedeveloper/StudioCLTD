@@ -205,7 +205,6 @@ function createLogoTemplate(source: Group, material: MeshStandardMaterial) {
 }
 
 type LogoLightFieldProps = {
-  activeSectionId: string;
   onCoinCollect: () => void;
   onHealthCollect: () => boolean;
   onReset: () => void;
@@ -213,7 +212,7 @@ type LogoLightFieldProps = {
   restartKey: number;
 };
 
-export function LogoLightField({ activeSectionId, onCoinCollect, onHealthCollect, onOpenShare, onReset, restartKey }: LogoLightFieldProps) {
+export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, onReset, restartKey }: LogoLightFieldProps) {
   const { scene } = useGLTF(assetForDevice(logoPath));
   const pickupTextures = useTexture(["/images/pickups/dollar.svg", "/images/pickups/heart.svg"]);
   const pickupVisuals = useMemo(() => pickupTextures.map((texture) => {
@@ -282,7 +281,7 @@ export function LogoLightField({ activeSectionId, onCoinCollect, onHealthCollect
         object: templates[logo.kind].clone(true),
       }));
     },
-    [activeSectionId, restartKey, templates],
+    [restartKey, templates],
   );
   const surfaceLocations = useMemo(() => logos.map(logo =>
     [logo.position[0], (logo.height ?? floorLogoY) - floorLogoY, logo.position[1]] as const), [logos]);

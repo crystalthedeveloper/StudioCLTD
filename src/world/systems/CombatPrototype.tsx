@@ -174,7 +174,6 @@ function poweredContact(id: string, basePosition: Vector3) {
   });
 }
 type CombatPrototypeProps = {
-  activeSectionId: string;
   onVillainReward: (amount: number) => void;
   onPlayerDamage: () => void;
   onPlayerDialogue: (text: string) => void;
@@ -184,7 +183,6 @@ type CombatPrototypeProps = {
 };
 
 export function CombatPrototype({
-  activeSectionId,
   onVillainReward,
   onPlayerDamage,
   onPlayerDialogue,
@@ -228,7 +226,7 @@ export function CombatPrototype({
         <NearbyAsset key={`${encounter.id}:${restartKey}`} position={[0, 0, 0]}>
           <SectionPortalEncounter
             encounter={encounter}
-            active={encounter.id === activeSectionId}
+            active
             onPlayerDialogue={onPlayerDialogue}
             onPlayerDamage={contactDamage}
             onSectionResolved={onSectionResolved}

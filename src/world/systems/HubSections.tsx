@@ -38,7 +38,6 @@ import { serviceInfoText } from "../serviceInfo";
 import { playVillainVoice } from "../../audio/villainAudio";
 
 type HubSectionsProps = {
-  activeSectionId: string;
   activeServiceInfoId: string | null;
   onSectionTrigger: (sectionId: string, triggerId: string) => void;
   restartKey: number | string;
@@ -340,7 +339,7 @@ function getWebsiteVideoTexture(video: HTMLVideoElement) {
   return websiteVideoTexture;
 }
 
-export function HubSections({ activeSectionId, activeServiceInfoId, onSectionTrigger, restartKey, serviceResolutions }: HubSectionsProps) {
+export function HubSections({ activeServiceInfoId, onSectionTrigger, restartKey, serviceResolutions }: HubSectionsProps) {
   const displayTimersRef = useRef<Record<string, number>>({});
   const [activeSimpleDisplays, setActiveSimpleDisplays] = useState<Record<string, string>>({});
   const [billboardScale, setBillboardScale] = useState(1);
@@ -398,7 +397,6 @@ export function HubSections({ activeSectionId, activeServiceInfoId, onSectionTri
   }, [visibleSectionCount]);
 
   const showSimpleDisplay = (sectionId: string, imagePath: string) => {
-    if (sectionId !== activeSectionId) return;
     playVillainVoice(sectionId);
     onSectionTrigger(sectionId, imagePath);
     const existingTimer = displayTimersRef.current[sectionId];
@@ -434,7 +432,7 @@ export function HubSections({ activeSectionId, activeServiceInfoId, onSectionTri
             showcaseCompleted={showcaseCompleted}
             onOfferSelect={(offerId) => {
               setSelectedOfferId((current) => current === offerId ? null : offerId);
-              if (offerId && section.id === activeSectionId) onSectionTrigger("offers", offerId);
+              if (offerId) onSectionTrigger("offers", offerId);
             }}
             onSimpleDisplayTrigger={showSimpleDisplay}
             onShowcasePause={() => {
@@ -442,7 +440,6 @@ export function HubSections({ activeSectionId, activeServiceInfoId, onSectionTri
               setShowcaseVideoState((current) => (current.playing ? { ...current, playing: false } : current));
             }}
             onShowcasePlay={() => {
-              if (section.id !== activeSectionId) return;
               if (showcaseVideoState.playing) return;
               const video = getShowcaseVideoElement();
               const finish = () => {

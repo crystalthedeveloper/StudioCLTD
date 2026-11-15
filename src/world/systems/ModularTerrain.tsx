@@ -40,7 +40,7 @@ function isWebsiteFixRoadSegment(z: number) {
 }
 
 function createRoadMaterial() {
-  const material = new MeshStandardMaterial({ color: "#303a45", roughness: 0.9, metalness: 0.02 });
+  const material = new MeshStandardMaterial({ color: "#3b4858", roughness: 0.9, metalness: 0.02 });
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = "varying vec3 vRoadWorldPosition;\n" + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace(
@@ -61,14 +61,14 @@ function createRoadMaterial() {
       float stain = smoothstep(0.68, 0.92, fract(sin(dot(crackCell + 17.0, vec2(41.7, 93.1))) * 15731.17));
       float roadCenter = 8.5 * sin((28.0 - vRoadWorldPosition.z) * 0.019635) + 2.8 * sin((28.0 - vRoadWorldPosition.z) * 0.009229);
       float roadEdge = smoothstep(5.4, 8.1, abs(vRoadWorldPosition.x - roadCenter));
-      vec3 coldAsphalt = diffuseColor.rgb * vec3(0.86, 0.89, 0.94);
+      vec3 coldAsphalt = diffuseColor.rgb * vec3(0.94, 0.97, 1.0);
       float horrorRoad = 1.0 - damagedRoad;
       float scratch = smoothstep(0.035, 0.0, abs(fract(vRoadWorldPosition.z * 0.18 + crackNoise * 4.0) - 0.5))
         * smoothstep(0.8, 0.2, abs(vRoadWorldPosition.x - roadCenter) / 8.5);
-      vec3 abandonedAsphalt = diffuseColor.rgb * vec3(0.58, 0.62, 0.69);
+      vec3 abandonedAsphalt = diffuseColor.rgb * vec3(0.68, 0.72, 0.80);
       abandonedAsphalt *= 1.0 - stain * 0.22;
       abandonedAsphalt += vec3(0.012, 0.014, 0.018) * scratch;
-      vec3 wornAsphalt = diffuseColor.rgb * vec3(0.52, 0.54, 0.59);
+      vec3 wornAsphalt = diffuseColor.rgb * vec3(0.62, 0.64, 0.70);
       wornAsphalt += vec3(0.018, 0.014, 0.012) * crackLine;
       wornAsphalt *= 1.0 - stain * 0.16;
       diffuseColor.rgb = mix(diffuseColor.rgb, coldAsphalt, 0.38);

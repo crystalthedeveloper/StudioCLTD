@@ -31,6 +31,7 @@ type StudioExperienceProps = {
 
 export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRestart, restartKey }: StudioExperienceProps) {
   const gameFocused = useGameFocus();
+  const compactVisualBudget = isCompactVisualBudget();
   const [worldReady, setWorldReady] = useState(false);
   const markWorldReady = useCallback(() => setWorldReady(true), []);
   const playRequestedRef = useRef(false);
@@ -278,7 +279,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
             outputColorSpace: SRGBColorSpace,
             powerPreference: "high-performance",
             toneMapping: ACESFilmicToneMapping,
-            toneMappingExposure: 1.08,
+            toneMappingExposure: compactVisualBudget ? 1.2 : 1.08,
           }}
           camera={{ position: [11, 7, 15], fov: 58, near: 0.1, far: 10000 }}
 

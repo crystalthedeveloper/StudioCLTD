@@ -10,6 +10,7 @@ import { useGameFrame } from "./useGameFrame";
 import { playerWorldState } from "../world/playerWorldState";
 import { useKeyboardControls } from "./useKeyboardControls";
 import { gameNow } from "./gameFocus";
+import { isCompactVisualBudget } from "../world/visualQuality";
 
 type PlayerCharacterProps = { animationStateRef: MutableRefObject<CharacterAnimationState>; damageFlashUntil: number; dialogue: DialogueMessage | null; yawRef: MutableRefObject<number> };
 
@@ -19,6 +20,7 @@ export function PlayerCharacter({ dialogue, damageFlashUntil, yawRef }: PlayerCh
   const wheelRefs = useRef<Mesh[]>([]);
   const controls = useKeyboardControls();
   const headlightTarget = useMemo(() => new Group(), []);
+  const mobileLighting = useMemo(isCompactVisualBudget, []);
   const model = useGLTF("/characters/sports-car.glb");
   useSyncExternalStore(subscribePowers, () => getActivePowers().join(","), () => "");
   const active = getActivePowers();
@@ -107,14 +109,15 @@ export function PlayerCharacter({ dialogue, damageFlashUntil, yawRef }: PlayerCh
     <group ref={carRef} name="Player old BMW i8 visual">
       <spotLight
         color="#c8ddff"
-        intensity={2.1}
-        distance={18}
-        angle={0.58}
+        intensity={mobileLighting ? 3.4 : 2.1}
+        distance={mobileLighting ? 22 : 18}
+        angle={mobileLighting ? 0.72 : 0.58}
         penumbra={0.9}
         decay={2}
         position={[0, 0.42, -0.92]}
         target={headlightTarget}
       />
+      {mobileLighting && <pointLight color="#b9d0ed" intensity={1.05} distance={5.5} decay={2} position={[0, 0.55, 0.15]} />}
       <primitive object={headlightTarget} position={[0, 0.05, -8]} />
       <primitive object={body} />
       {([-0.68, 0.68] as const).flatMap((x) => [-1.02, 1.02].map((z) => (

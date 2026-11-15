@@ -928,13 +928,13 @@ body aside.game-hud .game-hud__powers .game-hud__fix {
   }
 
   body aside.game-hud .game-hud__bottom {
-    --direction-row-size: clamp(39px, 11vw, 48px);
+    --direction-row-size: clamp(48px, 13vw, 58px);
     bottom: max(6px, env(safe-area-inset-bottom));
     gap: 4px;
   }
 
   body aside.game-hud .game-hud__bottom .direction-controls {
-    --direction-column-size: clamp(39px, 11vw, 48px);
+    --direction-column-size: clamp(48px, 13vw, 58px);
   }
 
   body aside.game-hud .game-hud__powers .game-hud__fix {

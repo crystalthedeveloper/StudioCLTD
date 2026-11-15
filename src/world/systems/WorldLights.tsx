@@ -10,6 +10,7 @@ const playerLightingLayer = 2;
 const villainLightingLayer = 1;
 
 export function WorldLights() {
+  const mobileLighting = isCompactVisualBudget();
   const sunRef = useRef<DirectionalLight>(null);
   const [sunTarget] = useState(() => new Object3D());
   const [shadowSize] = useState(() => isCompactVisualBudget() ? 512 : 2048);
@@ -42,32 +43,32 @@ export function WorldLights() {
 
   return (
     <>
-      <ambientLight intensity={0.36} color={WINTER_THEME_ENABLED ? "#bacddd" : "#fffdf8"} />
-      <hemisphereLight intensity={0.62} color={WINTER_THEME_ENABLED ? "#c2d6eb" : "#eef7fc"} groundColor={WINTER_THEME_ENABLED ? "#6d7c8d" : "#85877f"} />
-      <ambientLight ref={playerFillRef} intensity={0.32} color="#fffdf8" />
+      <ambientLight intensity={mobileLighting ? 0.54 : 0.36} color={WINTER_THEME_ENABLED ? "#bacddd" : "#fffdf8"} />
+      <hemisphereLight intensity={mobileLighting ? 0.82 : 0.62} color={WINTER_THEME_ENABLED ? "#c2d6eb" : "#eef7fc"} groundColor={WINTER_THEME_ENABLED ? "#6d7c8d" : "#85877f"} />
+      <ambientLight ref={playerFillRef} intensity={mobileLighting ? 0.48 : 0.32} color="#fffdf8" />
       <directionalLight
         ref={playerKeyRef}
         color="#fff7ec"
-        intensity={0.9}
+        intensity={mobileLighting ? 1.05 : 0.9}
         position={[8, 14, 10]}
       />
       <directionalLight
         ref={playerRimRef}
         color="#e2f2ff"
-        intensity={0.65}
+        intensity={mobileLighting ? 0.8 : 0.65}
         position={[-12, 9, -14]}
       />
-      <ambientLight ref={villainFillRef} intensity={0.12} color="#c7d6e2" />
+      <ambientLight ref={villainFillRef} intensity={mobileLighting ? 0.2 : 0.12} color="#c7d6e2" />
       <directionalLight
         ref={villainKeyRef}
         color="#e8edf0"
-        intensity={0.48}
+        intensity={mobileLighting ? 0.6 : 0.48}
         position={[10, 13, 8]}
       />
       <directionalLight
         ref={villainRimRef}
         color="#668ead"
-        intensity={0.36}
+        intensity={mobileLighting ? 0.46 : 0.36}
         position={[-10, 8, -12]}
       />
       <LocalLightPool />
@@ -90,7 +91,7 @@ export function WorldLights() {
         shadow-mapSize-height={shadowSize}
         shadow-mapSize-width={shadowSize}
       />
-      <directionalLight color="#9fb9d4" intensity={0.34} position={[20, 18, -16]} />
+      <directionalLight color="#9fb9d4" intensity={mobileLighting ? 0.42 : 0.34} position={[20, 18, -16]} />
     </>
   );
 }

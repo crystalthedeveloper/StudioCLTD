@@ -14,6 +14,7 @@ type GameHudProps = {
   onOpenGuide: () => void;
   onCloseGuide: () => void;
   health: number;
+  damageFlashUntil: number;
   onOpenWebsite: () => void;
   onRestart: () => void;
   cash: number;
@@ -26,7 +27,7 @@ const villainVoiceLabels: Record<string, string> = {
   "site-improvement": "Site Improvement",
 };
 
-export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onCloseGuide, health, onOpenWebsite, onRestart, cash }: GameHudProps) {
+export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onCloseGuide, health, damageFlashUntil, onOpenWebsite, onRestart, cash }: GameHudProps) {
   const formattedCash = formatCash(cash);
   const gameFocused = useGameFocus();
   const audioEnabled = useGameAudioEnabled();
@@ -112,7 +113,7 @@ export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onClose
           </button>
         </div>
 
-        <section className="game-hud__health" aria-label={`${health} of 3 hearts`} aria-live="polite">
+        <section className={`game-hud__health${damageFlashUntil > Date.now() ? " game-hud__health--damaged" : ""}`} aria-label={`${health} of 3 hearts`} aria-live="polite">
           <span className="game-hud__stat-label">Health</span>
           <strong aria-hidden="true">
             {Array.from({ length: 3 }, (_, index) => <img key={index} src="/images/pickups/heart.svg" alt="" className={index < health ? "game-hud__heart" : "game-hud__heart game-hud__heart--empty"} />)}

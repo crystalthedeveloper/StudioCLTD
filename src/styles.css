@@ -505,6 +505,13 @@ canvas {
 .game-guide__logo-icon { display: block; mask: url("/images/cltd-logo.svg") center / contain no-repeat; }
 .game-hud__heart { width: 18px; height: 18px; vertical-align: middle; }
 .game-hud__heart--empty { opacity: 0.25; filter: grayscale(1); }
+.game-hud__health--damaged .game-hud__heart:not(.game-hud__heart--empty) {
+  animation: game-hud-heart-damage 280ms ease-out;
+}
+@keyframes game-hud-heart-damage {
+  0%, 100% { filter: none; transform: scale(1); }
+  45% { filter: brightness(1.8) saturate(1.45); transform: scale(1.18); }
+}
 @media (max-width: 560px) {
   .game-guide__header { padding: 12px; }
   .game-guide__sections { padding: 12px; }

@@ -1,7 +1,7 @@
 import { gameNow, isGameFocused } from './gameFocus';
 import { isPowerActive } from './temporaryPowers';
 
-export const contactDamageCooldownMs = 1250;
+export const contactDamageCooldownMs = 1000;
 
 /** One player-wide cooldown prevents simultaneous villains/events stacking hits. */
 export function createContactDamageGate() {

@@ -9,10 +9,11 @@ import { getActivePower, getActivePowers, powerModes, subscribePowers } from "./
 import { useGameFrame } from "./useGameFrame";
 import { playerWorldState } from "../world/playerWorldState";
 import { useKeyboardControls } from "./useKeyboardControls";
+import { gameNow } from "./gameFocus";
 
 type PlayerCharacterProps = { animationStateRef: MutableRefObject<CharacterAnimationState>; damageFlashUntil: number; dialogue: DialogueMessage | null; yawRef: MutableRefObject<number> };
 
-export function PlayerCharacter({ dialogue, yawRef }: PlayerCharacterProps) {
+export function PlayerCharacter({ dialogue, damageFlashUntil, yawRef }: PlayerCharacterProps) {
   const groundAnchor = useRef<Group>(null);
   const carRef = useRef<Group>(null);
   const wheelRefs = useRef<Mesh[]>([]);
@@ -69,6 +70,16 @@ export function PlayerCharacter({ dialogue, yawRef }: PlayerCharacterProps) {
     wheelRefs.current.forEach((wheel, index) => {
       wheel.rotation.x -= direction * distance / 0.22;
       if (index < 2) wheel.rotation.y += (wheelTurn - wheel.rotation.y) * Math.min(1, delta * 10);
+    });
+    const damaged = gameNow() < damageFlashUntil;
+    body.traverse((object) => {
+      if (!(object instanceof Mesh) || !(object.material instanceof MeshStandardMaterial)) return;
+      const windowPart = /window|glass|windshield|windscreen/i.test(object.name);
+      if (windowPart) return;
+      if (/wheel|tire|tyre|rim|head|light|interior/i.test(object.name)) return;
+      object.material.color.set(damaged ? "#ef3340" : primary ? powerModes[primary].color : "#101318");
+      object.material.emissive.set(damaged ? "#ef3340" : primary ? powerModes[primary].color : "#000000");
+      object.material.emissiveIntensity = damaged ? 0.2 : primary ? 0.16 : 0;
     });
     previousPosition.current.copy(playerWorldState.position);
   });

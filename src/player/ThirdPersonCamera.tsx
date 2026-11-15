@@ -3,6 +3,7 @@ import { MutableRefObject, useRef } from "react";
 import { MathUtils, Vector3 } from "three";
 import { RapierRigidBody } from "@react-three/rapier";
 import { KeyboardControls } from "./useKeyboardControls";
+import { getDamageShake } from "./damageFeedback";
 
 type ThirdPersonCameraProps = {
   controlsRef: MutableRefObject<KeyboardControls>;
@@ -99,6 +100,13 @@ export function ThirdPersonCamera({
       smoothedCameraTarget.y + verticalOffset,
       smoothedCameraTarget.z + Math.cos(yaw) * horizontalDistance - Math.sin(yaw) * cameraSettings.shoulderOffset
     );
+    const shake = getDamageShake();
+    if (shake.amount > 0) {
+      const t = performance.now() * 0.045;
+      desiredPosition.x += Math.sin(t + shake.seed * 2.3) * 0.035 * shake.amount;
+      desiredPosition.y += Math.cos(t * 1.2 + shake.seed) * 0.025 * shake.amount;
+      desiredPosition.z += Math.sin(t * 0.8 + shake.seed * 1.7) * 0.03 * shake.amount;
+    }
     lookAt.copy(cameraTarget);
     lookAt.y += cameraSettings.framingLookOffset;
     smoothedLookAt.lerp(lookAt, 1 - Math.exp(-frameDelta * cameraSettings.lookAtDamping));

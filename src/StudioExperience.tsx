@@ -18,6 +18,8 @@ import { triggerTrophyHaptic } from "./ui/haptics";
 import { StudioWorld } from "./world/StudioWorld";
 import { preloadScreenTextures } from "./world/systems/HubSections";
 import { distanceFog } from "./world/distanceFog";
+import { triggerDamageFeedback } from "./player/damageFeedback";
+import { playCollectibleSound } from "./audio/collectibleSounds";
 
 type StudioExperienceProps = {
   onOpenWebsite: () => void;
@@ -81,7 +83,9 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
     if (healthRef.current <= 0) return;
     const cooldownUntil = contactDamageGate.claim();
     if (cooldownUntil === null) return;
-    setDamageFlashUntil(cooldownUntil);
+    setDamageFlashUntil(Math.min(cooldownUntil, gameNow() + 320));
+    triggerDamageFeedback();
+    playCollectibleSound("damage");
     const nextHealth = Math.max(0, healthRef.current - 1);
     healthRef.current = nextHealth;
     setHealth(nextHealth);
@@ -333,6 +337,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         onCloseGuide={closeGuide}
         completedSectionCount={completedSectionCount}
         health={health}
+        damageFlashUntil={damageFlashUntil}
         onOpenWebsite={onOpenWebsite}
         onRestart={handleManualRestart}
         cash={cash}

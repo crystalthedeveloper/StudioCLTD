@@ -40,7 +40,7 @@ function isWebsiteFixRoadSegment(z: number) {
 }
 
 function createRoadMaterial() {
-  const material = new MeshStandardMaterial({ color: "#252d35", roughness: 0.94, metalness: 0.02 });
+  const material = new MeshStandardMaterial({ color: "#303a45", roughness: 0.9, metalness: 0.02 });
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = "varying vec3 vRoadWorldPosition;\n" + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace(
@@ -61,18 +61,18 @@ function createRoadMaterial() {
       float stain = smoothstep(0.68, 0.92, fract(sin(dot(crackCell + 17.0, vec2(41.7, 93.1))) * 15731.17));
       float roadCenter = 8.5 * sin((28.0 - vRoadWorldPosition.z) * 0.019635) + 2.8 * sin((28.0 - vRoadWorldPosition.z) * 0.009229);
       float roadEdge = smoothstep(5.4, 8.1, abs(vRoadWorldPosition.x - roadCenter));
-      vec3 coldAsphalt = diffuseColor.rgb * vec3(0.78, 0.82, 0.88);
+      vec3 coldAsphalt = diffuseColor.rgb * vec3(0.86, 0.89, 0.94);
       float horrorRoad = 1.0 - damagedRoad;
       float scratch = smoothstep(0.035, 0.0, abs(fract(vRoadWorldPosition.z * 0.18 + crackNoise * 4.0) - 0.5))
         * smoothstep(0.8, 0.2, abs(vRoadWorldPosition.x - roadCenter) / 8.5);
-      vec3 abandonedAsphalt = diffuseColor.rgb * vec3(0.46, 0.50, 0.57);
+      vec3 abandonedAsphalt = diffuseColor.rgb * vec3(0.58, 0.62, 0.69);
       abandonedAsphalt *= 1.0 - stain * 0.22;
       abandonedAsphalt += vec3(0.012, 0.014, 0.018) * scratch;
-      vec3 wornAsphalt = diffuseColor.rgb * vec3(0.42, 0.43, 0.47);
+      vec3 wornAsphalt = diffuseColor.rgb * vec3(0.52, 0.54, 0.59);
       wornAsphalt += vec3(0.018, 0.014, 0.012) * crackLine;
       wornAsphalt *= 1.0 - stain * 0.16;
       diffuseColor.rgb = mix(diffuseColor.rgb, coldAsphalt, 0.38);
-      diffuseColor.rgb = mix(diffuseColor.rgb, abandonedAsphalt, horrorRoad * 0.72);
+      diffuseColor.rgb = mix(diffuseColor.rgb, abandonedAsphalt, horrorRoad * 0.64);
       diffuseColor.rgb = mix(diffuseColor.rgb, wornAsphalt, damagedRoad * 0.94);
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.14, 0.018, 0.018), damagedRoad * roadEdge * 0.34);
       diffuseColor.rgb *= 1.0 - crackLine * damagedRoad * 0.38;`,

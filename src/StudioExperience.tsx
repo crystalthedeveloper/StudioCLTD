@@ -279,7 +279,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
             outputColorSpace: SRGBColorSpace,
             powerPreference: "high-performance",
             toneMapping: ACESFilmicToneMapping,
-            toneMappingExposure: compactVisualBudget ? 1.2 : 1.08,
+            toneMappingExposure: compactVisualBudget ? 1.28 : 1.15,
           }}
           camera={{ position: [11, 7, 15], fov: 58, near: 0.1, far: 10000 }}
 

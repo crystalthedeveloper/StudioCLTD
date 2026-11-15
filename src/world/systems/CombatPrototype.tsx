@@ -522,6 +522,11 @@ function SectionPortalEncounter({
   const [resolved, setResolved] = useState(false);
   const voiceNearRef = useRef(false);
   useGameFrame(() => {
+    if (resolved) {
+      if (voiceNearRef.current) stopVillainVoice(encounter.id);
+      voiceNearRef.current = false;
+      return;
+    }
     const distance = Math.hypot(
       playerWorldState.position.x - encounter.platformPosition.x,
       playerWorldState.position.z - encounter.platformPosition.z,

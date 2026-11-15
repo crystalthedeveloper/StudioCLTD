@@ -98,19 +98,19 @@ const serviceSectionIds = ["quick-fix", "urgent-fix", "performance", "site-impro
 const serviceScreenImages: Record<string, { bad: string; good: string }> = {
   "quick-fix": {
     bad: "/images/optimized/quickFix/quick-fix-bad.jpg",
-    good: "/images/optimized/quickFix/quick-fix-good.jpg",
+    good: "/images/optimized/fixed/fixed.webp",
   },
   "urgent-fix": {
     bad: "/images/optimized/urgentFix/urgent-fix-bad.jpg",
-    good: "/images/optimized/urgentFix/urgent-fix-good.jpg",
+    good: "/images/optimized/fixed/fixed.webp",
   },
   performance: {
     bad: "/images/optimized/performance/performance-bad.webp",
-    good: "/images/optimized/performance/performance-good.webp",
+    good: "/images/optimized/fixed/fixed.webp",
   },
   "site-improvement": {
     bad: "/images/optimized/siteImprovement/site-improvement-bad.webp",
-    good: "/images/optimized/siteImprovement/site-improvement-good.webp",
+    good: "/images/optimized/fixed/fixed.webp",
   },
 };
 const tipDisplayOptions = [

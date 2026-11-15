@@ -1,4 +1,19 @@
 {
+  "/images/optimized/fixed/fixed.webp": {
+    "sourceHash": "8bbb0cbfd7872ecf59f607bda29d90bb9f469fcaa479b82fbd337a7ebaec08f6",
+    "mobile": {
+      "url": "/images/screens/fixed-fixed-mobile.040256d94bf6540b.webp",
+      "width": 768,
+      "height": 432,
+      "bytes": 34176
+    },
+    "desktop": {
+      "url": "/images/screens/fixed-fixed-desktop.6b204b5c61f532d6.webp",
+      "width": 1536,
+      "height": 864,
+      "bytes": 93016
+    }
+  },
   "/images/optimized/performance/performance-bad.webp": {
     "sourceHash": "219e5c8c472380aebac5ec9acb9a8457786c54e8af4e73af94916905a6f2bfc9",
     "mobile": {
@@ -12,21 +27,6 @@
       "width": 1536,
       "height": 864,
       "bytes": 133308
-    }
-  },
-  "/images/optimized/performance/performance-good.webp": {
-    "sourceHash": "85f070a0e1492cd941554d7397ffc55e75a2f0cc79e4272aa79b234ae0010eb6",
-    "mobile": {
-      "url": "/images/screens/performance-performance-good-mobile.49c13bbaf20147ff.webp",
-      "width": 768,
-      "height": 432,
-      "bytes": 31460
-    },
-    "desktop": {
-      "url": "/images/screens/performance-performance-good-desktop.b6d9a549ffb33953.webp",
-      "width": 1536,
-      "height": 864,
-      "bytes": 91926
     }
   },
   "/images/optimized/quickFix/quick-fix-bad.jpg": {
@@ -44,21 +44,6 @@
       "bytes": 40832
     }
   },
-  "/images/optimized/quickFix/quick-fix-good.jpg": {
-    "sourceHash": "7d99714e2c0796ec1ac1c9e1658de6507ba9be82d996010695eeae1ec200724a",
-    "mobile": {
-      "url": "/images/screens/quickFix-quick-fix-good-mobile.f393d3b799316ee0.webp",
-      "width": 768,
-      "height": 432,
-      "bytes": 20102
-    },
-    "desktop": {
-      "url": "/images/screens/quickFix-quick-fix-good-desktop.d1079a0c7475cc55.webp",
-      "width": 1024,
-      "height": 576,
-      "bytes": 35776
-    }
-  },
   "/images/optimized/siteImprovement/site-improvement-bad.webp": {
     "sourceHash": "cabd0852119ffd22159b5d7f646f97112265dd58052477e7455040746816bd6f",
     "mobile": {
@@ -74,21 +59,6 @@
       "bytes": 104964
     }
   },
-  "/images/optimized/siteImprovement/site-improvement-good.webp": {
-    "sourceHash": "a15e2a320ca958307b4bb8c63a7ee8ac4051d1537691adedbe98a7f78644efe7",
-    "mobile": {
-      "url": "/images/screens/siteImprovement-site-improvement-good-mobile.6d70aa4c467d8d52.webp",
-      "width": 768,
-      "height": 432,
-      "bytes": 21584
-    },
-    "desktop": {
-      "url": "/images/screens/siteImprovement-site-improvement-good-desktop.e9c412849af2311d.webp",
-      "width": 1536,
-      "height": 864,
-      "bytes": 64168
-    }
-  },
   "/images/optimized/urgentFix/urgent-fix-bad.jpg": {
     "sourceHash": "b2bc17858f45d13e2d21d228d80cd88cdcafdb8c9a661913db4a332bc9ece6d0",
     "mobile": {
@@ -102,21 +72,6 @@
       "width": 1536,
       "height": 864,
       "bytes": 49320
-    }
-  },
-  "/images/optimized/urgentFix/urgent-fix-good.jpg": {
-    "sourceHash": "e45a3a9be64654cddb4dd7f5d7e36902a941064dc22de0c1da2bb29b1b65ac0f",
-    "mobile": {
-      "url": "/images/screens/urgentFix-urgent-fix-good-mobile.b5dce1a45ce7d728.webp",
-      "width": 768,
-      "height": 432,
-      "bytes": 27358
-    },
-    "desktop": {
-      "url": "/images/screens/urgentFix-urgent-fix-good-desktop.e40edf0d24896ed3.webp",
-      "width": 1536,
-      "height": 864,
-      "bytes": 93026
     }
   }
 }

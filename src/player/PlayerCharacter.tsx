@@ -18,6 +18,7 @@ export function PlayerCharacter({ dialogue, damageFlashUntil, yawRef }: PlayerCh
   const carRef = useRef<Group>(null);
   const wheelRefs = useRef<Mesh[]>([]);
   const controls = useKeyboardControls();
+  const headlightTarget = useMemo(() => new Group(), []);
   const model = useGLTF("/characters/sports-car.glb");
   useSyncExternalStore(subscribePowers, () => getActivePowers().join(","), () => "");
   const active = getActivePowers();
@@ -77,7 +78,7 @@ export function PlayerCharacter({ dialogue, damageFlashUntil, yawRef }: PlayerCh
       const windowPart = /window|glass|windshield|windscreen/i.test(object.name);
       if (windowPart) return;
       if (/wheel|tire|tyre|rim|head|light|interior/i.test(object.name)) return;
-      object.material.color.set(damaged ? "#ef3340" : primary ? powerModes[primary].color : "#101318");
+      object.material.color.set(damaged ? "#ef3340" : primary ? powerModes[primary].color : "#181d24");
       object.material.emissive.set(damaged ? "#ef3340" : primary ? powerModes[primary].color : "#000000");
       object.material.emissiveIntensity = damaged ? 0.2 : primary ? 0.16 : 0;
     });
@@ -96,14 +97,26 @@ export function PlayerCharacter({ dialogue, damageFlashUntil, yawRef }: PlayerCh
     }
     const protectedPart = /wheel|tire|tyre|rim|head|light|interior/i.test(object.name);
     if (protectedPart) return;
-    object.material.color.set(primary ? powerModes[primary].color : "#101318");
+    object.material.color.set(primary ? powerModes[primary].color : "#181d24");
     object.material.emissive.set(primary ? powerModes[primary].color : "#000000");
     object.material.emissiveIntensity = primary ? 0.16 : 0;
   });
   return <group>
     <group ref={groundAnchor} name="Player ground-effect anchor" />
     <PlayerRollingEffects sphere={groundAnchor} />
-    <group ref={carRef} name="Player old BMW i8 visual"><primitive object={body} />
+    <group ref={carRef} name="Player old BMW i8 visual">
+      <spotLight
+        color="#c8ddff"
+        intensity={2.1}
+        distance={18}
+        angle={0.58}
+        penumbra={0.9}
+        decay={2}
+        position={[0, 0.42, -0.92]}
+        target={headlightTarget}
+      />
+      <primitive object={headlightTarget} position={[0, 0.05, -8]} />
+      <primitive object={body} />
       {([-0.68, 0.68] as const).flatMap((x) => [-1.02, 1.02].map((z) => (
         <mesh key={`${x}:${z}`} position={[x, -sphereRadius + 0.012, z]} rotation-x={-Math.PI / 2} scale={[0.32, 0.58, 1]} renderOrder={-1}>
           <planeGeometry args={[1, 1]} /><meshBasicMaterial color="#101722" transparent opacity={0.22} depthWrite={false} />

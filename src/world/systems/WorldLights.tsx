@@ -42,8 +42,8 @@ export function WorldLights() {
 
   return (
     <>
-      <ambientLight intensity={0.28} color={WINTER_THEME_ENABLED ? "#bacddd" : "#fffdf8"} />
-      <hemisphereLight intensity={0.55} color={WINTER_THEME_ENABLED ? "#c2d6eb" : "#eef7fc"} groundColor={WINTER_THEME_ENABLED ? "#6d7c8d" : "#85877f"} />
+      <ambientLight intensity={0.36} color={WINTER_THEME_ENABLED ? "#bacddd" : "#fffdf8"} />
+      <hemisphereLight intensity={0.62} color={WINTER_THEME_ENABLED ? "#c2d6eb" : "#eef7fc"} groundColor={WINTER_THEME_ENABLED ? "#6d7c8d" : "#85877f"} />
       <ambientLight ref={playerFillRef} intensity={0.32} color="#fffdf8" />
       <directionalLight
         ref={playerKeyRef}
@@ -90,7 +90,7 @@ export function WorldLights() {
         shadow-mapSize-height={shadowSize}
         shadow-mapSize-width={shadowSize}
       />
-      <directionalLight color="#afcde3" intensity={0.24} position={[20, 18, -16]} />
+      <directionalLight color="#9fb9d4" intensity={0.34} position={[20, 18, -16]} />
     </>
   );
 }

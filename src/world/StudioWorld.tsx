@@ -1,5 +1,4 @@
 import { scenerySettings } from "./scenery/sceneryLayout";
-import { isCompactVisualBudget } from "./visualQuality";
 import { WINTER_THEME_ENABLED } from "./winterTheme";
 import { WinterSnow } from "./systems/WinterSnow";
 import { GroundFog } from "./systems/GroundFog";
@@ -100,7 +99,7 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
       <GroundFog />
       <FixPowerPickups key={`powers:${restartKey}`} />
       <SpaceSky />
-      {!isCompactVisualBudget() && <Environment preset="warehouse" background={false} environmentIntensity={0.16} />}
+      <Environment preset="warehouse" background={false} environmentIntensity={0.16} />
       <ModularTerrain material={groundMaterial} />
       <HomeBase material={groundMaterial} />
       <TransportPads unlocked={completedCount === 8} onTransport={setTransportDestination} restartKey={restartKey} />

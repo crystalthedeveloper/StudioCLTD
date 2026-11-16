@@ -1,13 +1,12 @@
 import { useMemo } from "react";
 import { AdditiveBlending, PlaneGeometry, ShaderMaterial } from "three";
 import { useGameFrame } from "../../player/useGameFrame";
-import { isCompactVisualBudget } from "../visualQuality";
 
 const noRaycast = () => {};
 
 /** A small, low-altitude fog sheet: distant, HUD-safe, and one draw call. */
 export function GroundFog() {
-  const geometry = useMemo(() => new PlaneGeometry(42 * (isCompactVisualBudget() ? 0.72 : 1), 28 * (isCompactVisualBudget() ? 0.72 : 1)), []);
+  const geometry = useMemo(() => new PlaneGeometry(68, 38), []);
   const material = useMemo(() => new ShaderMaterial({
     transparent: true, depthWrite: false, depthTest: true, blending: AdditiveBlending,
     uniforms: { time: { value: 0 } },

@@ -3,18 +3,21 @@ import { useEffect, useRef, useState } from "react";
 import { AmbientLight, DirectionalLight, Object3D } from "three";
 import { useGameFrame } from "../../player/useGameFrame";
 import { playerWorldState } from "../playerWorldState";
-import { sunlightOffset, isCompactVisualBudget } from "../visualQuality";
+import { sunlightOffset } from "../visualQuality";
 import { LocalLightPool } from "./LocalLightSpill";
+import { roadPoint } from "../roadSurface";
 
 const playerLightingLayer = 2;
 const villainLightingLayer = 1;
 
 export function WorldLights() {
   const sunRef = useRef<DirectionalLight>(null);
+  const lightningRef = useRef<DirectionalLight>(null);
+  const lightningTimerRef = useRef(8);
   const [sunTarget] = useState(() => new Object3D());
-  const [shadowSize] = useState(() => isCompactVisualBudget() ? 512 : 2048);
+  const [shadowSize] = useState(2048);
   useEffect(() => { sunRef.current?.layers.enable(3); }, []);
-  useGameFrame(() => {
+  useGameFrame((_, delta) => {
     const sun = sunRef.current;
     if (!sun) return;
     const texel = 64 / shadowSize;
@@ -23,6 +26,16 @@ export function WorldLights() {
     sunTarget.position.set(x, playerWorldState.position.y, z);
     sun.position.set(x + sunlightOffset[0], playerWorldState.position.y + sunlightOffset[1], z + sunlightOffset[2]);
     sunTarget.updateMatrixWorld();
+    lightningTimerRef.current -= delta;
+    if (lightningTimerRef.current <= 0) {
+      lightningTimerRef.current = 8 + Math.random() * 14;
+      if (Math.random() < 0.28 && lightningRef.current) {
+        lightningRef.current.intensity = 1.6;
+        window.setTimeout(() => {
+          if (lightningRef.current) lightningRef.current.intensity = 0;
+        }, 80);
+      }
+    }
   });
   const playerFillRef = useRef<AmbientLight>(null);
   const playerKeyRef = useRef<DirectionalLight>(null);
@@ -91,6 +104,13 @@ export function WorldLights() {
         shadow-mapSize-width={shadowSize}
       />
       <directionalLight color="#9fb9d4" intensity={0.52} position={[20, 28, -16]} />
+      <directionalLight ref={lightningRef} color="#dbe8ff" intensity={0} position={[-24, 36, -80]} />
+      <group name="WebsiteFixRedZoneLighting">
+        {[-380, -480, -580, -680].map((z) => {
+          const [x, y, roadZ] = roadPoint(0, z, 4.2);
+          return <pointLight key={`fix-zone-red:${roadZ}`} position={[x, y, roadZ]} color="#ff2638" intensity={7} distance={28} decay={1.8} />;
+        })}
+      </group>
     </>
   );
 }

@@ -1,5 +1,4 @@
 import { createContactDamageGate } from "./player/contactDamage";
-import { isCompactVisualBudget } from "./world/visualQuality";
 import { createGuidePauseSession } from "./player/guidePauseSession";
 import { resetTemporaryPowers } from "./player/temporaryPowers";
 import { cancelCruise, toggleCruise } from "./player/useKeyboardControls";
@@ -20,6 +19,7 @@ import { preloadScreenTextures } from "./world/systems/HubSections";
 import { distanceFog } from "./world/distanceFog";
 import { triggerDamageFeedback } from "./player/damageFeedback";
 import { playCollectibleSound } from "./audio/collectibleSounds";
+import { roadTexturePath } from "./world/systems/ModularTerrain";
 
 type StudioExperienceProps = {
   onOpenWebsite: () => void;
@@ -46,7 +46,42 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   const [damageFlashUntil, setDamageFlashUntil] = useState(0);
   const [screenAssetProgress, setScreenAssetProgress] = useState(0);
   const [screenAssetsReady, setScreenAssetsReady] = useState(false);
+  const [fontReady, setFontReady] = useState(false);
+  const [roadTextureReady, setRoadTextureReady] = useState(false);
   const [shareScreenOpen, setShareScreenOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => {
+      if (!cancelled) setRoadTextureReady(true);
+    };
+    image.onerror = () => {
+      console.error(`[asset] Failed to load road colour texture: ${roadTexturePath}. Using medium-gray fallback.`);
+      if (!cancelled) setRoadTextureReady(true);
+    };
+    image.src = roadTexturePath;
+    return () => {
+      cancelled = true;
+      image.onload = null;
+      image.onerror = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const font = new FontFace("Trade Winds", "url(/fonts/tradewinds.ttf)");
+    font.load().then((loadedFont) => {
+      if (cancelled) return;
+      document.fonts.add(loadedFont);
+      setFontReady(true);
+    }).catch((error) => {
+      console.error("[asset] Failed to load font: /fonts/tradewinds.ttf", error);
+      if (!cancelled) setFontReady(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeGameFocus((running) => {
@@ -130,11 +165,6 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   }, [completedSectionCount]);
 
   useEffect(() => {
-    if (isCompactVisualBudget()) {
-      setScreenAssetProgress(100);
-      setScreenAssetsReady(true);
-      return;
-    }
     let cancelled = false;
     preloadScreenTextures((nextProgress) => {
       if (!cancelled) setScreenAssetProgress((current) => Math.max(current, nextProgress));
@@ -271,7 +301,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
     <>
       <div className={`game-shell${gameFocused ? " game-shell--focused" : ""}`}>
         <Canvas
-          dpr={isCompactVisualBudget() ? 0.85 : 1}
+          dpr={1}
           frameloop={gameFocused ? "always" : "demand"}
           gl={{
             antialias: false,
@@ -330,6 +360,8 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         onReady={onReady}
         screenAssetProgress={screenAssetProgress}
         screenAssetsReady={screenAssetsReady}
+        fontReady={fontReady}
+        roadTextureReady={roadTextureReady}
       />
       <GameHud
         guideOpen={guideOpen}
@@ -379,11 +411,15 @@ function StartupProgress({
   onReady,
   screenAssetProgress,
   screenAssetsReady,
+  fontReady,
+  roadTextureReady,
 }: {
   onProgress: (progress: number) => void;
   onReady: () => void;
   screenAssetProgress: number;
   screenAssetsReady: boolean;
+  fontReady: boolean;
+  roadTextureReady: boolean;
   worldReady: boolean;
 }) {
   const { active, progress } = useProgress();
@@ -399,11 +435,11 @@ function StartupProgress({
   if (active) observedWorldLoadingRef.current = true;
 
   // useProgress includes all five scenery textures via Three's loading manager.
-  const complete = worldReady && !active && progress >= 100;
+  const complete = worldReady && !active && progress >= 100 && fontReady && roadTextureReady;
   const worldProgress = observedWorldLoadingRef.current || screenAssetsReady
     ? MathUtils.clamp(progress, 0, 100)
     : 0;
-  const actualProgress = screenAssetsReady && complete
+  const actualProgress = screenAssetsReady && roadTextureReady && complete
     ? 100
     : Math.min(99, worldProgress * 0.8 + MathUtils.clamp(screenAssetProgress, 0, 100) * 0.2);
   targetProgressRef.current = Math.max(targetProgressRef.current, actualProgress);

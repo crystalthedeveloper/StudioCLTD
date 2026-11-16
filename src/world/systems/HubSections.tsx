@@ -49,7 +49,7 @@ const offerCountdownMs = 3000;
 const offerDisplayMs = 10000;
 const simpleDisplayMs = 10000;
 const mobileBillboardScale = 1;
-const tvSizeScale = 0.64;
+const tvSizeScale = 0.60;
 const tvVerticalLift = 1.15;
 // Lower the visual centre by the lost half-height to preserve its bottom edge.
 const tvCentreDrop = (scale: number) => 2.9 * scale * (1 - tvSizeScale);
@@ -170,6 +170,7 @@ function loadScreenTexture(source: string) {
     return loadedTexture;
   }).catch((error) => {
     lazyTexturePromises.delete(path);
+    console.error(`[asset] Failed to load screen texture: ${path} (source: ${source})`, error);
     throw error;
   });
 

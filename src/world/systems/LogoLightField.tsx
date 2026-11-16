@@ -639,4 +639,4 @@ function ContactLogoVisual({ glow = false, object, rotation, scale }: { glow?: b
   );
 }
 
-if (!isCompactVisualBudget()) useGLTF.preload(logoPath);
+useGLTF.preload(assetForDevice(logoPath));

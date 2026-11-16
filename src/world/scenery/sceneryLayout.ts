@@ -1,4 +1,4 @@
-import { hubSections, destinationPlatformRadius, sectionRampApproachLength } from '../hubSections';
+import { hubSections, destinationPlatformRadius, sectionRampApproachLength, roadCenterX } from '../hubSections';
 import { groundSize, groundCenter, walkingRoutes, walkingPathWidth, routePickupPositions, routePowerPositions, plazaRadius, isInsideTriggerExclusion } from '../worldLayout';
 import { seededRandom } from './sceneryModels';
 
@@ -37,6 +37,12 @@ const clusters = [[-14,-25],[14,-25],[-15,-95],[15,-95],[-14,-170],[14,-170],[-1
 export function createSceneryLayout(): SceneryItem[] {
   const random=seededRandom(91017), items:SceneryItem[]=[];
   const add=(kind:SceneryItem['kind'],x:number,z:number,scale:number)=>{
+    if (kind === 'pine') {
+      const offset = x - roadCenterX(z);
+      const side = offset < 0 ? -1 : 1;
+      x = roadCenterX(z) + side * Math.max(Math.abs(offset), 12.5);
+      scale *= 0.78;
+    }
     const radius=scale*(kind==='pine'?2.8:kind==='rock'?1.55:2);
     if(!sceneryClearance(x,z,radius,kind==='pine')) return;
     if(items.some(item=>Math.hypot(x-item.x,z-item.z)<radius+item.radius+1.6)) return;
@@ -67,6 +73,11 @@ export function createSceneryLayout(): SceneryItem[] {
     {kind:'snowbank',x:9,z:-46,scale:.95}, {kind:'snowbank',x:-8,z:-32,scale:.95},
   ];
   for(const target of foreground) {
+    if (target.kind === 'pine') {
+      const offset = target.x - roadCenterX(target.z);
+      target.x = roadCenterX(target.z) + (offset < 0 ? -1 : 1) * Math.max(Math.abs(offset), 12.5);
+      target.scale *= 0.78;
+    }
     const radius=target.scale*(target.kind==='pine'?2.8:target.kind==='snowbank'?2:1.55);
     if(!sceneryClearance(target.x,target.z,radius,target.kind==='pine',true)) continue;
     if(items.some(item=>Math.hypot(target.x-item.x,target.z-item.z)<radius+item.radius+1.6)) continue;

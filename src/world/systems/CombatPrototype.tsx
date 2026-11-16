@@ -56,6 +56,9 @@ const bonusVillainMoveSpeed = 1.2;
 const bonusVillainVisualScale = 0.48;
 const bonusVillainSteeringAngles = [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, Math.PI] as const;
 
+// Warm the device-specific villain model cache before the loading gate opens.
+useGLTF.preload(assetForDevice("/characters/char-optimized.glb"));
+
 const fixPadVisualConfig = {
   pulseBaseScale: 1.05,
   pulseScaleAmount: 0.2,
@@ -114,6 +117,8 @@ function createSectionEncounters(): SectionEncounterConfig[] {
 
 const sectionEncounters = createSectionEncounters();
 const bonusSpawnSpots = bonusRouteSpots.map(([x, z]) => new Vector3(...roadPoint(x, z)));
+const villainPoolSize = 32;
+const activeVillainPoolSize = () => isCompactVisualBudget() ? 14 : 24;
 const bonusRampClearance = 2;
 
 function distanceToBonusRamp(
@@ -198,7 +203,7 @@ export function CombatPrototype({
   const [visibleEncounterCount, setVisibleEncounterCount] = useState(1);
 
   useEffect(() => {
-    if (!isCompactVisualBudget()) preloadVillainAudio();
+    preloadVillainAudio();
     return stopAllVillainAudio;
   }, []);
 
@@ -251,8 +256,8 @@ function BonusVillainSystem({
 }) {
   return (
     <group name="BonusVillains">
-      {bonusSpawnSpots.map((_, index) => (
-        <BonusVillain key={`bonus:${index + 1}`} id={`bonus:${index + 1}`} initialSpot={index} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} />
+      {Array.from({ length: villainPoolSize }, (_, index) => (
+        <BonusVillain key={`bonus-pool:${index + 1}`} id={`bonus:${index + 1}`} initialSpot={index % bonusSpawnSpots.length} initiallyActive={index < activeVillainPoolSize()} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} />
       ))}
     </group>
   );
@@ -261,11 +266,13 @@ function BonusVillainSystem({
 function BonusVillain({
   id,
   initialSpot,
+  initiallyActive,
   onDefeat,
   onPlayerDamage,
 }: {
   id: string;
   initialSpot: number;
+  initiallyActive: boolean;
   onDefeat: (amount: number) => void;
   onPlayerDamage: () => void;
 }) {
@@ -280,10 +287,11 @@ function BonusVillain({
   const lastSpawnSpotRef = useRef(initialSpot);
   const targetSpotRef = useRef((initialSpot + 1) % bonusSpawnSpots.length);
   const aliveRef = useRef(true);
+  const poolActiveRef = useRef(initiallyActive);
   const chasingPlayerRef = useRef(false);
   const respawnTimerRef = useRef(0);
   const cashPopupTimerRef = useRef(0);
-  const [alive, setAlive] = useState(true);
+  const [alive, setAlive] = useState(initiallyActive);
   const [showCashPopup, setShowCashPopup] = useState(false);
   const [cashReward, setCashReward] = useState(0);
   const cashPopupPositionRef = useRef(new Vector3());
@@ -327,7 +335,7 @@ function BonusVillain({
       onDefeat(reward);
       cashPopupTimerRef.current = gameTimers.setTimeout(() => setShowCashPopup(false), 1100);
 
-      const delay = 8000 + Math.random() * 2000;
+      const delay = 3000 + Math.random() * 4000;
       respawnTimerRef.current = gameTimers.setTimeout(() => {
         const nextSpot = bonusSpawnSpots.findIndex((spot, index) =>
           index !== lastSpawnSpotRef.current
@@ -342,6 +350,7 @@ function BonusVillain({
         groupRef.current?.position.copy(positionRef.current);
         resetPowerContact(id);
         aliveRef.current = true;
+        poolActiveRef.current = true;
         combat.setMotion("idle");
         setAlive(true);
       }, delay);
@@ -354,13 +363,20 @@ function BonusVillain({
 
   useGameFrame((_, delta) => {
     const group = groupRef.current;
-    if (!group || !aliveRef.current) {
+    if (!group || !poolActiveRef.current || !aliveRef.current) {
         return;
     }
     const playerDx = playerWorldState.position.x - positionRef.current.x;
     const playerDz = playerWorldState.position.z - positionRef.current.z;
     const playerDistanceSq = playerDx * playerDx + playerDz * playerDz;
     const sameLevel = Math.abs(playerWorldState.position.y - (positionRef.current.y + 0.7)) < 1.15;
+    // Only nearby pool members receive full chase, collision and attack work.
+    // Distant active members stay rendered but idle until the Player approaches.
+    if (playerDistanceSq > 65 * 65) {
+      chasingPlayerRef.current = false;
+      combat.setMotion("idle");
+      return;
+    }
     const inRange = sameLevel && playerDistanceSq <= bonusVillainContactRadiusSq && navigation.sight(positionRef.current, playerWorldState.position);
     // Sphere against the bonus villain's body volume, not its chase radius.
     const bodyDx = Math.max(Math.abs(playerDx) - 0.3, 0);

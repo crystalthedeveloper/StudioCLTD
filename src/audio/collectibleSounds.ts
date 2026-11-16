@@ -1,7 +1,7 @@
 import type { GameAudioState } from "../player/footsteps";
 import { getActiveGameAudioState } from "../player/footsteps";
 
-export type CollectibleSound = "power" | "coin" | "penalty" | "contact" | "health" | "damage";
+export type CollectibleSound = "power" | "coin" | "penalty" | "contact" | "health" | "damage" | "splat";
 
 type ToneOptions = {
   delay?: number;
@@ -62,6 +62,12 @@ export function playCollectibleSound(sound: CollectibleSound) {
   if (sound === "damage") {
     playTone(state, { type: "sawtooth", startFrequency: 150, endFrequency: 72, duration: 0.16, gain: 0.026 });
     playTone(state, { type: "triangle", startFrequency: 92, endFrequency: 58, duration: 0.12, gain: 0.014, delay: 0.025 });
+    return;
+  }
+
+  if (sound === "splat") {
+    playTone(state, { type: "sawtooth", startFrequency: 118, endFrequency: 46, duration: 0.14, gain: 0.034 });
+    playTone(state, { type: "triangle", startFrequency: 260, endFrequency: 82, duration: 0.09, gain: 0.018, delay: 0.012 });
     return;
   }
 

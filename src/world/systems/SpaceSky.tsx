@@ -168,6 +168,7 @@ export function SpaceSky() {
           roughness={0.92}
         />
       </mesh>
+      <pointLight position={[-135, 48, 165]} color="#d17b45" intensity={0.32} distance={240} decay={2} />
       <mesh position={[-135, 48, 165]} scale={[1.015, 1.015, 1.015]}>
         <sphereGeometry args={[17, segments, 32]} />
         <meshBasicMaterial

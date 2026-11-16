@@ -78,9 +78,9 @@ export function PlayerCharacter({ dialogue, damageFlashUntil, yawRef }: PlayerCh
       const windowPart = /window|glass|windshield|windscreen/i.test(object.name);
       if (windowPart) return;
       if (/wheel|tire|tyre|rim|head|light|interior/i.test(object.name)) return;
-      object.material.color.set(damaged ? "#ef3340" : primary ? powerModes[primary].color : "#181d24");
-      object.material.emissive.set(damaged ? "#ef3340" : primary ? powerModes[primary].color : "#000000");
-      object.material.emissiveIntensity = damaged ? 0.2 : primary ? 0.16 : 0;
+      object.material.color.set(damaged ? "#ef3340" : primary ? "#d8b900" : "#181d24");
+      object.material.emissive.set(damaged ? "#ef3340" : primary ? "#d8b900" : "#000000");
+      object.material.emissiveIntensity = damaged ? 0.12 : primary ? 0.1 : 0;
     });
     previousPosition.current.copy(playerWorldState.position);
   });
@@ -97,9 +97,9 @@ export function PlayerCharacter({ dialogue, damageFlashUntil, yawRef }: PlayerCh
     }
     const protectedPart = /wheel|tire|tyre|rim|head|light|interior/i.test(object.name);
     if (protectedPart) return;
-    object.material.color.set(primary ? powerModes[primary].color : "#181d24");
-    object.material.emissive.set(primary ? powerModes[primary].color : "#000000");
-    object.material.emissiveIntensity = primary ? 0.16 : 0;
+    object.material.color.set(primary ? "#d8b900" : "#181d24");
+    object.material.emissive.set(primary ? "#d8b900" : "#000000");
+    object.material.emissiveIntensity = primary ? 0.1 : 0;
   });
   return <group>
     <group ref={groundAnchor} name="Player ground-effect anchor" />

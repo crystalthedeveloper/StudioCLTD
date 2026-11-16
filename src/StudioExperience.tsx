@@ -18,7 +18,7 @@ import { StudioWorld } from "./world/StudioWorld";
 import { preloadScreenTextures } from "./world/systems/HubSections";
 import { distanceFog } from "./world/distanceFog";
 import { triggerDamageFeedback } from "./player/damageFeedback";
-import { playCollectibleSound } from "./audio/collectibleSounds";
+import { playCollectibleSound, playPlayerDeathSound } from "./audio/collectibleSounds";
 import { roadTexturePath } from "./world/systems/ModularTerrain";
 
 type StudioExperienceProps = {
@@ -31,6 +31,7 @@ type StudioExperienceProps = {
 
 export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRestart, restartKey }: StudioExperienceProps) {
   const gameFocused = useGameFocus();
+  const [gameStarted, setGameStarted] = useState(false);
   const [worldReady, setWorldReady] = useState(false);
   const markWorldReady = useCallback(() => setWorldReady(true), []);
   const playRequestedRef = useRef(false);
@@ -49,6 +50,12 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   const [fontReady, setFontReady] = useState(false);
   const [roadTextureReady, setRoadTextureReady] = useState(false);
   const [shareScreenOpen, setShareScreenOpen] = useState(false);
+  const [returning, setReturning] = useState(false);
+  const [deathFade, setDeathFade] = useState(0);
+  const [deathGlitch, setDeathGlitch] = useState(false);
+  const [respawnCameraSnap, setRespawnCameraSnap] = useState(false);
+  const [carHidden, setCarHidden] = useState(false);
+  const returnTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,29 +99,74 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
     return () => { unsubscribe(); setGameFocused(false); };
   }, []);
 
-  const resetGameSession = useCallback(() => {
-    cancelCruise();
-    contactDamageGate.reset();
-    previousCompletedSectionCountRef.current = 0;
-    setCash(0);
-    setCompletedSectionCount(0);
-    setHealth(3);
-    healthRef.current = 3;
-    setDamageFlashUntil(0);
-    resetTemporaryPowers();
-    setShareScreenOpen(false);
-    onRestart();
-  }, [onRestart, contactDamageGate]);
+  const beginReturnSequence = useCallback(() => {
+    if (returnTimerRef.current !== null || returning) return;
+    setReturning(true);
+    setDeathFade(0);
+    setDeathGlitch(false);
+    setRespawnCameraSnap(false);
+    setCarHidden(false);
+    setGameFocused(true);
+    triggerDamageFeedback();
+    playPlayerDeathSound();
+    // Start the fast blackout on the first rendered overlay frame. The reset
+    // below waits until that transition has finished rather than sharing its
+    // first frame with the teleport.
+    window.requestAnimationFrame(() => setDeathFade(1));
+    const blackoutTimer = window.setTimeout(() => {
+      setCarHidden(true);
+      // Reset the complete session only after the blackout is opaque. This
+      // also makes manual restart and death restart behave identically.
+      cancelCruise();
+      contactDamageGate.reset();
+      resetTemporaryPowers();
+      previousCompletedSectionCountRef.current = 0;
+      setCash(0);
+      setCompletedSectionCount(0);
+      setHealth(3);
+      healthRef.current = 3;
+      setDamageFlashUntil(0);
+      setShareScreenOpen(false);
+      onRestart();
+      // Let Rapier apply the teleport, then hard-snap the follow camera after
+      // two rendered frames while the blackout is still fully opaque.
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => setRespawnCameraSnap(true));
+      });
+    }, 240);
+    const glitchTimer = window.setTimeout(() => setDeathGlitch(true), 3300);
+    returnTimerRef.current = window.setTimeout(() => {
+      window.clearTimeout(blackoutTimer);
+      window.clearTimeout(glitchTimer);
+      setDeathFade(0);
+      setDeathGlitch(false);
+      setCarHidden(false);
+      // Keep the sequence locked until the 0.2s fade has completely finished.
+      window.setTimeout(() => {
+        setHealth(3);
+        healthRef.current = 3;
+        setRespawnCameraSnap(false);
+        setReturning(false);
+        returnTimerRef.current = null;
+        setGameFocused(true);
+      }, 240);
+    }, 3700);
+  }, [contactDamageGate, onRestart, returning]);
+
+  useEffect(() => () => {
+    if (returnTimerRef.current !== null) window.clearTimeout(returnTimerRef.current);
+  }, []);
 
   const handlePlayerDeath = useCallback(() => {
-    resetGameSession();
-  }, [resetGameSession]);
+    beginReturnSequence();
+  }, [beginReturnSequence]);
 
   const handleManualRestart = useCallback(() => {
-    resetGameSession();
-  }, [resetGameSession]);
+    beginReturnSequence();
+  }, [beginReturnSequence]);
 
   const damagePlayer = useCallback(() => {
+    if (returning) return;
     if (healthRef.current <= 0) return;
     const cooldownUntil = contactDamageGate.claim();
     if (cooldownUntil === null) return;
@@ -269,6 +321,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
     // The Play click starts the simulation. Pointer lock is optional: embedded
     // browsers can expose the API but reject the request.
     playRequestedRef.current = true;
+    setGameStarted(true);
     setGameFocused(true);
     if (window.matchMedia("(pointer: coarse)").matches) return;
 
@@ -346,6 +399,10 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
                 onHealthCollect={collectHealth}
                 onPlayerDamage={damagePlayer}
                 onReset={handleManualRestart}
+                returning={returning}
+                respawnCameraSnap={respawnCameraSnap}
+                carHidden={carHidden}
+                startCamera={!gameStarted}
                 onSectionComplete={() => setCompletedSectionCount((current) => Math.min(8, current + 1))}
                 restartKey={restartKey}
               />
@@ -386,6 +443,14 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         </div>
       )}
       {shareScreenOpen && <ShareWebsiteScreen onClose={() => setShareScreenOpen(false)} />}
+      {returning && (
+        <div className={`death-restart-fade${deathGlitch ? " death-restart-fade--glitch" : ""}`} style={{ opacity: deathFade }}>
+          {deathFade > 0.8 && <div className="death-restart-caption" role="status" aria-live="polite">
+            <div className="death-restart-caption__laugh">HEH… HEH… HEH…</div>
+            <span className="sr-only">Witch laughing</span>
+          </div>}
+        </div>
+      )}
     </>
   );
 }

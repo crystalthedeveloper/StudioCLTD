@@ -31,6 +31,10 @@ type CharacterControllerProps = {
   damageFlashUntil: number;
   dialogue: DialogueMessage | null;
   onReset: () => void;
+  returning: boolean;
+  respawnCameraSnap: boolean;
+  carHidden: boolean;
+  startCamera: boolean;
   restartKey: number;
   transportDestination: TransportDestination | null;
   checkpoint: [number, number, number];
@@ -40,6 +44,10 @@ export function CharacterController({
   damageFlashUntil,
   dialogue,
   onReset,
+  returning,
+  respawnCameraSnap,
+  carHidden,
+  startCamera,
   restartKey,
   transportDestination,
   checkpoint,
@@ -61,6 +69,8 @@ export function CharacterController({
   const checkpointRef = useRef<[number, number, number]>(spawn);
   const teleportTimerRef = useRef<number | null>(null);
   const fallResetPendingRef = useRef(false);
+  const returnProgressRef = useRef(0);
+  const returnStartRef = useRef(new Vector3());
 
   const touchingGround = () => {
     const body = bodyRef.current;
@@ -88,6 +98,20 @@ export function CharacterController({
   }), [world, rapier, groundRay]);
 
   useEffect(() => installFootstepAudioUnlock(), []);
+
+  useEffect(() => {
+    colliderRef.current?.setEnabled(!returning);
+    if (returning) {
+      const translation = bodyRef.current?.translation();
+      if (translation) returnStartRef.current.set(translation.x, translation.y, translation.z);
+      returnProgressRef.current = 0;
+      bodyRef.current?.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      bodyRef.current?.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      bodyRef.current?.sleep();
+    } else {
+      bodyRef.current?.wakeUp();
+    }
+  }, [returning]);
 
   useEffect(() => {
     const body = bodyRef.current;
@@ -139,6 +163,13 @@ export function CharacterController({
   useGameFrame(({ clock }, delta) => {
     const body = bodyRef.current;
     if (!body) return;
+    if (returning) {
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      body.sleep();
+      playerWorldState.position.set(body.translation().x, body.translation().y, body.translation().z);
+      return;
+    }
     const frameDelta = Math.min(delta, maxFrameDelta);
     controlsRef.current = controls;
 
@@ -236,6 +267,9 @@ export function CharacterController({
         movementDirectionRef={movementDirectionRef}
         playerYawRef={yawRef}
         targetRef={bodyRef}
+        returning={returning}
+        respawnCameraSnap={respawnCameraSnap}
+        startCamera={startCamera}
       />
       <RigidBody
         ref={bodyRef}
@@ -248,12 +282,14 @@ export function CharacterController({
         canSleep={false}
       >
         <CuboidCollider ref={colliderRef} args={[0.68, 0.42, 1.3]} friction={0} restitution={0} />
-        <PlayerCharacter
-          animationStateRef={animationStateRef}
-          damageFlashUntil={damageFlashUntil}
-          dialogue={dialogue}
-          yawRef={yawRef}
-        />
+        <group visible={!carHidden}>
+          <PlayerCharacter
+            animationStateRef={animationStateRef}
+            damageFlashUntil={damageFlashUntil}
+            dialogue={dialogue}
+            yawRef={yawRef}
+          />
+        </group>
       </RigidBody>
     </>
   );

@@ -28,6 +28,10 @@ type StudioWorldProps = {
   onOpenShare: () => void;
   onPlayerDamage: () => void;
   onReset: () => void;
+  returning: boolean;
+  respawnCameraSnap: boolean;
+  carHidden: boolean;
+  startCamera: boolean;
   onSectionComplete: () => void;
   restartKey: number;
 };
@@ -43,7 +47,7 @@ const requiredSectionTriggers: Record<string, number> = {
   showcase: 1,
 };
 
-export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, onHealthCollect, onOpenShare, onPlayerDamage, onReset, onSectionComplete, restartKey }: StudioWorldProps) {
+export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, onHealthCollect, onOpenShare, onPlayerDamage, onReset, onSectionComplete, restartKey, returning, respawnCameraSnap, carHidden, startCamera }: StudioWorldProps) {
   const groundMaterial = useSharedGroundMaterial();
   const dialogueIdRef = useRef(0);
   const activatedSectionTriggersRef = useRef<Record<string, Set<string>>>({});
@@ -135,6 +139,10 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
         damageFlashUntil={damageFlashUntil}
         dialogue={playerDialogue}
         onReset={onReset}
+        returning={returning}
+        respawnCameraSnap={respawnCameraSnap}
+        carHidden={carHidden}
+        startCamera={startCamera}
         restartKey={restartKey}
         transportDestination={transportDestination}
         checkpoint={checkpoint}

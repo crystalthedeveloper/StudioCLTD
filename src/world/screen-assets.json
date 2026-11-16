@@ -1,17 +1,17 @@
 {
   "/images/optimized/fixed/fixed.webp": {
-    "sourceHash": "8bbb0cbfd7872ecf59f607bda29d90bb9f469fcaa479b82fbd337a7ebaec08f6",
+    "sourceHash": "07c9aa29b1fa44360d5fe39a05448aa3287d4c2494a7d8dd31c0e0a431204690",
     "mobile": {
-      "url": "/images/screens/fixed-fixed-mobile.040256d94bf6540b.webp",
+      "url": "/images/screens/fixed-fixed-mobile.6b67cb5af1d474ac.webp",
       "width": 768,
       "height": 432,
-      "bytes": 34176
+      "bytes": 57590
     },
     "desktop": {
-      "url": "/images/screens/fixed-fixed-desktop.6b204b5c61f532d6.webp",
+      "url": "/images/screens/fixed-fixed-desktop.6b2b51e6ad000071.webp",
       "width": 1536,
-      "height": 864,
-      "bytes": 93016
+      "height": 865,
+      "bytes": 195740
     }
   },
   "/images/optimized/performance/performance-bad.webp": {
@@ -29,19 +29,19 @@
       "bytes": 133308
     }
   },
-  "/images/optimized/quickFix/quick-fix-bad.jpg": {
-    "sourceHash": "c25808f31367ee844654fb63f834ae408a748201f7601af04685fc26fa5d5e56",
+  "/images/optimized/quickFix/quick-fix-bad.webp": {
+    "sourceHash": "d2e7d6c161fed04dd7f83300ae89ac0735fae09cc5b0d795f248269f195efc76",
     "mobile": {
-      "url": "/images/screens/quickFix-quick-fix-bad-mobile.ef79bc3783e05685.webp",
+      "url": "/images/screens/quickFix-quick-fix-bad-mobile.910fa0d385bcb740.webp",
       "width": 768,
       "height": 432,
-      "bytes": 22696
+      "bytes": 39630
     },
     "desktop": {
-      "url": "/images/screens/quickFix-quick-fix-bad-desktop.f6b8e42e098fb931.webp",
-      "width": 1024,
-      "height": 576,
-      "bytes": 40832
+      "url": "/images/screens/quickFix-quick-fix-bad-desktop.fe33b5d84d74c4eb.webp",
+      "width": 1536,
+      "height": 864,
+      "bytes": 132546
     }
   },
   "/images/optimized/siteImprovement/site-improvement-bad.webp": {

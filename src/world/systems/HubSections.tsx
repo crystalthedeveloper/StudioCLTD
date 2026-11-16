@@ -97,7 +97,7 @@ const tvBackingGeometry = new PlaneGeometry(9.25, 4.7);
 const serviceSectionIds = ["quick-fix", "urgent-fix", "performance", "site-improvement"];
 const serviceScreenImages: Record<string, { bad: string; good: string }> = {
   "quick-fix": {
-    bad: "/images/optimized/quickFix/quick-fix-bad.jpg",
+    bad: "/images/optimized/quickFix/quick-fix-bad.webp",
     good: "/images/optimized/fixed/fixed.webp",
   },
   "urgent-fix": {

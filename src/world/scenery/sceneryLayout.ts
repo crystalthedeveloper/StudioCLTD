@@ -85,6 +85,17 @@ export function createSceneryLayout(): SceneryItem[] {
       .sort((a,b)=>Math.hypot(b.x,b.z)-Math.hypot(a.x,a.z))[0];
     if(item) Object.assign(item,target,{radius,featured:true});
   }
+  // Keep the Tips screen sightline clear: move only pines in its immediate
+  // approach farther out toward the shoulder and reduce their silhouette.
+  for (const item of items) {
+    if (item.kind !== 'pine' || Math.abs(item.z + 80) > 22) continue;
+    const offset = item.x - roadCenterX(item.z);
+    if (Math.abs(offset) < 16) {
+      item.x = roadCenterX(item.z) + (offset < 0 ? -1 : 1) * 16;
+      item.scale *= 0.78;
+      item.radius = item.scale * 2.8;
+    }
+  }
   return items;
 }
 

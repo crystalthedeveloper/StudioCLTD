@@ -103,6 +103,70 @@ canvas {
   display: block;
 }
 
+.death-restart-fade {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  pointer-events: none;
+  background: #000;
+  transition: opacity 200ms ease;
+}
+
+.death-restart-fade--glitch::before,
+.death-restart-fade--glitch::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent 0 12px, rgba(255,255,255,.08) 13px 15px, transparent 16px 27px);
+  animation: death-glitch-slice 360ms steps(3, end) both;
+}
+.death-restart-fade--glitch::after {
+  background: rgba(255,255,255,.16);
+  mix-blend-mode: screen;
+  animation-name: death-glitch-flash;
+}
+.death-restart-fade--glitch .death-restart-caption {
+  animation: death-caption-disappear 360ms steps(3, end) both;
+}
+.death-restart-caption {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  font-family: "Trade Winds", cursive;
+  color: #f2eee5;
+  text-shadow: 0 0 8px #4d1018, 0 0 20px rgba(121, 25, 35, .75);
+  animation: death-caption-flicker 640ms steps(2, end) infinite;
+}
+.death-restart-caption__laugh {
+  font-size: clamp(24px, 4vw, 58px);
+  letter-spacing: .12em;
+  animation: death-caption-wobble 420ms steps(3, end) infinite;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+@keyframes death-caption-flicker { 0%, 100% { opacity: 1; } 48% { opacity: .72; } 52% { opacity: .95; } }
+@keyframes death-caption-wobble { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(2px) skewX(-2deg); } }
+@keyframes death-glitch-slice { 0% { transform: translateX(0); opacity: 0; } 25% { transform: translateX(-8px); opacity: 1; } 65% { transform: translateX(7px); opacity: .7; } 100% { transform: translateX(0); opacity: 0; } }
+@keyframes death-glitch-flash { 0%, 70%, 100% { opacity: 0; } 78% { opacity: 1; } }
+@keyframes death-caption-disappear {
+  0% { opacity: 1; transform: translateX(0) skewX(0); filter: none; }
+  35% { opacity: .8; transform: translateX(-5px) skewX(-8deg); filter: drop-shadow(7px 0 #1d5d88) drop-shadow(-7px 0 #7b1f2d); }
+  70% { opacity: .25; transform: translateX(8px) scaleX(1.04); }
+  100% { opacity: 0; transform: translateX(0) scaleX(.98); }
+}
+
 .share-screen {
   position: fixed;
   inset: 0;
@@ -373,10 +437,14 @@ canvas {
 }
 
 .game-focus-hint {
-  min-width: min(280px, 80vw);
-  min-height: 76px;
-  padding: 20px 32px;
-  font-size: clamp(24px, 4vw, 32px);
+  min-width: min(250px, 72vw);
+  min-height: 58px;
+  padding: 14px 24px;
+  font-size: clamp(20px, 3vw, 28px);
+}
+
+@media (max-width: 600px) {
+  .game-focus-hint { min-width: min(210px, 68vw); min-height: 50px; padding: 11px 18px; font-size: 20px; }
 }
 
 .game-pause-overlay__content p {

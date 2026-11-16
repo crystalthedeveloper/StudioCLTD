@@ -1,5 +1,32 @@
 import type { GameAudioState } from "../player/footsteps";
 import { getActiveGameAudioState } from "../player/footsteps";
+import { isGameAudioEnabled } from "./gameAudio";
+import { playGameMedia, registerGameMedia, stopGameMedia } from "./gameMedia";
+
+const powerPickupAudio = typeof Audio === "undefined" ? null : new Audio("/audio/power.mp3");
+const playerDeathAudio = typeof Audio === "undefined" ? null : new Audio("/audio/die.mp3");
+if (powerPickupAudio) {
+  powerPickupAudio.preload = "auto";
+  powerPickupAudio.volume = 0.72;
+  powerPickupAudio.muted = !isGameAudioEnabled();
+  powerPickupAudio.load();
+  registerGameMedia(powerPickupAudio);
+}
+if (playerDeathAudio) {
+  playerDeathAudio.preload = "auto";
+  playerDeathAudio.volume = 0.78;
+  playerDeathAudio.muted = !isGameAudioEnabled();
+  playerDeathAudio.load();
+  registerGameMedia(playerDeathAudio);
+}
+
+export function playPlayerDeathSound() {
+  if (!playerDeathAudio) return;
+  stopGameMedia(playerDeathAudio);
+  playerDeathAudio.currentTime = 0;
+  playerDeathAudio.muted = !isGameAudioEnabled();
+  void playGameMedia(playerDeathAudio);
+}
 
 export type CollectibleSound = "power" | "coin" | "penalty" | "contact" | "health" | "damage" | "splat";
 
@@ -36,8 +63,12 @@ export function playCollectibleSound(sound: CollectibleSound) {
   if (!state) return;
 
   if (sound === "power") {
-    playTone(state, { type: "triangle", startFrequency: 640, endFrequency: 960, duration: 0.1, gain: 0.025 });
-    playTone(state, { type: "sine", startFrequency: 960, endFrequency: 1440, duration: 0.12, gain: 0.022, delay: 0.07 });
+    if (powerPickupAudio) {
+      stopGameMedia(powerPickupAudio);
+      powerPickupAudio.currentTime = 0;
+      powerPickupAudio.muted = !isGameAudioEnabled();
+      void playGameMedia(powerPickupAudio);
+    }
     return;
   }
 

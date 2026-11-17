@@ -101,7 +101,7 @@ const serviceScreenImages: Record<string, { bad: string; good: string }> = {
     good: "/images/optimized/fixed/fixed.webp",
   },
   "urgent-fix": {
-    bad: "/images/optimized/urgentFix/urgent-fix-bad.jpg",
+    bad: "/images/optimized/urgentFix/urgent-fix-bad.webp",
     good: "/images/optimized/fixed/fixed.webp",
   },
   performance: {

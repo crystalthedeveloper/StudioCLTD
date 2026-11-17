@@ -91,8 +91,8 @@ export function createSceneryLayout(): SceneryItem[] {
     if (item.kind !== 'pine' || Math.abs(item.z + 80) > 22) continue;
     const offset = item.x - roadCenterX(item.z);
     if (Math.abs(offset) < 16) {
-      item.x = roadCenterX(item.z) + (offset < 0 ? -1 : 1) * 16;
-      item.scale *= 0.78;
+      item.x = roadCenterX(item.z) + (offset < 0 ? -1 : 1) * 22;
+      item.scale *= 0.72;
       item.radius = item.scale * 2.8;
     }
   }

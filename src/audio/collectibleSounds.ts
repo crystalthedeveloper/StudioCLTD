@@ -5,6 +5,7 @@ import { playGameMedia, registerGameMedia, stopGameMedia } from "./gameMedia";
 
 const powerPickupAudio = typeof Audio === "undefined" ? null : new Audio("/audio/power.mp3");
 const playerDeathAudio = typeof Audio === "undefined" ? null : new Audio("/audio/die.mp3");
+const sectionFixedAudio = typeof Audio === "undefined" ? null : new Audio("/audio/fixed.mp3");
 if (powerPickupAudio) {
   powerPickupAudio.preload = "auto";
   powerPickupAudio.volume = 0.72;
@@ -18,6 +19,21 @@ if (playerDeathAudio) {
   playerDeathAudio.muted = !isGameAudioEnabled();
   playerDeathAudio.load();
   registerGameMedia(playerDeathAudio);
+}
+if (sectionFixedAudio) {
+  sectionFixedAudio.preload = "auto";
+  sectionFixedAudio.volume = 0.72;
+  sectionFixedAudio.muted = !isGameAudioEnabled();
+  sectionFixedAudio.load();
+  registerGameMedia(sectionFixedAudio);
+}
+
+export function playSectionFixedSound() {
+  if (!sectionFixedAudio) return;
+  stopGameMedia(sectionFixedAudio);
+  sectionFixedAudio.currentTime = 0;
+  sectionFixedAudio.muted = !isGameAudioEnabled();
+  void playGameMedia(sectionFixedAudio);
 }
 
 export function playPlayerDeathSound() {

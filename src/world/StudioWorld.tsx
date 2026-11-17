@@ -19,6 +19,7 @@ import { WorldLights } from "./systems/WorldLights";
 import { TransportPads } from "./systems/TransportPads";
 import type { TransportDestination } from "./systems/TransportPads";
 import { roadPoint } from "./roadSurface";
+import { playSectionFixedSound } from "../audio/collectibleSounds";
 
 type StudioWorldProps = {
   damageFlashUntil: number;
@@ -83,6 +84,7 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
     if (requiredTriggerCount === undefined || activatedTriggers.size < requiredTriggerCount) return;
 
     completedSectionsRef.current.add(sectionId);
+    playSectionFixedSound();
     setCompletedCount((count) => Math.min(8, count + 1));
     onSectionComplete();
   };

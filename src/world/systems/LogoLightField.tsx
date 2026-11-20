@@ -543,7 +543,8 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, surface, onCoinColle
   if (logo.kind === "light") {
     return (
       <RigidBody type="fixed" colliders={false} position={[logo.position[0], logo.height ?? floorLogoY, logo.position[1]]} name={`WhiteLogoObstacle:${logo.id}`}>
-        <CuboidCollider args={[1.1, 0.65, 0.32]} position={[0, 0.65, 0]} />
+        {/* Keep the visible logo solid, but keep its collision footprint tight to the art. */}
+        <CuboidCollider args={[0.72, 0.34, 0.18]} position={[0, 0.34, 0]} />
         {visual}
       </RigidBody>
     );

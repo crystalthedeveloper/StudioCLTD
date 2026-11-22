@@ -1,5 +1,6 @@
 import { playGameMedia, registerGameMedia, stopGameMedia } from "./gameMedia";
 import { isGameAudioEnabled, subscribeGameAudio } from "./gameAudio";
+import { beginSectionAudio } from "./sectionAudio";
 
 const defeatAudioPath = "/audio/defeat.mp3";
 const villainVoicePaths: Record<string, string> = {
@@ -88,6 +89,8 @@ export function playVillainVoice(sectionId: string) {
   const path = villainVoicePaths[sectionId];
   if (!path) return;
   installAudioSubscription();
+  stopAllVillainAudio();
+  beginSectionAudio(stopAllVillainAudio);
   playFromStart(getVoiceAudio(sectionId, path));
 }
 

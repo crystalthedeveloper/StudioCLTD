@@ -24,6 +24,8 @@ import { beginGameAudioLock, endGameAudioLock } from "./audio/gameAudio";
 import { roadTexturePath } from "./world/systems/ModularTerrain";
 import { villainsRequired, readPersonalBest, savePersonalBest, type RunScore } from "./game/roundSystem";
 
+const maxHealth = 3;
+
 type StudioExperienceProps = {
   onOpenWebsite: () => void;
   onReady: () => void;
@@ -43,10 +45,10 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const previousCompletedSectionCountRef = useRef(0);
   const [contactDamageGate] = useState(createContactDamageGate);
-  const healthRef = useRef(3);
+  const healthRef = useRef(maxHealth);
   const [cash, setCash] = useState(0);
   const [completedSectionCount, setCompletedSectionCount] = useState(0);
-  const [health, setHealth] = useState(3);
+  const [health, setHealth] = useState(maxHealth);
   const [damageFlashUntil, setDamageFlashUntil] = useState(0);
   const [screenAssetProgress, setScreenAssetProgress] = useState(0);
   const [screenAssetsReady, setScreenAssetsReady] = useState(false);
@@ -146,8 +148,8 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
       setRunVillains(0);
       setRoundActive(true);
       setLevelOverlay(false);
-      setHealth(3);
-      healthRef.current = 3;
+      setHealth(maxHealth);
+      healthRef.current = maxHealth;
       setDamageFlashUntil(0);
       setShareScreenOpen(false);
       onRestart();
@@ -166,8 +168,8 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
       setCarHidden(false);
       // Keep the sequence locked until the 0.2s fade has completely finished.
       window.setTimeout(() => {
-        setHealth(3);
-        healthRef.current = 3;
+        setHealth(maxHealth);
+        healthRef.current = maxHealth;
         setRespawnCameraSnap(false);
         setReturning(false);
         returnTimerRef.current = null;
@@ -204,7 +206,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
 
   const collectHealth = useCallback(() => {
     if (!isGameFocused()) return false;
-    if (healthRef.current >= 3) return false;
+    if (healthRef.current >= maxHealth) return false;
     healthRef.current += 1;
     setHealth(healthRef.current);
     return true;
@@ -558,7 +560,8 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         onOpenGuide={openGuide}
         onCloseGuide={closeGuide}
         completedSectionCount={completedSectionCount}
-        health={health}
+                health={health}
+                maxHealth={maxHealth}
         damageFlashUntil={damageFlashUntil}
         onOpenWebsite={onOpenWebsite}
         onRestart={handleManualRestart}

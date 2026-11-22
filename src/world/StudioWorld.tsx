@@ -17,7 +17,8 @@ import { WorldLights } from "./systems/WorldLights";
 import { TransportPads } from "./systems/TransportPads";
 import type { TransportDestination } from "./systems/TransportPads";
 import { roadPoint } from "./roadSurface";
-import { playSectionFixedSound } from "../audio/collectibleSounds";
+import { playGeneralFixedSound, playSectionFixedSound } from "../audio/collectibleSounds";
+import { homeBaseCenter } from "./systems/HomeBase";
 
 type StudioWorldProps = {
   damageFlashUntil: number;
@@ -85,7 +86,8 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
     if (requiredTriggerCount === undefined || activatedTriggers.size < requiredTriggerCount) return;
 
     completedSectionsRef.current.add(sectionId);
-    playSectionFixedSound();
+    if (sectionId === "tips" || sectionId === "offers" || sectionId === "value" || sectionId === "showcase") playGeneralFixedSound();
+    else playSectionFixedSound();
     setCompletedCount((count) => Math.min(8, count + 1));
     onSectionComplete();
   };
@@ -108,7 +110,14 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
       <Environment preset="warehouse" background={false} environmentIntensity={0.16} />
       <ModularTerrain material={groundMaterial} />
       <HomeBase material={groundMaterial} />
-      <TransportPads unlocked={completedCount === 8} onTransport={setTransportDestination} restartKey={restartKey} />
+      <TransportPads
+        unlocked={completedCount === 8}
+        onTransport={(destination) => {
+          if (destination.position[0] === homeBaseCenter[0]) playGeneralFixedSound();
+          setTransportDestination(destination);
+        }}
+        restartKey={restartKey}
+      />
       <LogoLightField
         onCoinCollect={onCoinCollect}
         onHealthCollect={onHealthCollect}

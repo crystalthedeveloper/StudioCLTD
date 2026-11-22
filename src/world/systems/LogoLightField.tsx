@@ -61,8 +61,8 @@ type PlazaLogo = {
 };
 
 const homeBaseLogos: PlazaLogo[] = [
-  { id: "home-contact", kind: "contact", position: [homeBaseCenter[0] - 8, homeBaseCenter[2] - 2], height: homeBaseCenter[1] + 0.04, rotationOffset: 0.08, scaleMultiplier: 0.9 },
-  { id: "home-share", kind: "share", position: [homeBaseCenter[0] + 8, homeBaseCenter[2] - 2], height: homeBaseCenter[1] + 0.04, rotationOffset: -0.08, scaleMultiplier: 0.9 },
+  { id: "home-contact", kind: "contact", position: [homeBaseCenter[0] - 9.5, homeBaseCenter[2] - 2], height: homeBaseCenter[1] + 0.04, rotationOffset: 0.08, scaleMultiplier: 0.9 },
+  { id: "home-share", kind: "share", position: [homeBaseCenter[0] + 9.5, homeBaseCenter[2] - 2], height: homeBaseCenter[1] + 0.04, rotationOffset: -0.08, scaleMultiplier: 0.9 },
   { id: "home-coin-1", kind: "coin", position: [homeBaseCenter[0] - 10, homeBaseCenter[2] + 9], height: homeBaseCenter[1] + 0.04, rotationOffset: -0.12 },
   { id: "home-coin-2", kind: "coin", position: [homeBaseCenter[0], homeBaseCenter[2] - 1], height: homeBaseCenter[1] + 0.04, rotationOffset: 0.08 },
   { id: "home-coin-3", kind: "coin", position: [homeBaseCenter[0] + 10, homeBaseCenter[2] - 9], height: homeBaseCenter[1] + 0.04, rotationOffset: 0.14 },
@@ -267,14 +267,21 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
   const logos = useMemo(
     () => {
       let roadCoinIndex = 0;
+      let roadHealthIndex = 0;
+      const healthSectionIndexes = [1, 3, 5] as const;
       const roadMoney = accessiblePlazaLogos.map((logo, index) => {
-        const section = hubSections[Math.min(hubSections.length - 1, Math.floor(index / 3))];
+        const sectionIndex = logo.kind === "dark"
+          ? healthSectionIndexes[roadHealthIndex++ % healthSectionIndexes.length]
+          : Math.min(hubSections.length - 1, Math.floor(index / 3));
+        const section = hubSections[sectionIndex];
         const lane = index % 3;
-        const z = section.position[2] - 10 - lane * 10;
+        const z = section.position[2] - 10 - (logo.kind === "dark" ? 4 : lane * 10);
         // Keep gold pickups out of the centre driving line. Alternate the
         // outer lanes so they remain collectible without forcing a collision
         // course through the player/villain path.
-        const lateral = logo.kind === "coin"
+        const lateral = logo.kind === "dark"
+          ? (roadHealthIndex % 2 === 0 ? -4.8 : 4.8)
+          : logo.kind === "coin"
           ? (roadCoinIndex++ % 2 === 0 ? -5.2 : 5.2)
           : (lane - 1) * 4.2;
         const point = roadPoint(lateral, z, 0.04);
@@ -292,9 +299,11 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
           return seed / 4294967296;
         };
         const lateral = logo.kind === "penalty"
-          ? (decorativeIndex % 2 === 0 ? -6.9 : 6.9)
+          ? (decorativeIndex % 2 === 0 ? -5.5 : 5.5)
           : decorativeLogoOffsets[decorativeIndex % decorativeLogoOffsets.length];
-        const forwardOffset = (next() - 0.5) * 4;
+        // Give red penalty logos a small forward nudge so they do not sit
+        // directly in the previous road mark's visual band.
+        const forwardOffset = logo.kind === "penalty" ? -12 : (next() - 0.5) * 4;
         const z = logo.position[1] + forwardOffset;
         const point = roadPoint(lateral, z, 0.04);
         const tangent = roadTangent(z);
@@ -383,6 +392,24 @@ type PlazaLogoInstanceProps = {
 
 function PlazaLogoInstance({ healthRespawnGeneration, logo, goldScene, surface, onCoinCollect, onHealthCollect, onHealthLogoCollected, onOpenShare, onReset, restartKey }: PlazaLogoInstanceProps) {
   const [available, setAvailable] = useState(true);
+  const redLogoLift = useMemo(() => {
+    if (logo.kind !== "penalty") return 0;
+    const bounds = new Box3().setFromObject(logo.object);
+    const modelScale = logoScale * (logo.scaleMultiplier ?? 1);
+    // Correct from the actual cloned mesh pivot, then add a deliberate gap.
+    // This keeps the entire red model above the road even if its GLB origin
+    // is below the visible geometry.
+    // Keep the logo low enough for the car to hit while preserving a visible
+    // gap below its lowest mesh point.
+    return Math.max(0.35, -bounds.min.y + 0.18 / modelScale);
+  }, [logo.kind, logo.object, logo.scaleMultiplier]);
+  const redLogoColliderY = useMemo(() => {
+    if (logo.kind !== "penalty") return 0.65;
+    const bounds = new Box3().setFromObject(logo.object);
+    const modelScale = logoScale * (logo.scaleMultiplier ?? 1);
+    const centerY = bounds.getCenter(new Vector3()).y;
+    return redLogoLift + centerY * modelScale;
+  }, [logo.kind, logo.object, logo.scaleMultiplier, redLogoLift]);
   const availableRef = useRef(true);
   const collectedRef = useRef(false);
   const colliderRef = useRef<RapierCollider>(null);
@@ -544,12 +571,16 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, goldScene, surface, 
   const position: [number, number, number] = [logo.position[0], surface.y, logo.position[1]];
   const standardVisual = (
     <>
-      <primitive
-        object={logo.object}
+      <group
+        // Lift the wrapper rather than relying on the GLB root pivot. This
+        // keeps the actual red mesh elevated even when the asset has its own
+        // transform or a child animation changes the model root.
+        position={[0, redLogoLift, 0]}
         rotation={[0, logo.rotationOffset ?? worldLogoRotation, 0]}
         scale={logoScale * (logo.scaleMultiplier ?? 1)}
-        dispose={null}
-      />
+      >
+        <primitive object={logo.object} dispose={null} />
+      </group>
     </>
   );
   const visual = (
@@ -586,15 +617,17 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, goldScene, surface, 
         ref={colliderRef}
         // Coins use a tighter sensor so the car cannot visually catch its
         // edge and appear to jump while collecting it.
-        args={[logo.kind === "coin" ? 0.95 : pickupColliderRadius]}
-        position={[0, 0.65, 0]}
+        args={[logo.kind === "coin" ? 0.95 : logo.kind === "penalty" ? 0.72 : pickupColliderRadius]}
+        position={[0, logo.kind === "penalty" ? redLogoColliderY : 0.65, 0]}
         sensor
         friction={0}
         restitution={0}
         onIntersectionEnter={collect}
         onIntersectionExit={handleExit}
       />
-      <GroundedPickupVisual surface={surface}>{visual}</GroundedPickupVisual>
+      {logo.kind === "penalty" ? visual : (
+        <GroundedPickupVisual surface={surface}>{visual}</GroundedPickupVisual>
+      )}
       {(logo.kind === "contact" || logo.kind === "share") && !playerStanding && (
         <BillboardLabel color={logoColors[logo.kind]} fontSize={0.25} position={[0, triggerPopupLayout.labelHeight + 0.42, 0]} maxWidth={4}>
           {logo.kind === "contact" ? "CONTACT" : "SHARE"}

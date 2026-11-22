@@ -34,6 +34,7 @@ import { padVisualStyle } from "../padVisualStyle";
 import { triggerPopupLayout } from "../triggerPopupLayout";
 import { serviceInfoText } from "../serviceInfo";
 import { playVillainVoice } from "../../audio/villainAudio";
+import { playGeneralFixedSound } from "../../audio/collectibleSounds";
 import { brandYellow } from "../../player/effectColors";
 
 type HubSectionsProps = {
@@ -498,15 +499,20 @@ export function HubSections({ activeServiceInfoId, onSectionTrigger, restartKey,
             showcaseVideoState={showcaseVideoState}
             showcaseCompleted={showcaseCompleted}
             onOfferSelect={(offerId) => {
+              // The TV selector is a two-way toggle: every click restarts the
+              // shared Fixed voice and stops any previous section voice.
+              playGeneralFixedSound();
               setSelectedOfferId((current) => current === offerId ? null : offerId);
               if (offerId) onSectionTrigger("offers", offerId);
             }}
             onSimpleDisplayTrigger={showSimpleDisplay}
             onShowcasePause={() => {
+              playGeneralFixedSound();
               if (showcaseVideoElement) pauseShowcaseVideo(showcaseVideoElement);
               setShowcaseVideoState((current) => (current.playing ? { ...current, playing: false } : current));
             }}
             onShowcasePlay={() => {
+              playGeneralFixedSound();
               if (showcaseVideoState.playing) return;
               const video = getShowcaseVideoElement();
               if (!showcaseCompletedRef.current) {
@@ -1168,9 +1174,15 @@ export function HomeBaseVideoScreen() {
         active={isPlaying}
         label="PLAY"
         name="HomeBaseVideo:play"
-        onPlayerEnter={() => setIsPlaying(true)}
-        onPlayerExit={() => setIsPlaying(false)}
-        position={[0, 0.18, 2.5]}
+        onPlayerEnter={() => {
+          playGeneralFixedSound();
+          setIsPlaying(true);
+        }}
+        onPlayerExit={() => {
+          playGeneralFixedSound();
+          setIsPlaying(false);
+        }}
+        position={[0, 0.18, 3.5]}
       />
     </group>
   );

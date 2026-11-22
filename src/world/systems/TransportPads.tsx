@@ -25,7 +25,9 @@ const transportSectionIds = [
   "showcase",
 ] as const;
 // Keep the completed-route HOME BASE trigger at the shortened road endpoint.
-const homeBaseRoadPoint = roadPoint(0, -415, 0.035);
+// Keep the unlocked Home Base trigger visible just beyond Showcase, on the
+// supported road surface rather than overlapping the final section screen.
+const homeBaseRoadPoint = roadPoint(0, -435, 0.035);
 export const roadHomeBaseTransportPadPosition: readonly [number, number, number] = homeBaseRoadPoint;
 
 export type TransportDestination = {
@@ -123,7 +125,7 @@ export function TransportPads({ unlocked = false, onTransport, restartKey }: Tra
         label="Return"
         material={resources.material}
         onEnter={(event) => transportDirect([0, 2.8, 11], 0, event)}
-        position={[homeBaseCenter[0], homeBaseCenter[1] + 0.04, homeBaseCenter[2] - 10.5]}
+        position={[homeBaseCenter[0], homeBaseCenter[1] + 0.04, homeBaseCenter[2] - 12.5]}
       />
     </group>
   );

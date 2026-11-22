@@ -11,6 +11,7 @@ import { DialogueMessage } from "../ui/DialogueBubble";
 import { playerWorldState } from "../world/playerWorldState";
 import type { TransportDestination } from "../world/systems/TransportPads";
 import { installFootstepAudioUnlock } from "./footsteps";
+import { isCompactVisualBudget } from "../world/visualQuality";
 
 const moveDirection = new Vector3();
 const playerForward = new Vector3();
@@ -19,6 +20,9 @@ const nextVelocity = { x: 0, y: 0, z: 0 };
 const baseRunSpeed = 23;
 const boostedRunSpeed = 39.6;
 const reverseSpeed = 18;
+const mobileRunSpeed = 18;
+const mobileBoostedRunSpeed = 30;
+const mobileReverseSpeed = 15;
 const turnSpeed = 2.2;
 const acceleration = 9;
 const braking = 15;
@@ -54,6 +58,7 @@ export function CharacterController({
   const yawRef = useRef(0);
   const cameraYawRef = useRef(0);
   const controls = useKeyboardControls();
+  const compactControls = useMemo(isCompactVisualBudget, []);
   const controlsRef = useRef(controls);
   const movementDirectionRef = useRef(new Vector3());
   const forwardBackSpeedRef = useRef(0);
@@ -140,7 +145,9 @@ export function CharacterController({
     if (controls.backward) cancelCruise();
     const throttle = Number(controls.forward || (controls as typeof controls & { cruise?: boolean }).cruise) - Number(controls.backward);
     const turnInput = Number(controls.left) - Number(controls.right);
-    const forwardBackSpeed = hasPowerSpeedBoost() ? boostedRunSpeed : baseRunSpeed;
+    const forwardBackSpeed = hasPowerSpeedBoost()
+      ? (compactControls ? mobileBoostedRunSpeed : boostedRunSpeed)
+      : (compactControls ? mobileRunSpeed : baseRunSpeed);
     const speed = forwardBackSpeedRef.current;
     const steeringGrip = Math.min(1, Math.abs(speed) / 3.2);
     const highSpeedStability = 1 - 0.28 * Math.min(1, Math.abs(speed) / forwardBackSpeed);
@@ -152,7 +159,11 @@ export function CharacterController({
 
     // Direction changes target the requested signed speed immediately. The
     // damped rate carries the car smoothly through zero without a double press.
-    const targetSpeed = throttle > 0 ? forwardBackSpeed : throttle < 0 ? -Math.max(reverseSpeed, forwardBackSpeed) : 0;
+    const targetSpeed = throttle > 0
+      ? forwardBackSpeed
+      : throttle < 0
+        ? -Math.max(compactControls ? mobileReverseSpeed : reverseSpeed, forwardBackSpeed)
+        : 0;
     const reversingAgainstMotion = throttle < 0 && speed > 0;
     const acceleratingAgainstMotion = throttle > 0 && speed < 0;
     const rate = throttle === 0 ? braking : (reversingAgainstMotion || acceleratingAgainstMotion ? braking : acceleration);

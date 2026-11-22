@@ -10,13 +10,15 @@ import { createConcreteBoxGeometry } from "./ModularTerrain";
 export const homeBaseCenter = [12000, 0.6, 12000] as const;
 
 export function HomeBase({ material }: { material: MeshStandardMaterial }) {
-  const geometry = useMemo(() => createConcreteBoxGeometry(26, 0.6, 26), []);
+  // Give the return hub a little more turning room without changing its
+  // elevation or the surrounding world layout.
+  const geometry = useMemo(() => createConcreteBoxGeometry(31.2, 0.6, 31.2), []);
   useEffect(() => () => geometry.dispose(), [geometry]);
 
   return (
     <group name="HomeBase" position={homeBaseCenter}>
       <RigidBody type="fixed" colliders={false}>
-        <CuboidCollider args={[13, 0.3, 13]} position={[0, -0.3, 0]} friction={0.35} />
+        <CuboidCollider args={[15.6, 0.3, 15.6]} position={[0, -0.3, 0]} friction={0.35} />
         <mesh geometry={geometry} material={material} position={[0, -0.3, 0]} castShadow receiveShadow />
       </RigidBody>
       <HomeBaseVideoScreen />

@@ -3,9 +3,11 @@ import { getActiveGameAudioState, trackGameOscillator } from "../player/footstep
 import { isGameAudioEnabled, isGameAudioLocked } from "./gameAudio";
 import { playGameMedia, registerGameMedia, stopGameMedia, stopAllGameMedia } from "./gameMedia";
 import { stopAllGameWebAudio } from "../player/footsteps";
+import { beginSectionAudio } from "./sectionAudio";
 
 const powerPickupAudio = typeof Audio === "undefined" ? null : new Audio("/audio/power.mp3");
 const playerDeathAudio = typeof Audio === "undefined" ? null : new Audio("/audio/die.mp3");
+const generalFixedAudio = typeof Audio === "undefined" ? null : new Audio("/audio/fixed.mp3");
 const playerFixedAudio = typeof Audio === "undefined" ? null : new Audio("/audio/player-fixed.mp3");
 if (powerPickupAudio) {
   powerPickupAudio.preload = "auto";
@@ -21,6 +23,13 @@ if (playerDeathAudio) {
   playerDeathAudio.load();
   registerGameMedia(playerDeathAudio);
 }
+if (generalFixedAudio) {
+  generalFixedAudio.preload = "auto";
+  generalFixedAudio.volume = 0.72;
+  generalFixedAudio.muted = !isGameAudioEnabled();
+  generalFixedAudio.load();
+  registerGameMedia(generalFixedAudio);
+}
 if (playerFixedAudio) {
   playerFixedAudio.preload = "auto";
   playerFixedAudio.volume = 0.72;
@@ -31,10 +40,22 @@ if (playerFixedAudio) {
 
 export function playSectionFixedSound() {
   if (!playerFixedAudio || isGameAudioLocked()) return;
+  if (generalFixedAudio) stopGameMedia(generalFixedAudio);
   stopGameMedia(playerFixedAudio);
   playerFixedAudio.currentTime = 0;
   playerFixedAudio.muted = !isGameAudioEnabled();
+  beginSectionAudio(() => stopGameMedia(playerFixedAudio));
   void playGameMedia(playerFixedAudio);
+}
+
+export function playGeneralFixedSound() {
+  if (!generalFixedAudio || isGameAudioLocked()) return;
+  if (playerFixedAudio) stopGameMedia(playerFixedAudio);
+  stopGameMedia(generalFixedAudio);
+  generalFixedAudio.currentTime = 0;
+  generalFixedAudio.muted = !isGameAudioEnabled();
+  beginSectionAudio(() => stopGameMedia(generalFixedAudio));
+  void playGameMedia(generalFixedAudio);
 }
 
 export function playPlayerDeathSound() {

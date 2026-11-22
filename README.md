@@ -53,7 +53,7 @@ Shock activates on pickup for 3 seconds and appears at the top right. Global pau
 
 | Color | Purpose |
 | --- | --- |
-| Green `#3F7D3A` | Coin / Cash |
+| Gold | Cash pickup and Shock feedback |
 | Red | Penalty |
 | Blue `#2583E8` | Contact |
 | Purple `#A855F7` | Share |
@@ -78,14 +78,15 @@ src/
 
 public/
 ├── audio/          Voice, collectible, and defeat audio
-├── characters/     Optimized shared player/villain GLB
+├── characters/     Sports-car and villain GLB models
+├── pickup/         Gold pickup GLB
 ├── images/         Screen, planet, logo, and environment assets
 └── videos/         Responsive Showcase and website videos
 ```
 
 ## Character Asset and Animations
 
-The player uses `public/characters/sports-car.glb`; villains use `public/characters/villain.glb`.
+The player uses `public/characters/sports-car.glb`, villains use `public/characters/villain.glb`, and cash pickups use `public/pickup/gold.glb`.
 
 - Villain source clips are matched case-insensitively: `idle`, `run`, `hit`, and `die`.
 

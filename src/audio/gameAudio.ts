@@ -13,9 +13,22 @@ function readStoredPreference() {
 }
 
 let audioEnabled = readStoredPreference();
+let gameAudioLocked = false;
 
 export function isGameAudioEnabled() {
   return audioEnabled;
+}
+
+export function isGameAudioLocked() {
+  return gameAudioLocked;
+}
+
+export function beginGameAudioLock() {
+  gameAudioLocked = true;
+}
+
+export function endGameAudioLock() {
+  gameAudioLocked = false;
 }
 
 export function setGameAudioEnabled(enabled: boolean) {

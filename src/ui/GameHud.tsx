@@ -9,6 +9,9 @@ import { useEffect, useSyncExternalStore, type CSSProperties } from "react";
 import { DirectionControls } from "./DirectionControls";
 
 type GameHudProps = {
+  level: number;
+  levelDefeats: number;
+  levelRequirement: number;
   completedSectionCount: number;
   guideOpen: boolean;
   onOpenGuide: () => void;
@@ -27,7 +30,7 @@ const villainVoiceLabels: Record<string, string> = {
   "site-improvement": "Site Improvement",
 };
 
-export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onCloseGuide, health, damageFlashUntil, onOpenWebsite, onRestart, cash }: GameHudProps) {
+export function GameHud({ level, levelDefeats, levelRequirement, completedSectionCount, guideOpen, onOpenGuide, onCloseGuide, health, damageFlashUntil, onOpenWebsite, onRestart, cash }: GameHudProps) {
   const formattedCash = formatCash(cash);
   const gameFocused = useGameFocus();
   const audioEnabled = useGameAudioEnabled();
@@ -120,9 +123,14 @@ export function GameHud({ completedSectionCount, guideOpen, onOpenGuide, onClose
           </strong>
         </section>
 
-        <section className="game-hud__stat" aria-label={`${completedSectionCount} of 8 sections complete`} aria-live="polite">
+        <section className="game-hud__stat" aria-label={`Level ${level}, ${levelDefeats} of ${levelRequirement} villains defeated`} aria-live="polite">
+          <span className="game-hud__stat-label">Level {level}</span>
+          <strong>{levelDefeats}/{levelRequirement}</strong>
+        </section>
+
+        <section className="game-hud__stat game-hud__stat--section-progress" aria-label={`Progress: ${completedSectionCount} of 8`} aria-live="polite">
           <span className="game-hud__stat-label">Progress</span>
-          <strong>{completedSectionCount >= 8 ? "🏆" : `${completedSectionCount}/8`}</strong>
+          <strong>{completedSectionCount}/8</strong>
         </section>
 
         <section className="game-hud__stat game-hud__stat--cash" aria-label={`Cash: ${formattedCash}`} aria-live="polite"

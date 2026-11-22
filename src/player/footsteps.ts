@@ -1,5 +1,5 @@
 import { isGameFocused, subscribeGameFocus } from "./gameFocus";
-import { isGameAudioEnabled, subscribeGameAudio } from "../audio/gameAudio";
+import { isGameAudioEnabled, isGameAudioLocked, subscribeGameAudio } from "../audio/gameAudio";
 
 export type GameAudioState = {
   context: AudioContext;
@@ -9,6 +9,7 @@ export type GameAudioState = {
 
 let audioState: GameAudioState | null = null;
 let unlockInstalled = false;
+const activeOscillators = new Set<OscillatorNode>();
 
 function createAudioState() {
   if (audioState || typeof window === "undefined") return audioState;
@@ -65,6 +66,28 @@ export function installFootstepAudioUnlock() {
 
 export function getActiveGameAudioState() {
   const state = audioState;
-  if (!isGameFocused() || !state || state.context.state !== "running" || !isGameAudioEnabled()) return null;
+  if (isGameAudioLocked() || !isGameFocused() || !state || state.context.state !== "running" || !isGameAudioEnabled()) return null;
   return state;
+}
+
+export function stopAllGameWebAudio() {
+  if (!audioState) return;
+  activeOscillators.forEach((oscillator) => {
+    try { oscillator.stop(); } catch { /* already stopped */ }
+    oscillator.disconnect();
+  });
+  activeOscillators.clear();
+  audioState.masterGain.gain.cancelScheduledValues(audioState.context.currentTime);
+  audioState.masterGain.gain.setValueAtTime(0, audioState.context.currentTime);
+}
+
+export function resumeGameWebAudio() {
+  if (!audioState) return;
+  audioState.masterGain.gain.cancelScheduledValues(audioState.context.currentTime);
+  audioState.masterGain.gain.setValueAtTime(isGameAudioEnabled() ? 1 : 0, audioState.context.currentTime);
+}
+
+export function trackGameOscillator(oscillator: OscillatorNode) {
+  activeOscillators.add(oscillator);
+  oscillator.addEventListener("ended", () => activeOscillators.delete(oscillator), { once: true });
 }

@@ -17,6 +17,8 @@ type BillboardLabelProps = {
   lineHeight?: number;
   maxWidth?: number;
   position?: [number, number, number];
+  outlineColor?: string;
+  outlineWidth?: number;
 };
 
 export function BillboardLabel({
@@ -26,6 +28,8 @@ export function BillboardLabel({
   lineHeight,
   maxWidth = 2.8,
   position = [0, 1.05, 0],
+  outlineColor = "#05070b",
+  outlineWidth = 0.012,
 }: BillboardLabelProps) {
   const groupRef = useRef<Group>(null);
 
@@ -60,8 +64,8 @@ export function BillboardLabel({
         fontSize={fontSize}
         lineHeight={lineHeight}
         maxWidth={maxWidth}
-        outlineColor="#05070b"
-        outlineWidth={0.012}
+        outlineColor={outlineColor}
+        outlineWidth={outlineWidth}
       >
         {children}
       </Text>

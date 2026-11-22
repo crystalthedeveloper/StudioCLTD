@@ -28,8 +28,7 @@ function load(path, dependencies) {
   } });
   return exports;
 }
-const jump = load('src/player/poweredJump.ts', {});
-const powers = load('src/player/temporaryPowers.ts', { './gameFocus': focus, './poweredJump': jump });
+const powers = load('src/player/temporaryPowers.ts', { './gameFocus': focus });
 const runtime = { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
 const { PowerMeter: render } = load('src/ui/PowerMeter.tsx', {
   react: {
@@ -66,13 +65,11 @@ function check(mode, amount, draining) {
 for (const mode of Object.keys(powers.powerModes)) treeFor(mode);
 const cleanups = effects.map(effect => effect());
 check(null, 0, false);
-for (const mode of Object.keys(powers.powerModes)) powers.collectFixPower(mode);
-check('standard',6000,true);check('rapid',10000,true);check('power',15000,true);
-advance(1250.5);check('standard',4749.5,true);check('rapid',8749.5,true);check('power',13749.5,true);
-powers.collectFixPower('standard');check('standard',6000,true);check('power',13749.5,true);
-setFocus(false);advance(60000);check('standard',6000,false);check('rapid',8749.5,false);
-setFocus(true);advance(6000);check('standard',0,false);check('rapid',2749.5,true);
-advance(7749.5);check('power',0,false);
+powers.collectFixPower('rapid');
+check('rapid',3000,true);
+advance(1250.5);check('rapid',1749.5,true);
+setFocus(false);advance(60000);check('rapid',1749.5,false);
+setFocus(true);advance(1749.5);check('rapid',0,false);
 powers.resetTemporaryPowers();check(null,0,false);
 cleanups.forEach(cleanup => cleanup());
 assert.equal(focusListeners.size, 0);

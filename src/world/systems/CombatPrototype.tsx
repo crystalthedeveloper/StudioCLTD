@@ -7,7 +7,6 @@ import { powerModes, type PowerMode, getActivePowers, isPowerActive, resolvePowe
 import { createVillainCombat, villainClips } from "../../villain/villainCombat";
 import { useVillainNavigation } from "../../villain/useVillainNavigation";
 import { useVillainHitReaction } from "../../villain/useVillainHitReaction";
-import { LocalLightSpill } from "./LocalLightSpill";
 import { useGameFrame } from "../../player/useGameFrame";
 import { useGameAnimations } from "../../player/useGameFrame";
 import { gameNow } from "../../player/gameFocus";
@@ -36,7 +35,6 @@ import { isPlayerObject } from "../playerCollision";
 import { playerWorldState } from "../playerWorldState";
 import { padVisualStyle } from "../padVisualStyle";
 import { triggerPopupLayout } from "../triggerPopupLayout";
-import { fixPulseGeometry, fixRingGeometry, useTriggerPadVisuals } from "../useTriggerPadVisuals";
 import { clampRoadX, roadCenterX, roadHalfWidth, roadHeight, roadPoint, roadSurfaceY } from "../roadSurface";
 import { brandYellow } from "../../player/effectColors";
 
@@ -53,19 +51,12 @@ const bonusVillainContactRadiusSq = 1 * 1;
 const bonusVillainDetectionRadiusSq = 8 * 8;
 const bonusVillainChaseReleaseRadiusSq = 11 * 11;
 const bonusVillainMoveSpeed = 1.2;
+const unpoweredVillainSpeedMultiplier = 2.7;
 const bonusVillainVisualScale = 0.48;
 const bonusVillainSteeringAngles = [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, Math.PI] as const;
 
 // Warm the device-specific villain model cache before the loading gate opens.
-useGLTF.preload(assetForDevice("/characters/char-optimized.glb"));
-
-const fixPadVisualConfig = {
-  pulseBaseScale: 1.05,
-  pulseScaleAmount: 0.2,
-  ringColor: padVisualStyle.color,
-  ringOpacity: (_active: boolean, activationGlow: number) => 0.54 + activationGlow * 0.32,
-  pulseOpacity: (_active: boolean, activationGlow: number) => activationGlow * 0.17,
-};
+useGLTF.preload(assetForDevice("/characters/villain.glb"));
 
 type SectionEncounterConfig = {
   id: string;
@@ -143,7 +134,7 @@ function isSafeBonusRoamingPosition(x: number, z: number) {
 }
 
 function getBonusRoamingClearance(x: number, z: number) {
-  let clearance = Math.min(roadHalfWidth - Math.abs(x - roadCenterX(z)), z + 828, 28 - z);
+  let clearance = Math.min(roadHalfWidth - Math.abs(x - roadCenterX(z)), z + 460, 28 - z);
 
   for (const section of hubSections) {
     const [sectionX, , sectionZ] = section.position;
@@ -189,6 +180,9 @@ type CombatPrototypeProps = {
   onSectionResolved: (sectionId: string) => void;
   onSectionTrigger: (sectionId: string, triggerId: string) => void;
   restartKey: number | string;
+  level: number;
+  roundActive: boolean;
+  onVillainDefeated: () => void;
 };
 
 export function CombatPrototype({
@@ -198,6 +192,9 @@ export function CombatPrototype({
   onSectionResolved,
   onSectionTrigger,
   restartKey,
+  level,
+  roundActive,
+  onVillainDefeated,
 }: CombatPrototypeProps) {
   const contactDamage = () => { if (!isPowerActive()) onPlayerDamage(); };
   const [visibleEncounterCount, setVisibleEncounterCount] = useState(1);
@@ -228,8 +225,10 @@ export function CombatPrototype({
       <PowerContactEffects key={`contact-effects:${restartKey}`} />
       <BonusVillainSystem
         key={`bonus-villains:${restartKey}`}
-        onDefeat={onVillainReward}
+        onDefeat={(amount) => { onVillainReward(amount); onVillainDefeated(); }}
         onPlayerDamage={contactDamage}
+        roundActive={roundActive}
+        level={level}
       />
       {sectionEncounters.map((encounter) => (
         <NearbyAsset key={`${encounter.id}:${restartKey}`} position={[0, 0, 0]}>
@@ -250,14 +249,18 @@ export function CombatPrototype({
 function BonusVillainSystem({
   onDefeat,
   onPlayerDamage,
+  roundActive,
+  level,
 }: {
   onDefeat: (amount: number) => void;
   onPlayerDamage: () => void;
+  roundActive: boolean;
+  level: number;
 }) {
   return (
     <group name="BonusVillains">
       {Array.from({ length: villainPoolSize }, (_, index) => (
-        <BonusVillain key={`bonus-pool:${index + 1}`} id={`bonus:${index + 1}`} initialSpot={index % bonusSpawnSpots.length} initiallyActive={index < activeVillainPoolSize()} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} />
+        <BonusVillain key={`bonus-pool:${index + 1}`} id={`bonus:${index + 1}`} initialSpot={index % bonusSpawnSpots.length} initiallyActive={index < activeVillainPoolSize()} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} roundActive={roundActive} level={level} />
       ))}
     </group>
   );
@@ -269,14 +272,18 @@ function BonusVillain({
   initiallyActive,
   onDefeat,
   onPlayerDamage,
+  roundActive,
+  level,
 }: {
   id: string;
   initialSpot: number;
   initiallyActive: boolean;
   onDefeat: (amount: number) => void;
   onPlayerDamage: () => void;
+  roundActive: boolean;
+  level: number;
 }) {
-  const model = useGLTF(assetForDevice("/characters/char-optimized.glb"), false, true);
+  const model = useGLTF(assetForDevice("/characters/villain.glb"), false, true);
   const scene = useMemo(() => {
     const villainScene = SkeletonUtils.clone(model.scene);
     hideVillainMask(villainScene);
@@ -289,18 +296,21 @@ function BonusVillain({
   const aliveRef = useRef(true);
   const poolActiveRef = useRef(initiallyActive);
   const chasingPlayerRef = useRef(false);
-  const respawnTimerRef = useRef(0);
+  const respawnTimerRef = useRef<number | null>(null);
   const cashPopupTimerRef = useRef(0);
   const [alive, setAlive] = useState(initiallyActive);
   const [showCashPopup, setShowCashPopup] = useState(false);
   const [cashReward, setCashReward] = useState(0);
+  const roundActiveRef = useRef(roundActive);
+  roundActiveRef.current = roundActive;
   const cashPopupPositionRef = useRef(new Vector3());
   const clips = useMemo(() => villainClips(model.animations), [model.animations]);
-  const { actions } = useGameAnimations(clips, groupRef, "idleV");
+  const { actions, animationReady } = useGameAnimations(clips, groupRef, "idleV");
   const combat = useMemo(() => createVillainCombat(actions), [actions]);
   const navigation = useVillainNavigation();
   const deathTimer = useRef(0);
   useLayoutEffect(() => { combat.setMotion("idle"); }, [combat]);
+  useEffect(() => { combat.setMotion("idle"); }, [combat]);
 
   useEffect(() => {
     applyCharacterMaterials(scene, model.materials, villainMaterialProfile);
@@ -315,7 +325,7 @@ function BonusVillain({
   useEffect(() => {
     return () => {
       gameTimers.clearTimeout(deathTimer.current);
-      gameTimers.clearTimeout(respawnTimerRef.current);
+      if (respawnTimerRef.current !== null) gameTimers.clearTimeout(respawnTimerRef.current);
       gameTimers.clearTimeout(cashPopupTimerRef.current);
     };
   }, [id]);
@@ -335,7 +345,7 @@ function BonusVillain({
       onDefeat(reward);
       cashPopupTimerRef.current = gameTimers.setTimeout(() => setShowCashPopup(false), 1100);
 
-      const delay = 3000 + Math.random() * 4000;
+      const delay = 3000 + Math.random() * Math.max(1200, 4000 - level * 180);
       respawnTimerRef.current = gameTimers.setTimeout(() => {
         const nextSpot = bonusSpawnSpots.findIndex((spot, index) =>
           index !== lastSpawnSpotRef.current
@@ -349,6 +359,19 @@ function BonusVillain({
         chasingPlayerRef.current = false;
         groupRef.current?.position.copy(positionRef.current);
         resetPowerContact(id);
+        if (!roundActiveRef.current) {
+          respawnTimerRef.current = gameTimers.setTimeout(() => {
+            respawnTimerRef.current = null;
+            if (roundActiveRef.current) {
+              resetPowerContact(id);
+              aliveRef.current = true;
+              poolActiveRef.current = true;
+              combat.setMotion("idle");
+              setAlive(true);
+            }
+          }, 450);
+          return;
+        }
         aliveRef.current = true;
         poolActiveRef.current = true;
         combat.setMotion("idle");
@@ -357,13 +380,13 @@ function BonusVillain({
     };
     powerDefeatHandlers.set(id, defeat);
     return () => { powerDefeatHandlers.delete(id); };
-  }, [id, initialSpot, onDefeat, combat, actions, scene]);
+  }, [id, initialSpot, onDefeat, combat, actions, scene, level, roundActive]);
 
   const reaction = useVillainHitReaction(id, scene);
 
   useGameFrame((_, delta) => {
     const group = groupRef.current;
-    if (!group || !poolActiveRef.current || !aliveRef.current) {
+    if (!group || !roundActive || !poolActiveRef.current || !aliveRef.current) {
         return;
     }
     const playerDx = playerWorldState.position.x - positionRef.current.x;
@@ -411,7 +434,10 @@ function BonusVillain({
       const awayLength = Math.hypot(awayX, awayZ) || 1;
       const directionX = isPowerActive() ? awayX / awayLength : playerDx / distance;
       const directionZ = isPowerActive() ? awayZ / awayLength : playerDz / distance;
-      const step = Math.min(distance, Math.min(delta, 1 / 30) * bonusVillainMoveSpeed);
+      const approachSpeed = bonusVillainMoveSpeed
+        * (isPowerActive() ? 1 : unpoweredVillainSpeedMultiplier)
+        * (1 + Math.min(0.55, (level - 1) * 0.045));
+      const step = Math.min(distance, Math.min(delta, 1 / 30) * approachSpeed);
       const playerHeading = Math.atan2(directionX, directionZ);
       const safeHeading = bonusVillainSteeringAngles
         .map((angle) => playerHeading + angle)
@@ -444,7 +470,7 @@ function BonusVillain({
 
   return (
     <>
-      <group ref={groupRef} position={positionRef.current} visible={alive}>
+      <group ref={groupRef} position={positionRef.current} visible={alive && animationReady}>
         <group ref={reaction.group}><primitive object={scene} scale={bonusVillainVisualScale} position={[0, 0.3, 0]} /></group>
       </group>
       {showCashPopup && (
@@ -582,7 +608,6 @@ type TriggerPadProps = {
 };
 
 export function TriggerPad({ active, label, onActivate, onDeactivate, position }: TriggerPadProps) {
-  const { pulseRef, ringRef } = useTriggerPadVisuals(active, fixPadVisualConfig);
   const playerInsideRef = useRef(false);
   const [playerInside, setPlayerInside] = useState(false);
   const lastTriggeredAtRef = useRef(-Infinity);
@@ -611,10 +636,6 @@ export function TriggerPad({ active, label, onActivate, onDeactivate, position }
 
   return (
     <group position={position}>
-      <mesh rotation-x={-Math.PI / 2} position={[0, 0.012, 0]} scale={[2.6, 0.9, 1]}>
-        <planeGeometry args={[1, 1]} />
-        <meshBasicMaterial color={active ? brandYellow : "#8b949e"} transparent opacity={0.42} depthWrite={false} />
-      </mesh>
       <CylinderCollider
         sensor
         args={[0.28, triggerPadRadius]}
@@ -622,16 +643,11 @@ export function TriggerPad({ active, label, onActivate, onDeactivate, position }
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
-      <LocalLightSpill intensity={active ? 2.2 : 0.6} distance={4} />
-      <mesh ref={ringRef} geometry={fixRingGeometry} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} dispose={null}>
-        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0.5} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <mesh ref={pulseRef} geometry={fixPulseGeometry} rotation-x={-Math.PI / 2} position={[0, 0.05, 0]} visible={false} dispose={null}>
-        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
-      </mesh>
       {label && !playerInside && (
         <BillboardLabel
-          color={active ? brandYellow : padVisualStyle.labelColor}
+          color={brandYellow}
+          outlineColor="#6b5310"
+          outlineWidth={0.025}
           fontSize={label === "More Info" ? 0.24 : 0.28}
           position={[0, triggerPopupLayout.labelHeight, 0]}
           maxWidth={2.5}

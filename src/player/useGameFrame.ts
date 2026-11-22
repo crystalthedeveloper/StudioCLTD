@@ -1,6 +1,6 @@
 import { useFrame, type RenderCallback } from "@react-three/fiber";
-import { useLayoutEffect, useMemo, useRef, type RefObject } from "react";
-import { AnimationAction, AnimationClip, AnimationMixer, Object3D, Frustum, Matrix4, Sphere, Vector3 } from "three";
+import { useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { AnimationAction, AnimationClip, AnimationMixer, Object3D } from "three";
 import { isGameFocused, subscribeGameFocus } from "./gameFocus";
 
 export function useGameFrame(callback: RenderCallback) {
@@ -11,8 +11,8 @@ export function useGameFrame(callback: RenderCallback) {
 
 /** One gameplay mixer, with a static idle preview while simulation is paused. */
 export function useGameAnimations(clips: AnimationClip[], root: RefObject<Object3D>, idleName: string) {
-  const visibility = useMemo(() => ({ frustum: new Frustum(), matrix: new Matrix4(), sphere: new Sphere(new Vector3(), 3) }), []);
   const mixers = useRef<{ gameplay: AnimationMixer; preview: AnimationMixer } | null>(null);
+  const [animationReady, setAnimationReady] = useState(false);
   const actions = useMemo(() => {
     const result: Record<string, AnimationAction | null> = {};
     for (const clip of clips) {
@@ -31,16 +31,38 @@ export function useGameAnimations(clips: AnimationClip[], root: RefObject<Object
     const preview = new AnimationMixer(object);
     mixers.current = { gameplay, preview };
     const idle = clips.find((clip) => clip.name === idleName);
+    if (import.meta.env?.DEV && !idle) {
+      let armatureFound = false;
+      let skinnedMeshFound = false;
+      object.traverse((child) => {
+        if (child.type === "Bone" || child.name.toLowerCase().includes("armature")) armatureFound = true;
+        if (child.type === "SkinnedMesh") skinnedMeshFound = true;
+      });
+      console.warn("[villain] idle animation could not bind", {
+        availableAnimations: clips.map((clip) => clip.name),
+        clonedRoot: object.name || "(unnamed)",
+        armatureFound,
+        skinnedMeshFound,
+      });
+    }
+    const startGameplayIdle = () => {
+      if (!idle) return false;
+      gameplay.clipAction(idle).reset().setEffectiveWeight(1).play();
+      gameplay.update(0);
+      return true;
+    };
     const syncPause = () => {
       if (isGameFocused()) {
         // stop restores the exact pose captured before preview, without resetting
         // gameplay action times, fades, or death animation state.
         preview.stopAllAction();
+        startGameplayIdle();
       } else if (idle) {
         preview.clipAction(idle).reset().setEffectiveWeight(1).play();
         preview.update(0);
       }
     };
+    setAnimationReady(Boolean(idle && startGameplayIdle()));
     syncPause();
     const unsubscribe = subscribeGameFocus(syncPause);
     return () => {
@@ -50,19 +72,16 @@ export function useGameAnimations(clips: AnimationClip[], root: RefObject<Object
       preview.uncacheRoot(object);
       gameplay.uncacheRoot(object);
       mixers.current = null;
+      setAnimationReady(false);
     };
   }, [clips, idleName, root]);
 
-  useFrame(({ camera }, delta) => {
+  useFrame((_, delta) => {
     if (!isGameFocused()) return;
-    // Keep nearby attack/death feedback smooth; damage is independent of mixers.
-    if (idleName === "idleV" && root.current) {
-      root.current.getWorldPosition(visibility.sphere.center);
-      visibility.frustum.setFromProjectionMatrix(visibility.matrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
-      if (camera.position.distanceToSquared(visibility.sphere.center) > 24 * 24
-        && !visibility.frustum.intersectsSphere(visibility.sphere)) return;
-    }
+    // Every active villain advances its mixer, including pooled villains that
+    // are just outside the camera. This guarantees a recycled villain has a
+    // valid idle pose before it becomes visible again.
     mixers.current?.gameplay.update(delta);
   });
-  return { actions };
+  return { actions, animationReady };
 }

@@ -52,7 +52,7 @@ type HighlightableMaterial = Material & {
 };
 
 export function VillainCharacter({ id, basePosition, platformPosition, onPlayerDamage, onPowerContact, dialogue, dialogueVariant = "danger", villainStatus }: VillainCharacterProps) {
-  const model = useGLTF(assetForDevice("/characters/char-optimized.glb"), false, true);
+  const model = useGLTF(assetForDevice("/characters/villain.glb"), false, true);
   const scene = useMemo(() => {
     const villainScene = SkeletonUtils.clone(model.scene);
     hideVillainMask(villainScene);
@@ -62,7 +62,7 @@ export function VillainCharacter({ id, basePosition, platformPosition, onPlayerD
   const modelRef = useRef<Group>(null);
   const frozenDeathYawRef = useRef<number | null>(null);
   const clips = useMemo(() => villainClips(model.animations), [model.animations]);
-  const { actions } = useGameAnimations(clips, modelRef, "idleV");
+  const { actions, animationReady } = useGameAnimations(clips, modelRef, "idleV");
   const combat = useMemo(() => createVillainCombat(actions), [actions]);
   const bodyRef = useRef<RapierRigidBody>(null);
   const deathRequestedRef = useRef(false);
@@ -70,6 +70,7 @@ export function VillainCharacter({ id, basePosition, platformPosition, onPlayerD
   const navigation = useVillainNavigation();
   const destination = useMemo(() => new Vector3(), []);
   useLayoutEffect(() => { combat.setMotion("idle"); }, [combat]);
+  useEffect(() => { combat.setMotion("idle"); }, [combat]);
 
   useEffect(() => {
     applyCharacterMaterials(scene, model.materials, villainMaterialProfile);
@@ -196,7 +197,7 @@ export function VillainCharacter({ id, basePosition, platformPosition, onPlayerD
 
   return (
     <RigidBody ref={bodyRef} type="kinematicPosition" colliders={false} position={[basePosition.x, basePosition.y, basePosition.z]}>
-      {villainStatus !== "dead" && <CuboidCollider args={[0.5, 1.25, 0.5]} position={[0, 1.2, 0]}
+      {animationReady && villainStatus !== "dead" && <CuboidCollider args={[0.5, 1.25, 0.5]} position={[0, 1.2, 0]}
         onCollisionEnter={({ other }) => {
           if (isPlayerObject(other.rigidBodyObject) || isPlayerObject(other.colliderObject)) {
             contact.enter(other.collider.handle, handleContact);
@@ -204,7 +205,7 @@ export function VillainCharacter({ id, basePosition, platformPosition, onPlayerD
         }}
         onCollisionExit={({ other }) => contact.exit(other.collider.handle)}
       />}
-      <group ref={rootRef}>
+      <group ref={rootRef} visible={animationReady}>
         <group ref={modelRef} position={[0, modelYOffset, 0]}>
           <DialogueBubble
             message={dialogue}

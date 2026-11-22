@@ -34,7 +34,7 @@ function powerPoint(localX: number, z: number): [number, number, number] {
   return [...point] as [number, number, number];
 }
 function SmokePickup({ x, z, surface, mode }: { x: number; z: number; surface: PickupSurface; mode: PowerMode }) {
-  const smoke = useMemo(() => createPowerSmoke(powerModes[mode].color, isCompactVisualBudget(), 0.52, false,
+  const smoke = useMemo(() => createPowerSmoke(powerModes[mode].color, isCompactVisualBudget(), 0.676, false,
     mode === "standard" ? effectCoreColors.wind : mode === "rapid" ? effectCoreColors.shock : effectCoreColors.fire,
     mode === "power"), [mode]);
   const collider = useRef<RapierCollider>(null);
@@ -74,7 +74,7 @@ function SmokePickup({ x, z, surface, mode }: { x: number; z: number; surface: P
   return <RigidBody type="fixed" colliders={false} position={[x, surface.y + pickupSurfaceGap, z]}>
     <BallCollider ref={collider} sensor args={[pickupRadius]} position={[0, pickupRadius, 0]}
       onIntersectionEnter={enter} onIntersectionExit={leave} />
-    <PickupSmokeGlow visible={visible} color={powerModes[mode].color} surface={surface} />
+    <PickupSmokeGlow visible={visible} color={powerModes[mode].color} surface={surface} scale={1.3} />
     <mesh name={`PowerSmoke:${mode}`} visible={visible} geometry={smoke.geometry} material={smoke.material}
       frustumCulled={false} dispose={null} />
   </RigidBody>;

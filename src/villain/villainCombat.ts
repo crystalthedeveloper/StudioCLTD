@@ -1,11 +1,30 @@
-import { AnimationAction, AnimationClip, AnimationUtils, LoopOnce, LoopRepeat } from "three";
+import { AnimationAction, AnimationClip, LoopOnce, LoopRepeat } from "three";
 import { gameNow, isGameFocused } from "../player/gameFocus";
 
 export const attackCooldownMs = 450;
+let loggedClipNames = false;
 export function villainClips(clips: AnimationClip[]) {
-  const hit = clips.find((clip) => clip.name === "hitV");
-  // hitV contains two strikes. Keep the first strike and recovery as one attack.
-  return hit ? [...clips, AnimationUtils.subclip(hit, "attackV", 0, 40, 30)] : clips;
+  if (import.meta.env?.DEV && !loggedClipNames) {
+    loggedClipNames = true;
+    console.debug("[villain] villain.glb animations:", clips.map((clip) => clip.name));
+  }
+  const aliases = [
+    ["idle", "idleV"],
+    ["run", "runV"],
+    ["hit", "attackV"],
+    ["die", "dieV"],
+  ] as const;
+  const mapped = aliases.flatMap(([expected, stateName]) => {
+    const clip = clips.find((candidate) => candidate.name.trim().toLowerCase() === expected);
+    if (!clip) {
+      if (import.meta.env?.DEV) console.warn(`[villain] villain.glb is missing the expected "${expected}" animation clip.`);
+      return [];
+    }
+    const mappedClip = clip.clone();
+    mappedClip.name = stateName;
+    return [mappedClip];
+  });
+  return mapped;
 }
 export function createVillainCombat(actions: Record<string, AnimationAction | null>) {
   let current: AnimationAction | null = null;

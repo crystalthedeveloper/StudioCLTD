@@ -13,13 +13,16 @@ import { isGameFocused, subscribeGameFocus, setGameFocused, useGameFocus } from 
 import { HubOverlay } from "./ui/HubOverlay";
 import { GameHud } from "./ui/GameHud";
 import { ShareWebsiteScreen } from "./ui/ShareWebsiteScreen";
+import { ScoreShareModal } from "./ui/ScoreShareModal";
 import { triggerTrophyHaptic } from "./ui/haptics";
 import { StudioWorld } from "./world/StudioWorld";
 import { preloadScreenTextures } from "./world/systems/HubSections";
 import { distanceFog } from "./world/distanceFog";
 import { triggerDamageFeedback } from "./player/damageFeedback";
 import { playCollectibleSound, playPlayerDeathSound } from "./audio/collectibleSounds";
+import { beginGameAudioLock, endGameAudioLock } from "./audio/gameAudio";
 import { roadTexturePath } from "./world/systems/ModularTerrain";
+import { villainsRequired, readPersonalBest, savePersonalBest, type RunScore } from "./game/roundSystem";
 
 type StudioExperienceProps = {
   onOpenWebsite: () => void;
@@ -50,11 +53,25 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   const [fontReady, setFontReady] = useState(false);
   const [roadTextureReady, setRoadTextureReady] = useState(false);
   const [shareScreenOpen, setShareScreenOpen] = useState(false);
+  const [scoreShareSnapshot, setScoreShareSnapshot] = useState<RunScore | null>(null);
+  const [scoreSharePersonalBest, setScoreSharePersonalBest] = useState(false);
+  const [scoreCardLoading, setScoreCardLoading] = useState(false);
+  const [scoreShareOpen, setScoreShareOpen] = useState(false);
+  const [scoreCardError, setScoreCardError] = useState(false);
+  const [scoreCardGeneration, setScoreCardGeneration] = useState(0);
   const [returning, setReturning] = useState(false);
   const [deathFade, setDeathFade] = useState(0);
   const [deathGlitch, setDeathGlitch] = useState(false);
   const [respawnCameraSnap, setRespawnCameraSnap] = useState(false);
   const [carHidden, setCarHidden] = useState(false);
+  const [level, setLevel] = useState(1);
+  const [levelDefeats, setLevelDefeats] = useState(0);
+  const [roundActive, setRoundActive] = useState(true);
+  const [levelOverlay, setLevelOverlay] = useState(false);
+  const [runVillains, setRunVillains] = useState(0);
+  const [runStartedAt] = useState(() => Date.now());
+  const [personalBest, setPersonalBest] = useState<RunScore | null>(() => readPersonalBest());
+  const levelTimerRef = useRef<number | null>(null);
   const returnTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -101,6 +118,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
 
   const beginReturnSequence = useCallback(() => {
     if (returnTimerRef.current !== null || returning) return;
+    beginGameAudioLock();
     setReturning(true);
     setDeathFade(0);
     setDeathGlitch(false);
@@ -123,6 +141,11 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
       previousCompletedSectionCountRef.current = 0;
       setCash(0);
       setCompletedSectionCount(0);
+      setLevel(1);
+      setLevelDefeats(0);
+      setRunVillains(0);
+      setRoundActive(true);
+      setLevelOverlay(false);
       setHealth(3);
       healthRef.current = 3;
       setDamageFlashUntil(0);
@@ -149,6 +172,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         setReturning(false);
         returnTimerRef.current = null;
         setGameFocused(true);
+        endGameAudioLock();
       }, 240);
     }, 3700);
   }, [contactDamageGate, onRestart, returning]);
@@ -208,6 +232,109 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
     if (health !== 0) return;
     handlePlayerDeath();
   }, [health, handlePlayerDeath]);
+
+  const advanceLevel = useCallback(() => {
+    if (levelTimerRef.current !== null) window.clearTimeout(levelTimerRef.current);
+    levelTimerRef.current = null;
+    playRequestedRef.current = true;
+    setGameStarted(true);
+    setScoreShareSnapshot(null);
+    setScoreCardLoading(false);
+    setScoreShareOpen(false);
+    setScoreCardError(false);
+    setLevel((current) => current + 1);
+    setLevelDefeats(0);
+    setRoundActive(true);
+    setLevelOverlay(false);
+    setGameFocused(true);
+  }, []);
+
+  const runScore: RunScore = {
+    level,
+    villains: runVillains,
+    cash,
+    survivalSeconds: Math.max(0, Math.floor((Date.now() - runStartedAt) / 1000)),
+  };
+
+  const shareScore = useCallback(() => {
+    if (levelTimerRef.current !== null) {
+      window.clearTimeout(levelTimerRef.current);
+      levelTimerRef.current = null;
+    }
+    const snapshot = { ...runScore };
+    const isBest = savePersonalBest(snapshot);
+    setPersonalBest(isBest ? snapshot : readPersonalBest());
+    setScoreShareSnapshot(snapshot);
+    setScoreSharePersonalBest(isBest);
+    setScoreCardLoading(true);
+    setScoreShareOpen(false);
+    setScoreCardError(false);
+    setScoreCardGeneration((current) => current + 1);
+    document.exitPointerLock?.();
+    setGameFocused(false);
+  }, [runScore]);
+
+  const closeScoreShare = useCallback(() => {
+    setScoreShareSnapshot(null);
+    setScoreCardLoading(false);
+    setScoreShareOpen(false);
+    setScoreCardError(false);
+    setGameFocused(false);
+    if (levelOverlay) {
+      if (levelTimerRef.current !== null) window.clearTimeout(levelTimerRef.current);
+      levelTimerRef.current = window.setTimeout(advanceLevel, 7000);
+    }
+  }, [advanceLevel, levelOverlay]);
+
+  const retryScoreCard = useCallback(() => {
+    setScoreCardError(false);
+    setScoreCardLoading(true);
+    setScoreCardGeneration((current) => current + 1);
+  }, []);
+
+  const scoreCardReady = useCallback(() => {
+    setScoreCardLoading(false);
+    setScoreShareOpen(true);
+  }, []);
+  const scoreCardFailed = useCallback(() => {
+    setScoreCardLoading(false);
+    setScoreCardError(true);
+  }, []);
+
+  useEffect(() => {
+    if (!levelOverlay) return undefined;
+    const handleLevelShortcut = (event: KeyboardEvent) => {
+      if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.code === "Digit5" || event.code === "Numpad5") {
+        event.preventDefault();
+        advanceLevel();
+      } else if (event.code === "Digit6" || event.code === "Numpad6") {
+        event.preventDefault();
+        shareScore();
+      }
+    };
+    window.addEventListener("keydown", handleLevelShortcut);
+    return () => window.removeEventListener("keydown", handleLevelShortcut);
+  }, [advanceLevel, levelOverlay, shareScore]);
+
+  const handleVillainDefeated = useCallback(() => {
+    if (!roundActive || levelOverlay) return;
+    setRunVillains((current) => current + 1);
+    setLevelDefeats((current) => {
+      const next = current + 1;
+      if (next >= villainsRequired(level)) {
+        setRoundActive(false);
+        setLevelOverlay(true);
+        setGameFocused(false);
+        levelTimerRef.current = window.setTimeout(advanceLevel, 7000);
+      }
+      return next;
+    });
+  }, [advanceLevel, level, levelOverlay, roundActive]);
+
+  useEffect(() => () => {
+    if (levelTimerRef.current !== null) window.clearTimeout(levelTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (completedSectionCount === 8 && previousCompletedSectionCountRef.current < 8) {
@@ -391,6 +518,9 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
                 damageFlashUntil={damageFlashUntil}
                 onCoinCollect={() => setCash((current) => current + 1)}
                 onVillainReward={(amount) => setCash((current) => current + amount)}
+                level={level}
+                roundActive={roundActive}
+                onVillainDefeated={handleVillainDefeated}
                 onOpenShare={() => {
                   document.exitPointerLock?.();
                   setGameFocused(false);
@@ -421,6 +551,9 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         roadTextureReady={roadTextureReady}
       />
       <GameHud
+        level={level}
+        levelDefeats={levelDefeats}
+        levelRequirement={villainsRequired(level)}
         guideOpen={guideOpen}
         onOpenGuide={openGuide}
         onCloseGuide={closeGuide}
@@ -431,8 +564,22 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         onRestart={handleManualRestart}
         cash={cash}
       />
+      {levelOverlay && (
+        <div className="round-overlay" role="dialog" aria-modal="true" aria-labelledby="round-title">
+          <section className="round-overlay__card">
+            <span className="game-hud__stat-label">StudioCLTD</span>
+            <h2 id="round-title">LEVEL {level} SURVIVED</h2>
+            <p>{levelDefeats} villains defeated · Level {level + 1} is waiting.</p>
+            <div className="round-overlay__actions">
+              <button type="button" className="studio-button" disabled={scoreCardLoading || scoreShareOpen || scoreCardError} onClick={advanceLevel}>5 · CONTINUE</button>
+              <button type="button" className="studio-button" disabled={scoreCardLoading || scoreShareOpen || scoreCardError} onClick={shareScore}>6 · SHARE SCORE</button>
+            </div>
+            <small>Continuing automatically…</small>
+          </section>
+        </div>
+      )}
       <HubOverlay />
-      {!gameFocused && !guideOpen && (
+      {!gameFocused && !guideOpen && !levelOverlay && (
         <div className="game-pause-overlay">
           <div className="game-pause-overlay__content">
             <button type="button" onClick={focusGame} className="studio-button game-focus-hint" aria-describedby="game-pause-instructions">
@@ -443,6 +590,25 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
         </div>
       )}
       {shareScreenOpen && <ShareWebsiteScreen onClose={() => setShareScreenOpen(false)} />}
+      {scoreShareSnapshot && scoreCardLoading && (
+        <div className="score-card-loading" role="status" aria-live="polite">
+          <div className="score-card-loading__card">
+            <span>STUDIOCLTD</span>
+            <strong>GENERATING SCORE CARD…</strong>
+            <p>Preparing your Level {scoreShareSnapshot.level} results</p>
+            <div className="score-card-loading__dots" aria-hidden="true"><i /><i /><i /></div>
+          </div>
+        </div>
+      )}
+      {scoreShareSnapshot && scoreCardError && (
+        <div className="score-card-loading" role="alert">
+          <div className="score-card-loading__card">
+            <span>STUDIOCLTD</span><strong>COULD NOT GENERATE SCORE CARD</strong>
+            <div className="round-overlay__actions"><button className="studio-button" onClick={retryScoreCard}>TRY AGAIN</button><button className="studio-button" onClick={closeScoreShare}>CLOSE</button></div>
+          </div>
+        </div>
+      )}
+      {scoreShareSnapshot && <ScoreShareModal key={scoreCardGeneration} score={scoreShareSnapshot} personalBest={scoreSharePersonalBest} onClose={closeScoreShare} onReady={scoreCardReady} onError={scoreCardFailed} />}
       {returning && (
         <div className={`death-restart-fade${deathGlitch ? " death-restart-fade--glitch" : ""}`} style={{ opacity: deathFade }}>
           {deathFade > 0.8 && <div className="death-restart-caption" role="status" aria-live="polite">
@@ -455,7 +621,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   );
 }
 
-/** Commits only after the entire world (including scenery textures) resolves.
+/** Commits only after the entire world (including environment textures) resolves.
  * Notify after its first rendered frame, even while gameplay is paused.
  */
 function WorldFirstRender({ onReady }: { onReady: () => void }) {
@@ -499,7 +665,7 @@ function StartupProgress({
   onReadyRef.current = onReady;
   if (active) observedWorldLoadingRef.current = true;
 
-  // useProgress includes all five scenery textures via Three's loading manager.
+  // useProgress includes the environment textures via Three's loading manager.
   const complete = worldReady && !active && progress >= 100 && fontReady && roadTextureReady;
   const worldProgress = observedWorldLoadingRef.current || screenAssetsReady
     ? MathUtils.clamp(progress, 0, 100)

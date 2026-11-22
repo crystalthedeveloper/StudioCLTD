@@ -1,5 +1,4 @@
 import { effectColors } from "./effectColors";
-import { requestPoweredJump, resetPoweredJump } from "./poweredJump";
 import { gameNow, gameTimers, isGameFocused } from "./gameFocus";
 export const powerModes = {
   standard: { label: "01", name: "Wind", pickupSize: 0.24, color: effectColors.wind, impactDuration: 0.24, impactSize: 1 },
@@ -8,7 +7,7 @@ export const powerModes = {
 } as const;
 export type PowerMode = keyof typeof powerModes;
 
-export const powerDurations = { standard: 6000, rapid: 10000, power: 15000 } as const;
+export const powerDurations = { standard: 6000, rapid: 3000, power: 15000 } as const;
 export const fixPowerRespawnMs = 20000;
 // Legacy definitions remain type-compatible, but only Shock is exposed or active.
 export const powerOrder: PowerMode[] = ["rapid"];
@@ -40,12 +39,6 @@ export function collectFixPower(mode: PowerMode) {
   notify();
   return true;
 }
-export function jumpWithPower() {
-  return isGameFocused() && isPowerActive() && requestPoweredJump();
-}
-export function handlePowerShortcut(code: string) {
-  return code === "Space" && jumpWithPower();
-}
 const defeatedByPower = new Set<string>();
 export function resetPowerContact(id: string) { defeatedByPower.delete(id); }
 /** Snapshot every active reward before invoking effects/rewards; claim each life once. */
@@ -59,7 +52,6 @@ export function resolvePowerContact(touching: boolean, id: string, defeat: (mode
 }
 export function resetTemporaryPowers() {
   defeatedByPower.clear();
-  resetPoweredJump();
   powerOrder.forEach(mode => {
     gameTimers.clearTimeout(expiry[mode]);
     delete expiry[mode];

@@ -1,13 +1,11 @@
-import { registerPoweredJump, resetPoweredJump } from "./poweredJump";
 import { hasPowerSpeedBoost } from "./temporaryPowers";
 import { useGameFrame } from "./useGameFrame";
-import { CuboidCollider, RigidBody, RapierRigidBody, useRapier, type RapierCollider } from "@react-three/rapier";
+import { CuboidCollider, RigidBody, RapierRigidBody, type RapierCollider } from "@react-three/rapier";
 import { useEffect, useMemo, useRef } from "react";
 import { MathUtils, Vector3 } from "three";
-import { playerCenterHeightReduction, playerSphereRadius } from "./playerDimensions";
+import { playerCenterHeightReduction } from "./playerDimensions";
 import { PlayerCharacter } from "./PlayerCharacter";
 import { ThirdPersonCamera } from "./ThirdPersonCamera";
-import { CharacterAnimationState } from "./playerTypes";
 import { useKeyboardControls, cancelCruise } from "./useKeyboardControls";
 import { DialogueMessage } from "../ui/DialogueBubble";
 import { playerWorldState } from "../world/playerWorldState";
@@ -25,7 +23,6 @@ const turnSpeed = 2.2;
 const acceleration = 9;
 const braking = 15;
 const maxFrameDelta = 1 / 30;
-const groundedRayDistance = playerSphereRadius + 0.13;
 
 type CharacterControllerProps = {
   damageFlashUntil: number;
@@ -54,17 +51,12 @@ export function CharacterController({
 }: CharacterControllerProps) {
   const bodyRef = useRef<RapierRigidBody | null>(null);
   const colliderRef = useRef<RapierCollider | null>(null);
-  const { rapier, world } = useRapier();
   const yawRef = useRef(0);
   const cameraYawRef = useRef(0);
   const controls = useKeyboardControls();
   const controlsRef = useRef(controls);
   const movementDirectionRef = useRef(new Vector3());
-  const animationStateRef = useRef<CharacterAnimationState>("idle");
   const forwardBackSpeedRef = useRef(0);
-  const groundRay = useMemo(() => new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 }), [rapier]);
-  const jumpInProgress = useRef(false);
-  const leftGround = useRef(false);
   const spawn = useMemo<[number, number, number]>(() => [0, 1.34, 18], []);
   const checkpointRef = useRef<[number, number, number]>(spawn);
   const teleportTimerRef = useRef<number | null>(null);
@@ -72,31 +64,7 @@ export function CharacterController({
   const returnProgressRef = useRef(0);
   const returnStartRef = useRef(new Vector3());
 
-  const touchingGround = () => {
-    const body = bodyRef.current;
-    if (!body) return false;
-    const position = body.translation();
-    groundRay.origin.x = position.x;
-    groundRay.origin.y = position.y;
-    groundRay.origin.z = position.z;
-    const hit = world.castRayAndGetNormal(groundRay, playerSphereRadius + 0.04, true,
-      rapier.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, body);
-    return hit !== null && hit.normal.y > 0.5;
-  };
   useEffect(() => { checkpointRef.current = checkpoint; }, [checkpoint]);
-  useEffect(() => registerPoweredJump({
-    launch: () => {
-      const body = bodyRef.current;
-      if (!body || jumpInProgress.current || !touchingGround() || Math.abs(body.linvel().y) > 0.5) return false;
-      jumpInProgress.current = true;
-      leftGround.current = false;
-      // At gravity -20, 9 units/s gives a roughly 2-unit rise.
-      body.applyImpulse({ x: 0, y: body.mass() * 9, z: 0 }, true);
-      return true;
-    },
-    airborne: () => jumpInProgress.current && !touchingGround(),
-  }), [world, rapier, groundRay]);
-
   useEffect(() => installFootstepAudioUnlock(), []);
 
   useEffect(() => {
@@ -116,15 +84,11 @@ export function CharacterController({
   useEffect(() => {
     const body = bodyRef.current;
 
-    resetPoweredJump();
-    jumpInProgress.current = false;
-    leftGround.current = false;
     fallResetPendingRef.current = false;
     yawRef.current = 0;
     cameraYawRef.current = 0;
     forwardBackSpeedRef.current = 0;
     movementDirectionRef.current.set(0, 0, 0);
-    animationStateRef.current = "idle";
     playerWorldState.position.set(spawn[0], spawn[1], spawn[2]);
 
     if (!body) return;
@@ -138,9 +102,6 @@ export function CharacterController({
     const body = bodyRef.current;
     if (!body || !transportDestination) return;
 
-    resetPoweredJump();
-    jumpInProgress.current = false;
-    leftGround.current = false;
     const [x, destinationY, z] = transportDestination.position;
     const y = destinationY - playerCenterHeightReduction;
     checkpointRef.current = [x, y, z];
@@ -173,14 +134,6 @@ export function CharacterController({
     const frameDelta = Math.min(delta, maxFrameDelta);
     controlsRef.current = controls;
 
-    const onGround = touchingGround();
-    if (jumpInProgress.current) {
-      if (!onGround) leftGround.current = true;
-      if (leftGround.current && onGround && body.linvel().y <= 0.5) {
-        jumpInProgress.current = false;
-        resetPoweredJump();
-      }
-    }
     const velocity = body.linvel();
     const translation = body.translation();
     playerWorldState.position.set(translation.x, translation.y, translation.z);
@@ -211,18 +164,6 @@ export function CharacterController({
 
     const isMoving = Math.abs(forwardBackSpeedRef.current) > 0.08;
     const horizontalSpeed = Math.hypot(velocity.x, velocity.z);
-    groundRay.origin.x = translation.x;
-    groundRay.origin.y = translation.y;
-    groundRay.origin.z = translation.z;
-    const grounded = world.castRay(
-      groundRay,
-      groundedRayDistance,
-      true,
-      rapier.QueryFilterFlags.EXCLUDE_SENSORS,
-      undefined,
-      undefined,
-      body,
-    ) !== null;
     targetVelocity.x = isMoving ? moveDirection.x : 0;
     targetVelocity.z = isMoving ? moveDirection.z : 0;
 
@@ -241,9 +182,6 @@ export function CharacterController({
     if (translation.y < -10) {
       if (fallResetPendingRef.current) return;
       fallResetPendingRef.current = true;
-      resetPoweredJump();
-      jumpInProgress.current = false;
-      leftGround.current = false;
       forwardBackSpeedRef.current = 0;
       const [x, y, z] = checkpointRef.current;
       body.setTranslation({ x, y, z }, true);
@@ -254,9 +192,6 @@ export function CharacterController({
       onReset();
     }
 
-    const nextState: CharacterAnimationState = isMoving ? "run" : "idle";
-
-    animationStateRef.current = nextState;
   });
 
   return (
@@ -284,7 +219,6 @@ export function CharacterController({
         <CuboidCollider ref={colliderRef} args={[0.68, 0.42, 1.3]} friction={0} restitution={0} />
         <group visible={!carHidden}>
           <PlayerCharacter
-            animationStateRef={animationStateRef}
             damageFlashUntil={damageFlashUntil}
             dialogue={dialogue}
             yawRef={yawRef}

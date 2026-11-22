@@ -1,12 +1,10 @@
-import { scenerySettings } from "./scenery/sceneryLayout";
 import { WINTER_THEME_ENABLED } from "./winterTheme";
 import { WinterSnow } from "./systems/WinterSnow";
-import { GroundFog } from "./systems/GroundFog";
+import { RoadErrorDecals } from "./systems/RoadErrorDecals";
 import { FixPowerPickups } from "./systems/FixPowerPickups";
 import { Environment } from "@react-three/drei";
 import { useEffect, useRef, useState } from "react";
 import { hubSections } from "./hubSections";
-import { WinterScenery } from "./systems/WinterScenery";
 import { CharacterController } from "../player/CharacterController";
 import { DialogueMessage } from "../ui/DialogueBubble";
 import { CombatPrototype } from "./systems/CombatPrototype";
@@ -35,6 +33,9 @@ type StudioWorldProps = {
   startCamera: boolean;
   onSectionComplete: () => void;
   restartKey: number;
+  level: number;
+  roundActive: boolean;
+  onVillainDefeated: () => void;
 };
 
 const requiredSectionTriggers: Record<string, number> = {
@@ -48,7 +49,7 @@ const requiredSectionTriggers: Record<string, number> = {
   showcase: 1,
 };
 
-export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, onHealthCollect, onOpenShare, onPlayerDamage, onReset, onSectionComplete, restartKey, returning, respawnCameraSnap, carHidden, startCamera }: StudioWorldProps) {
+export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, onHealthCollect, onOpenShare, onPlayerDamage, onReset, onSectionComplete, restartKey, returning, respawnCameraSnap, carHidden, startCamera, level, roundActive, onVillainDefeated }: StudioWorldProps) {
   const groundMaterial = useSharedGroundMaterial();
   const dialogueIdRef = useRef(0);
   const activatedSectionTriggersRef = useRef<Record<string, Set<string>>>({});
@@ -100,9 +101,8 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
   return (
     <>
       <WorldLights />
-      {scenerySettings.enabled && <WinterScenery />}
       {WINTER_THEME_ENABLED && <WinterSnow />}
-      <GroundFog />
+      <RoadErrorDecals />
       <FixPowerPickups key={`powers:${restartKey}`} />
       <SpaceSky />
       <Environment preset="warehouse" background={false} environmentIntensity={0.16} />
@@ -127,6 +127,9 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
         onVillainReward={onVillainReward}
         onPlayerDamage={onPlayerDamage}
         restartKey={restartKey}
+        level={level}
+        roundActive={roundActive}
+        onVillainDefeated={onVillainDefeated}
         onSectionTrigger={recordSectionTrigger}
         onPlayerDialogue={(text) => setPlayerDialogue(createDialogue(text))}
         onSectionResolved={(sectionId) => {

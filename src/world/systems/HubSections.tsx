@@ -1,7 +1,6 @@
 import { useScreenVisibility } from "../useScreenVisibility";
 import { screenAssetForDevice } from "../screenAssets";
 import { NearbyAsset } from "../NearbyAsset";
-import { LocalLightSpill } from "./LocalLightSpill";
 import { playGameMedia, registerGameMedia, stopGameMedia } from "../../audio/gameMedia";
 import { useGameFrame } from "../../player/useGameFrame";
 import { gameNow } from "../../player/gameFocus";
@@ -33,7 +32,6 @@ import { hubSections, HubSection } from "../hubSections";
 import { isPlayerObject } from "../playerCollision";
 import { padVisualStyle } from "../padVisualStyle";
 import { triggerPopupLayout } from "../triggerPopupLayout";
-import { portalPulseGeometry, portalRingGeometry, useTriggerPadVisuals } from "../useTriggerPadVisuals";
 import { serviceInfoText } from "../serviceInfo";
 import { playVillainVoice } from "../../audio/villainAudio";
 import { brandYellow } from "../../player/effectColors";
@@ -56,24 +54,12 @@ const tvCentreDrop = (scale: number) => 2.9 * scale * (1 - tvSizeScale);
 const mobileBillboardYOffset = -0.55;
 const portalTriggerRadius = 1.06;
 const portalActivationCooldownMs = 900;
-const offerPadVisualConfig = {
-  pulseBaseScale: 1.03,
-  pulseScaleAmount: 0.18,
-  ringOpacity: (_active: boolean, activationGlow: number) => 0.56 + activationGlow * 0.28,
-  pulseOpacity: (_active: boolean, activationGlow: number) => activationGlow * 0.16,
-};
-const selectorPadVisualConfig = {
-  pulseBaseScale: 1.04,
-  pulseScaleAmount: 0.16,
-  ringOpacity: (active: boolean, activationGlow: number) => 0.58 + (active ? 0.2 : 0) + activationGlow * 0.16,
-  pulseOpacity: (active: boolean, activationGlow: number) => active ? 0.1 + activationGlow * 0.1 : activationGlow * 0.12,
-};
 // Keep interaction pads in the established reachable driving lane in front of the TV.
 const selectorRowZ = 11.7;
 const completedTriggerColor = brandYellow;
 const roadsideOffsetForSection = (sectionId: string) => ["quick-fix", "urgent-fix", "performance", "site-improvement"].includes(sectionId) ? 5.4 : -5.4;
 const offersPageUrl = "https://www.crystalthedeveloper.ca/offers";
-const screenImageTint = "#f0f0f0";
+const screenImageTint = "#ffffff";
 const screenIdleColor = "#0b1018";
 const screenContentScale = 1.1;
 const screenContentSize: [number, number] = [9.05 * screenContentScale, 4.62 * screenContentScale];
@@ -97,19 +83,19 @@ const tvBackingGeometry = new PlaneGeometry(9.25, 4.7);
 const serviceSectionIds = ["quick-fix", "urgent-fix", "performance", "site-improvement"];
 const serviceScreenImages: Record<string, { bad: string; good: string }> = {
   "quick-fix": {
-    bad: "/images/optimized/quickFix/quick-fix-bad.webp",
+    bad: "/videos/villain/quick-fix-bad.mp4",
     good: "/images/optimized/fixed/fixed.webp",
   },
   "urgent-fix": {
-    bad: "/images/optimized/urgentFix/urgent-fix-bad.webp",
+    bad: "/videos/villain/urgent-fix-bad.mp4",
     good: "/images/optimized/fixed/fixed.webp",
   },
   performance: {
-    bad: "/images/optimized/performance/performance-bad.webp",
+    bad: "/videos/villain/performance-bad.mp4",
     good: "/images/optimized/fixed/fixed.webp",
   },
   "site-improvement": {
-    bad: "/images/optimized/siteImprovement/site-improvement-bad.webp",
+    bad: "/videos/villain/site-improvement-bad.mp4",
     good: "/images/optimized/fixed/fixed.webp",
   },
 };
@@ -132,6 +118,8 @@ type ShowcaseVideoState = {
 const textureLoader = new TextureLoader();
 const lazyTextureCache = new Map<string, Texture>();
 const lazyTexturePromises = new Map<string, Promise<Texture>>();
+const serviceVideoElements = new Map<string, HTMLVideoElement>();
+const serviceVideoTextures = new Map<string, VideoTexture>();
 let lazyTextureRequestIndex = 0;
 let showcaseVideoElement: HTMLVideoElement | null = null;
 let showcaseVideoTexture: VideoTexture | null = null;
@@ -140,18 +128,15 @@ let websiteVideoTexture: VideoTexture | null = null;
 const requiredScreenImagePaths = Array.from(
   new Set([
     ...Object.values(serviceScreenImages).flatMap((images) => [images.bad, images.good]),
-  ])
-);
+  ]),
+).filter((path) => !path.endsWith(".mp4"));
 
 function configureScreenTexture(texture: Texture, source: string) {
   texture.colorSpace = SRGBColorSpace;
   texture.generateMipmaps = false;
   texture.minFilter = LinearFilter;
   texture.magFilter = LinearFilter;
-  if (source.startsWith("/images/optimized/offers/")) {
-    texture.repeat.set(1, 1);
-    texture.offset.set(0, 0);
-  } else configureTextureCover(texture, screenContentAspect);
+  configureTextureCover(texture, screenContentAspect);
   texture.needsUpdate = true;
 }
 
@@ -253,6 +238,81 @@ function useLazyScreenTexture(source: string | null, enabled: boolean, delayMs =
   }, [delayMs, enabled, path, source]);
 
   return enabled ? cachedTexture ?? texture : null;
+}
+
+function getServiceVideoTexture(source: string) {
+  const cached = serviceVideoTextures.get(source);
+  if (cached) return cached;
+
+  const video = document.createElement("video");
+  registerGameMedia(video);
+  video.src = source;
+  video.crossOrigin = "anonymous";
+  video.loop = true;
+  video.muted = true;
+  video.playsInline = true;
+  video.autoplay = true;
+  video.preload = "auto";
+  video.setAttribute("playsinline", "");
+  video.setAttribute("webkit-playsinline", "");
+  video.addEventListener("canplay", () => { void playGameMedia(video); });
+  video.load();
+
+  const texture = new VideoTexture(video);
+  texture.colorSpace = SRGBColorSpace;
+  texture.generateMipmaps = false;
+  texture.minFilter = LinearFilter;
+  texture.magFilter = LinearFilter;
+  const refreshVideoTexture = () => {
+    texture.needsUpdate = true;
+    texture.update();
+  };
+  video.addEventListener("loadeddata", refreshVideoTexture);
+  video.addEventListener("canplay", refreshVideoTexture);
+  video.addEventListener("playing", refreshVideoTexture);
+  video.addEventListener("timeupdate", refreshVideoTexture);
+  configureTextureCover(texture, screenContentAspect);
+  serviceVideoElements.set(source, video);
+  serviceVideoTextures.set(source, texture);
+  // Muted service videos may start without a user gesture; the shared media
+  // helper still pauses them whenever the game is unfocused or in death flow.
+  void playGameMedia(video);
+  return texture;
+}
+
+function useServiceVideoTexture(source: string | null) {
+  const lastPlayAttemptRef = useRef(-Infinity);
+  const [texture, setTexture] = useState<VideoTexture | null>(() => {
+    if (!source) return null;
+    const video = serviceVideoElements.get(source);
+    return video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+      ? serviceVideoTextures.get(source) ?? null
+      : null;
+  });
+  useEffect(() => {
+    if (!source) { setTexture(null); return undefined; }
+    const videoTexture = getServiceVideoTexture(source);
+    const video = serviceVideoElements.get(source);
+    if (video) void playGameMedia(video);
+    const showFirstFrame = () => setTexture(videoTexture);
+    if (video?.readyState && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) showFirstFrame();
+    video?.addEventListener("loadeddata", showFirstFrame);
+    video?.addEventListener("canplay", showFirstFrame);
+    return () => {
+      const cachedVideo = serviceVideoElements.get(source);
+      if (cachedVideo) stopGameMedia(cachedVideo);
+      video?.removeEventListener("loadeddata", showFirstFrame);
+      video?.removeEventListener("canplay", showFirstFrame);
+    };
+  }, [source]);
+  useGameFrame(({ clock }) => {
+    if (!source || clock.elapsedTime - lastPlayAttemptRef.current < 0.5) return;
+    const video = serviceVideoElements.get(source);
+    if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.paused) return;
+    lastPlayAttemptRef.current = clock.elapsedTime;
+    void playGameMedia(video);
+  });
+  return texture;
 }
 
 function getShowcaseVideoElement() {
@@ -566,7 +626,6 @@ function SectionBillboard({
   return (
     <group name={`Billboard:${section.id}`} position={[roadsideOffset, screenGroupHeight(billboardScale, billboardYOffset), selectorRowZ * 1.6]} rotation-y={Math.PI}>
       <group name={`BillboardVisual:${section.id}`} position={[0, billboardYOffset - tvCentreDrop(billboardScale), 0]} scale={billboardScale * tvSizeScale}>
-        <LocalLightSpill position={[0, -1.8, -0.8]} intensity={5} distance={10} />
         <mesh castShadow receiveShadow geometry={tvFrameGeometry} position={[0, 0, -0.08]} dispose={null}>
           <meshStandardMaterial
             color="#101621"
@@ -814,12 +873,13 @@ function ServiceImageScreen({
   resolved: boolean;
 }) {
   const texturePath = resolved ? goodImage : badImage;
-  const texture = useLazyScreenTexture(texturePath, true, 240);
+  const videoTexture = useServiceVideoTexture(texturePath.endsWith(".mp4") ? texturePath : null);
+  const texture = useLazyScreenTexture(texturePath.endsWith(".mp4") ? null : texturePath, true, 240);
 
   return (
     <mesh geometry={screenContentGeometry} position={[0, -0.03, screenContentZ]} dispose={null}>
-      {texture ? (
-        <meshBasicMaterial color={screenImageTint} depthTest={true} depthWrite={true} map={texture} side={DoubleSide} toneMapped />
+      {videoTexture || texture ? (
+        <meshBasicMaterial color={screenImageTint} depthTest={true} depthWrite={true} map={videoTexture ?? texture} side={DoubleSide} toneMapped={false} />
       ) : (
         <meshBasicMaterial color={screenIdleColor} depthTest={true} depthWrite={true} side={DoubleSide} toneMapped />
       )}
@@ -1071,10 +1131,9 @@ export function HomeBaseVideoScreen() {
     <group name="HomeBaseVideoScreen">
       <group position={[0, screenGroupHeight(billboardScale, billboardYOffset), 7]} rotation-y={Math.PI}>
         <RigidBody type="fixed" colliders={false} position={[0, billboardYOffset, 0]}>
-          <CuboidCollider args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
+          <CuboidCollider sensor args={[5.35, 3.05, 0.24]} position={[0, 0.12, -0.1]} />
         </RigidBody>
         <group position={[0, billboardYOffset - tvCentreDrop(billboardScale), 0]} scale={billboardScale * tvSizeScale}>
-          <LocalLightSpill position={[0, -1.8, -0.8]} intensity={5} distance={10} />
         <mesh castShadow receiveShadow geometry={tvFrameGeometry} position={[0, 0, -0.08]} dispose={null}>
             <meshStandardMaterial
               color="#101621"
@@ -1281,7 +1340,6 @@ function OfferPortalPad({
   onPlayerEnter: () => void;
   onPlayerExit: () => void;
 }) {
-  const { pulseRef, ringRef } = useTriggerPadVisuals(active, offerPadVisualConfig);
   const playerInsideRef = useRef(false);
   const [playerInside, setPlayerInside] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -1322,15 +1380,10 @@ function OfferPortalPad({
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
-      <LocalLightSpill intensity={completed ? 2.2 : active ? 2.2 : 0.6} distance={4} />
-      <mesh ref={ringRef} geometry={portalRingGeometry} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]} dispose={null}>
-        <meshBasicMaterial color={completed ? completedTriggerColor : padVisualStyle.color} transparent opacity={0.5} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <mesh ref={pulseRef} geometry={portalPulseGeometry} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false} dispose={null}>
-        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
-      </mesh>
       {!playerInside && <BillboardLabel
-        color={completed ? completedTriggerColor : padVisualStyle.labelColor}
+        color={brandYellow}
+        outlineColor="#6b5310"
+        outlineWidth={0.025}
         fontSize={offer.name.length > 18 ? 0.2 : 0.24}
         position={[0, triggerPopupLayout.labelHeight, 0]}
         maxWidth={2.8}
@@ -1339,7 +1392,7 @@ function OfferPortalPad({
       </BillboardLabel>}
       {countdownSeconds > 0 && (
         <BillboardLabel
-          color={padVisualStyle.labelColor}
+          color={brandYellow}
           fontSize={0.2}
           position={[0, triggerPopupLayout.secondaryLabelHeight, 0]}
           maxWidth={3.2}
@@ -1368,7 +1421,6 @@ function ShowcasePortalPad({
   onPlayerExit: () => void;
   position?: [number, number, number];
 }) {
-  const { pulseRef, ringRef } = useTriggerPadVisuals(active, selectorPadVisualConfig);
   const playerInsideRef = useRef(false);
   const [playerInside, setPlayerInside] = useState(false);
   const [completedState, setCompletedState] = useState(false);
@@ -1419,15 +1471,10 @@ function ShowcasePortalPad({
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
-      <LocalLightSpill intensity={completed ? 2.8 : active ? 2.2 : 0.6} distance={4} />
-      <mesh ref={ringRef} geometry={portalRingGeometry} rotation-x={-Math.PI / 2} position={[0, 0.035, 0]} dispose={null}>
-        <meshBasicMaterial color={completed ? completedTriggerColor : padVisualStyle.color} transparent opacity={completed ? 0.72 : 0.52} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <mesh ref={pulseRef} geometry={portalPulseGeometry} rotation-x={-Math.PI / 2} position={[0, 0.045, 0]} visible={false} dispose={null}>
-        <meshBasicMaterial color={padVisualStyle.color} transparent opacity={0} depthWrite={false} toneMapped={false} />
-      </mesh>
       <BillboardLabel
-        color={completed ? completedTriggerColor : padVisualStyle.labelColor}
+        color={brandYellow}
+        outlineColor="#6b5310"
+        outlineWidth={0.025}
         fontSize={0.28}
         position={[0, triggerPopupLayout.labelHeight, 0]}
         maxWidth={3}

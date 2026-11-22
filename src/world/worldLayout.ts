@@ -1,8 +1,8 @@
 import { destinationPlatformRadius, hubSections, roadCenterX, sectionRampApproachLength } from './hubSections';
 
 export type GroundPoint = readonly [number, number];
-export const groundSize = [92, 900] as const;
-export const groundCenter = [0, -390] as const;
+export const groundSize = [92, 540] as const;
+export const groundCenter = [0, -215] as const;
 export const plazaRadius = 18;
 export const walkingPathWidth = 7;
 export const triggerExclusionRadius = 5.2;
@@ -16,7 +16,7 @@ export function sectionTriggerPoint(section: (typeof hubSections)[number]): Grou
   ];
 }
 export const sectionTriggerPoints = hubSections.map(sectionTriggerPoint);
-export const homeBaseTransportPoint: GroundPoint = [roadCenterX(-800), -800];
+export const homeBaseTransportPoint: GroundPoint = [roadCenterX(-415), -415];
 export function isInsideTriggerExclusion(x: number, z: number, radius = 0) {
   return [...sectionTriggerPoints, homeBaseTransportPoint].some(([triggerX, triggerZ]) => Math.hypot(x - triggerX, z - triggerZ) < triggerExclusionRadius + radius);
 }
@@ -57,8 +57,8 @@ export const routePickupPositions: Record<string, GroundPoint> = {
   'light-4': [12, 16], 'light-5': [-15, -8],
 };
 export const bonusRouteSpots: GroundPoint[] = [
-  [-3.2, -45], [3.2, -95], [-2.8, -145], [2.8, -195],
-  [-3.2, -245], [3.2, -295], [-2.8, -345], [2.8, -395],
-  [-3.2, -445], [3.2, -495], [-2.8, -545], [2.8, -595],
-  [-3.2, -645], [2.8, -695], [-3.2, -745], [2.8, -795],
+  [-3.2, -38], [3.2, -62], [-2.8, -88], [2.8, -114],
+  [-3.2, -140], [3.2, -166], [-2.8, -192], [2.8, -218],
+  [-3.2, -244], [3.2, -270], [-2.8, -296], [2.8, -322],
+  [-3.2, -348], [2.8, -374], [-3.2, -400], [2.8, -414],
 ];

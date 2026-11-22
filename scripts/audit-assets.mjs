@@ -15,11 +15,12 @@ const assets = files(publicRoot);
 const sources = [...files(resolve(root, 'src')), resolve(root, 'index.html')]
   .filter(path => /\.(tsx?|jsx?|css|html)$/.test(path));
 sources.push(resolve(root, "src/world/mobile-assets.json"));
+sources.push(resolve(root, "src/world/screen-assets.json"));
 const source = sources.map(path => readFileSync(path, 'utf8')).join('\n');
 // Public URLs are literal in this project; review this scan if dynamic paths are added.
-const references = new Set([...source.matchAll(/["'`](\/(?:audio|videos|images|characters|logo|fonts)\/[^"'`\s]+)["'`]/g)].map(match => match[1]));
+const references = new Set([...source.matchAll(/["'`](\/(?:audio|videos|images|characters|logo|fonts|pickup)\/[^"'`\s]+)["'`]/g)].map(match => match[1]));
 for (const url of references) assert.ok(existsSync(resolve(publicRoot, url.slice(1))), `Missing asset: ${url}`);
-const licenseFiles = new Set(['/fonts/IBMPlexSans-OFL.txt']);
+const licenseFiles = new Set(['/fonts/IBMPlexSans-OFL.txt', '/characters/ATTRIBUTION-sports-car.txt', '/videos/fixed.mp4']);
 const hashes = new Map();
 for (const path of assets) {
   const url = '/' + relative(publicRoot, path);

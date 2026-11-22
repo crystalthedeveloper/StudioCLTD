@@ -1,22 +1,21 @@
 import { useGLTF } from "@react-three/drei";
-import { MutableRefObject, useMemo, useRef, useSyncExternalStore } from "react";
-import { Box3, Group, Mesh, MeshStandardMaterial, Vector3 } from "three";
+import { useEffect, useMemo, useRef, useSyncExternalStore, type MutableRefObject } from "react";
+import { Box3, DoubleSide, ExtrudeGeometry, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, Shape, Vector3 } from "three";
 import { PlayerRollingEffects } from "./PlayerRollingEffects";
 import { DialogueBubble, DialogueMessage } from "../ui/DialogueBubble";
 import { playerSphereRadius as sphereRadius } from "./playerDimensions";
-import { CharacterAnimationState } from "./playerTypes";
 import { getActivePower, getActivePowers, powerModes, subscribePowers } from "./temporaryPowers";
 import { useGameFrame } from "./useGameFrame";
 import { playerWorldState } from "../world/playerWorldState";
 import { useKeyboardControls } from "./useKeyboardControls";
 import { gameNow } from "./gameFocus";
 
-type PlayerCharacterProps = { animationStateRef: MutableRefObject<CharacterAnimationState>; damageFlashUntil: number; dialogue: DialogueMessage | null; yawRef: MutableRefObject<number> };
+type PlayerCharacterProps = { damageFlashUntil: number; dialogue: DialogueMessage | null; yawRef: MutableRefObject<number> };
 
 export function PlayerCharacter({ dialogue, damageFlashUntil, yawRef }: PlayerCharacterProps) {
   const groundAnchor = useRef<Group>(null);
   const carRef = useRef<Group>(null);
-  const wheelRefs = useRef<Mesh[]>([]);
+  const wheelRefs = useRef<Object3D[]>([]);
   const controls = useKeyboardControls();
   const headlightTarget = useMemo(() => new Group(), []);
   const model = useGLTF("/characters/sports-car.glb");
@@ -28,7 +27,10 @@ export function PlayerCharacter({ dialogue, damageFlashUntil, yawRef }: PlayerCh
     clone.traverse((object) => {
       if (!(object instanceof Mesh)) return;
       object.castShadow = true; object.receiveShadow = true;
-      if (/stripe|racing|roof.?line|hood.?line|decal/i.test(object.name)) object.visible = false;
+      // Hide only separately named cosmetic strips if a future car export
+      // exposes them; the current GLB keeps its roof lines inside the single
+      // sports-car_body mesh, so the structural body remains intact.
+      if (/stripe|racing|roof.?line|hood.?line|decal|roof.?rail|roof.?fin/i.test(object.name)) object.visible = false;
       if (object.material instanceof MeshStandardMaterial) object.material = object.material.clone();
     });
     const raw = new Box3().setFromObject(clone);
@@ -39,12 +41,12 @@ export function PlayerCharacter({ dialogue, damageFlashUntil, yawRef }: PlayerCh
     // body remains the handling reference and is not moved.
     clone.position.y = -sphereRadius - scaled.min.y + 0.12;
     clone.rotation.y = Math.PI;
-    const namedWheels: Mesh[] = [];
+    const namedWheels: Object3D[] = [];
     const meshes: Mesh[] = [];
     clone.traverse((object) => {
       if (!(object instanceof Mesh)) return;
       meshes.push(object);
-      if (/wheel|tire|tyre/i.test(object.name)) namedWheels.push(object);
+      if (/^Wheel_(FL|FR|RL|RR)$/i.test(object.name)) namedWheels.push(object);
     });
     if (namedWheels.length >= 4) {
       wheelRefs.current = namedWheels.slice(0, 4);
@@ -61,15 +63,17 @@ export function PlayerCharacter({ dialogue, damageFlashUntil, yawRef }: PlayerCh
     return clone;
   }, [model.scene]);
   const previousPosition = useRef(new Vector3());
+  const displacementScratch = useMemo(() => new Vector3(), []);
+  const forwardScratch = useMemo(() => new Vector3(), []);
   useGameFrame((_, delta) => {
     if (!carRef.current) return;
     carRef.current.rotation.y = yawRef.current;
     carRef.current.rotation.z *= Math.exp(-delta * 8);
-    const distance = playerWorldState.position.distanceTo(previousPosition.current);
-    const direction = controls.backward ? -1 : 1;
+    const signedTravel = displacementScratch.copy(playerWorldState.position).sub(previousPosition.current)
+      .dot(forwardScratch.set(-Math.sin(yawRef.current), 0, -Math.cos(yawRef.current)));
     const wheelTurn = (Number(controls.left) - Number(controls.right)) * 0.42;
     wheelRefs.current.forEach((wheel, index) => {
-      wheel.rotation.x -= direction * distance / 0.22;
+      wheel.rotation.x -= signedTravel / 0.22;
       if (index < 2) wheel.rotation.y += (wheelTurn - wheel.rotation.y) * Math.min(1, delta * 10);
     });
     const damaged = gameNow() < damageFlashUntil;
@@ -78,9 +82,11 @@ export function PlayerCharacter({ dialogue, damageFlashUntil, yawRef }: PlayerCh
       const windowPart = /window|glass|windshield|windscreen/i.test(object.name);
       if (windowPart) return;
       if (/wheel|tire|tyre|rim|head|light|interior/i.test(object.name)) return;
-      object.material.color.set(damaged ? "#ef3340" : primary ? "#d8b900" : "#181d24");
-      object.material.emissive.set(damaged ? "#ef3340" : primary ? "#d8b900" : "#000000");
-      object.material.emissiveIntensity = damaged ? 0.12 : primary ? 0.1 : 0;
+      object.material.color.set(damaged ? "#ef3340" : "#11161d");
+      object.material.emissive.set(damaged ? "#ef3340" : "#000000");
+      object.material.emissiveIntensity = damaged ? 0.12 : 0;
+      object.material.roughness = 0.3;
+      object.material.metalness = 0.62;
     });
     previousPosition.current.copy(playerWorldState.position);
   });
@@ -97,9 +103,11 @@ export function PlayerCharacter({ dialogue, damageFlashUntil, yawRef }: PlayerCh
     }
     const protectedPart = /wheel|tire|tyre|rim|head|light|interior/i.test(object.name);
     if (protectedPart) return;
-    object.material.color.set(primary ? "#d8b900" : "#181d24");
-    object.material.emissive.set(primary ? "#d8b900" : "#000000");
-    object.material.emissiveIntensity = primary ? 0.1 : 0;
+    object.material.color.set("#11161d");
+    object.material.emissive.set("#000000");
+    object.material.emissiveIntensity = 0;
+    object.material.roughness = 0.3;
+    object.material.metalness = 0.62;
   });
   return <group>
     <group ref={groundAnchor} name="Player ground-effect anchor" />
@@ -118,6 +126,7 @@ export function PlayerCharacter({ dialogue, damageFlashUntil, yawRef }: PlayerCh
       <pointLight color="#b9d0ed" intensity={1.05} distance={5.5} decay={2} position={[0, 0.55, 0.15]} />
       <primitive object={headlightTarget} position={[0, 0.05, -8]} />
       <primitive object={body} />
+      {primary === "rapid" && <ShockBolt />}
       {([-0.68, 0.68] as const).flatMap((x) => [-1.02, 1.02].map((z) => (
         <mesh key={`${x}:${z}`} position={[x, -sphereRadius + 0.012, z]} rotation-x={-Math.PI / 2} scale={[0.32, 0.58, 1]} renderOrder={-1}>
           <planeGeometry args={[1, 1]} /><meshBasicMaterial color="#101722" transparent opacity={0.22} depthWrite={false} />
@@ -126,6 +135,26 @@ export function PlayerCharacter({ dialogue, damageFlashUntil, yawRef }: PlayerCh
       {active.filter((mode) => mode !== primary).map((mode) => <mesh key={mode} position={[0, -sphereRadius + 0.025, 0]} rotation-x={-Math.PI / 2} scale={[1.15, 1.9, 1]} renderOrder={-1}><planeGeometry args={[1, 1]} /><meshBasicMaterial color={powerModes[mode].color} transparent opacity={0.16} depthWrite={false} /></mesh>)}
     </group>
     <DialogueBubble message={dialogue} position={[0, 2.65 - sphereRadius, 0]} />
+  </group>;
+}
+
+function ShockBolt() {
+  const geometry = useMemo(() => {
+    const shape = new Shape();
+    shape.moveTo(-0.14, 0.48);
+    shape.lineTo(0.22, 0.48);
+    shape.lineTo(0.02, 0.08);
+    shape.lineTo(0.22, 0.08);
+    shape.lineTo(-0.22, -0.5);
+    shape.lineTo(-0.08, -0.08);
+    shape.lineTo(-0.28, -0.08);
+    shape.closePath();
+    return new ExtrudeGeometry(shape, { depth: 0.12, bevelEnabled: true, bevelSegments: 1, bevelSize: 0.025, bevelThickness: 0.02 });
+  }, []);
+  const material = useMemo(() => new MeshStandardMaterial({ color: "#b89618", emissive: "#6b4d08", emissiveIntensity: 0.45, metalness: 0.65, roughness: 0.3, side: DoubleSide }), []);
+  useEffect(() => () => { geometry.dispose(); material.dispose(); }, [geometry, material]);
+  return <group name="Shock lightning bolt" position={[0, 0.72, 0]} scale={0.42}>
+    <mesh geometry={geometry} material={material} />
   </group>;
 }
 

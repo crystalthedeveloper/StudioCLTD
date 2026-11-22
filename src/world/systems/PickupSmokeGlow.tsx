@@ -5,7 +5,7 @@ import { type PickupSurface } from "../pickupSurface";
 import { useGameFrame } from "../../player/useGameFrame";
 
 /** Ground glow follows the support plane; no per-pickup dynamic lights or shadows. */
-export function PickupSmokeGlow({ visible, color, surface }: { visible: boolean; color: string; surface: PickupSurface }) {
+export function PickupSmokeGlow({ visible, color, surface, scale = 1 }: { visible: boolean; color: string; surface: PickupSurface; scale?: number }) {
   const material = useMemo(() => new ShaderMaterial({
     uniforms: { tint: { value: new Color(color) }, strength: { value: isCompactVisualBudget() ? 0.08 : 0.14 }, time: { value: 0 } },
     transparent: true, depthWrite: false, blending: AdditiveBlending, toneMapped: false,
@@ -22,6 +22,6 @@ export function PickupSmokeGlow({ visible, color, surface }: { visible: boolean;
   useEffect(() => () => material.dispose(), [material]);
   useGameFrame(() => { material.uniforms.time.value = performance.now() / 1000; });
   return <mesh name="Power ground glow" visible={visible} quaternion={rotation} material={material}>
-    <planeGeometry args={[0.95, 0.95]} />
+    <planeGeometry args={[0.95 * scale, 0.95 * scale]} />
   </mesh>;
 }

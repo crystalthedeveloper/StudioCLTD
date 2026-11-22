@@ -37,10 +37,10 @@ export function roadPoint(localX: number, z: number, yOffset = 0) {
 
 export const hubSections: HubSection[] = [
   ...[
-    ["tips", "Tips", "T", -80, "#63d8ff", "#1aa7ff"], ["offers", "Offers", "O", -180, "#E8ECEF", "#ff9f1c"],
-    ["value", "Value", "V", -280, "#7dffb2", "#26d07c"], ["quick-fix", "Quick Fix", "Q", -380, "#ffbc75", "#ff6b35"],
-    ["urgent-fix", "Urgent Fix", "U", -480, "#ff5d5d", "#d7263d"], ["performance", "Performance", "P", -580, "#c77dff", "#8a2be2"],
-    ["site-improvement", "Site Improvement", "S", -680, "#70e4ff", "#2a9df4"], ["showcase", "Showcase", "SC", -780, "#E8ECEF", "#E8ECEF"],
+    ["tips", "Tips", "T", -65, "#63d8ff", "#1aa7ff"], ["offers", "Offers", "O", -115, "#E8ECEF", "#ff9f1c"],
+    ["value", "Value", "V", -165, "#7dffb2", "#26d07c"], ["quick-fix", "Quick Fix", "Q", -215, "#ffbc75", "#ff6b35"],
+    ["urgent-fix", "Urgent Fix", "U", -265, "#ff5d5d", "#d7263d"], ["performance", "Performance", "P", -315, "#c77dff", "#8a2be2"],
+    ["site-improvement", "Site Improvement", "S", -365, "#70e4ff", "#2a9df4"], ["showcase", "Showcase", "SC", -415, "#E8ECEF", "#E8ECEF"],
   ].map(([id, name, icon, z, color, accent]) => {
     const tangent = roadTangent(Number(z));
     return { id: String(id), name: String(name), icon: String(icon), position: [roadCenterX(Number(z)), roadHeight(Number(z)) - 0.29, Number(z)] as [number, number, number], entrance: [tangent[0], tangent[1]] as [number, number], color: String(color), accent: String(accent) };

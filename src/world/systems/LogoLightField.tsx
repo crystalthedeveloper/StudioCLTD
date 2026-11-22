@@ -17,19 +17,25 @@ import {
   RigidBody,
 } from "@react-three/rapier";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Color, DoubleSide, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PlaneGeometry, PointLight, SRGBColorSpace, Vector3 } from "three";
+import { Box3, Color, DoubleSide, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, PlaneGeometry, PointLight, SRGBColorSpace, Vector3 } from "three";
+import { SkeletonUtils } from "three-stdlib";
 import { playCollectibleSound } from "../../audio/collectibleSounds";
 import { BillboardLabel } from "../../ui/BillboardLabel";
 import { destinationPlatformRadius, hubSections, sectionRampApproachLength, sectionRampWidth } from "../hubSections";
 import { roadHomeBaseTransportPadPosition } from "./TransportPads";
 import { homeBaseCenter } from "./HomeBase";
-import { clampRoadX, roadPoint, roadSurfaceY } from "../roadSurface";
+import { clampRoadX, roadPoint, roadSurfaceY, roadTangent } from "../roadSurface";
 import { brandYellow } from "../../player/effectColors";
 
 const logoPath = "/logo/logo-optimized.glb";
+const goldPath = "/pickup/gold.glb";
 const logoScale = 1.8;
 const floorLogoY = 0.04;
 const worldLogoRotation = -0.35;
+const decorativeLogoScale = 0.72;
+// Keep decorative logos outside the driving line and alternate sides with
+// enough longitudinal separation to read as painted road marks, not a cluster.
+const decorativeLogoOffsets = [-6.2, 6.1, -5.5, 5.8, -6.5, 6.3, -5.8, 6.0] as const;
 const pickupColliderRadius = 1.55;
 const collectibleRespawnMs = 28000;
 const healthGroupRespawnMs = 36000;
@@ -216,6 +222,7 @@ type LogoLightFieldProps = {
 
 export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, onReset, restartKey }: LogoLightFieldProps) {
   const { scene } = useGLTF(assetForDevice(logoPath));
+  const { scene: goldScene } = useGLTF(goldPath);
   const pickupTextures = useTexture(["/images/pickups/dollar.svg", "/images/pickups/heart.svg"]);
   const pickupVisuals = useMemo(() => pickupTextures.map((texture) => {
     texture.colorSpace = SRGBColorSpace;
@@ -259,13 +266,21 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
 
   const logos = useMemo(
     () => {
+      let roadCoinIndex = 0;
       const roadMoney = accessiblePlazaLogos.map((logo, index) => {
         const section = hubSections[Math.min(hubSections.length - 1, Math.floor(index / 3))];
         const lane = index % 3;
         const z = section.position[2] - 10 - lane * 10;
-        const point = roadPoint((lane - 1) * 4.2, z, 0.04);
+        // Keep gold pickups out of the centre driving line. Alternate the
+        // outer lanes so they remain collectible without forcing a collision
+        // course through the player/villain path.
+        const lateral = logo.kind === "coin"
+          ? (roadCoinIndex++ % 2 === 0 ? -5.2 : 5.2)
+          : (lane - 1) * 4.2;
+        const point = roadPoint(lateral, z, 0.04);
         return { ...logo, position: [point[0], z] as [number, number], height: point[1] };
       });
+      let decorativeIndex = 0;
       const restartRelocated = [...roadMoney, ...homeBaseLogos].map((logo, index) => {
         if (logo.kind !== "penalty" && logo.kind !== "light") return logo;
         // Keep red and white road logos in the safe road zone, but give them a
@@ -276,11 +291,24 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
           seed = (seed * 1664525 + 1013904223) >>> 0;
           return seed / 4294967296;
         };
-        const lane = next() * 2 - 1;
-        const forwardOffset = (next() - 0.5) * 14;
+        const lateral = logo.kind === "penalty"
+          ? (decorativeIndex % 2 === 0 ? -6.9 : 6.9)
+          : decorativeLogoOffsets[decorativeIndex % decorativeLogoOffsets.length];
+        const forwardOffset = (next() - 0.5) * 4;
         const z = logo.position[1] + forwardOffset;
-        const point = roadPoint(lane * 4.1, z, 0.04);
-        return { ...logo, position: [point[0], z] as [number, number], height: point[1] };
+        const point = roadPoint(lateral, z, 0.04);
+        const tangent = roadTangent(z);
+        const tangentRotation = Math.atan2(tangent[0], tangent[1]) + Math.PI;
+        const sizeVariation = 0.92 + next() * 0.12;
+        const wearRotation = (next() - 0.5) * 0.12;
+        decorativeIndex += 1;
+        return {
+          ...logo,
+          position: [point[0], z] as [number, number],
+          height: point[1],
+          rotationOffset: tangentRotation + wearRotation,
+          scaleMultiplier: (logo.scaleMultiplier ?? 1) * decorativeLogoScale * sizeVariation,
+        };
       });
       return restartRelocated.map((logo) => ({
         ...logo,
@@ -326,6 +354,7 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
           key={logo.id}
           healthRespawnGeneration={healthRespawnGeneration}
           logo={logo}
+          goldScene={goldScene}
           surface={surfaces[index]}
           onCoinCollect={onCoinCollect}
           onHealthCollect={onHealthCollect}
@@ -343,6 +372,7 @@ type PlazaLogoInstanceProps = {
   surface: PickupSurface;
   healthRespawnGeneration: number;
   logo: PlazaLogo & { object: Object3D };
+  goldScene: Group;
   onCoinCollect: () => void;
   onHealthCollect: () => boolean;
   onHealthLogoCollected: (logoId: string) => void;
@@ -351,7 +381,7 @@ type PlazaLogoInstanceProps = {
   restartKey: number;
 };
 
-function PlazaLogoInstance({ healthRespawnGeneration, logo, surface, onCoinCollect, onHealthCollect, onHealthLogoCollected, onOpenShare, onReset, restartKey }: PlazaLogoInstanceProps) {
+function PlazaLogoInstance({ healthRespawnGeneration, logo, goldScene, surface, onCoinCollect, onHealthCollect, onHealthLogoCollected, onOpenShare, onReset, restartKey }: PlazaLogoInstanceProps) {
   const [available, setAvailable] = useState(true);
   const availableRef = useRef(true);
   const collectedRef = useRef(false);
@@ -516,7 +546,7 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, surface, onCoinColle
     <>
       <primitive
         object={logo.object}
-        rotation={[0, worldLogoRotation + (logo.rotationOffset ?? 0), 0]}
+        rotation={[0, logo.rotationOffset ?? worldLogoRotation, 0]}
         scale={logoScale * (logo.scaleMultiplier ?? 1)}
         dispose={null}
       />
@@ -525,7 +555,7 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, surface, onCoinColle
   const visual = (
     <>
       {logo.kind === "coin" ? (
-        <GoldBarVisual scale={logo.scaleMultiplier ?? 1} />
+        <GoldBarVisual source={goldScene} scale={logo.scaleMultiplier ?? 1} />
       ) : logo.kind === "dark" ? (
         <PickupIconVisual object={logo.object}
           scale={logo.scaleMultiplier ?? 1} />
@@ -554,9 +584,13 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, surface, onCoinColle
     <RigidBody type="fixed" colliders={false} position={position} name={`PlazaLogo:${logo.id}`}>
       <BallCollider
         ref={colliderRef}
-        args={[pickupColliderRadius]}
+        // Coins use a tighter sensor so the car cannot visually catch its
+        // edge and appear to jump while collecting it.
+        args={[logo.kind === "coin" ? 0.95 : pickupColliderRadius]}
         position={[0, 0.65, 0]}
         sensor
+        friction={0}
+        restitution={0}
         onIntersectionEnter={collect}
         onIntersectionExit={handleExit}
       />
@@ -575,22 +609,25 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, surface, onCoinColle
   );
 }
 
-function GoldBarVisual({ scale }: { scale: number }) {
-  const texture = useTexture("/images/pickups/gold-bar.svg");
-  texture.colorSpace = SRGBColorSpace;
-  return <group name="GoldBar" scale={scale * 0.5}>
-    <mesh castShadow receiveShadow>
-      <boxGeometry args={[0.78, 0.34, 0.34]} />
-      <meshStandardMaterial color={brandYellow} emissive={brandYellow} emissiveIntensity={0.4} metalness={0.72} roughness={0.25} />
-    </mesh>
-    <mesh position={[0, 0, 0.176]}>
-      <planeGeometry args={[0.7, 0.3]} />
-      <meshBasicMaterial map={texture} transparent side={DoubleSide} toneMapped={false} />
-    </mesh>
-    <mesh position={[0, 0, -0.176]} rotation={[0, Math.PI, 0]}>
-      <planeGeometry args={[0.7, 0.3]} />
-      <meshBasicMaterial map={texture} transparent side={DoubleSide} toneMapped={false} />
-    </mesh>
+function GoldBarVisual({ source, scale }: { source: Group; scale: number }) {
+  const model = useMemo(() => SkeletonUtils.clone(source), [source]);
+  const fit = useMemo(() => {
+    const bounds = new Box3().setFromObject(model);
+    const size = bounds.getSize(new Vector3());
+    const center = bounds.getCenter(new Vector3());
+    const normalizedScale = 0.92 / Math.max(size.x, size.y, size.z, 0.001);
+    model.traverse((object) => {
+      if (!(object instanceof Mesh)) return;
+      // Gold is a small collectible; its shadow was a disproportionate cost
+      // when several pooled pickups were visible at once.
+      object.castShadow = false;
+      object.receiveShadow = false;
+      object.frustumCulled = true;
+    });
+    return { normalizedScale, position: [-center.x * normalizedScale, -bounds.min.y * normalizedScale, -center.z * normalizedScale] as [number, number, number] };
+  }, [model]);
+  return <group name="GoldGLB" scale={scale * 0.576}>
+    <primitive object={model} position={fit.position} scale={fit.normalizedScale} dispose={null} />
   </group>;
 }
 
@@ -641,3 +678,4 @@ function ContactLogoVisual({ glow = false, object, rotation, scale }: { glow?: b
 }
 
 useGLTF.preload(assetForDevice(logoPath));
+useGLTF.preload(goldPath);

@@ -67,7 +67,7 @@ setGameFocused(true);
 advance(100);
 assert.equal(pending.size, 0);
 
-const media = load('src/audio/gameMedia.ts', { '../player/gameFocus': focus });
+const media = load('src/audio/gameMedia.ts', { '../player/gameFocus': focus, './gameAudio': { isGameAudioLocked: () => false } });
 const listeners = {};
 const clip = {
   paused: true, ended: false, currentTime: 12.5,
@@ -151,27 +151,23 @@ setGameFocused(false);
 console.log('Animation tests passed: first-frame idle, paused idle, fixed world position, combat timing and repeated resume.');
 
 // Production power controls, inventory and timers run against deterministic game time.
-const jump = load('src/player/poweredJump.ts', {});
-const powers = load('src/player/temporaryPowers.ts', { './gameFocus': focus, './poweredJump': jump });
+const powers = load('src/player/temporaryPowers.ts', { './gameFocus': focus });
 powers.resetTemporaryPowers();
 assert.equal(powers.collectFixPower('standard'), false, 'paused pickup does nothing');
 setGameFocused(true);
 for (const mode of powers.powerOrder) powers.collectFixPower(mode);
-assert.equal(powers.getActivePowerMask(), 7);
+assert.equal(powers.getActivePowerMask(), 1);
 advance(1250.5);
-assert.equal(powers.getPowerRemainingMs('standard'), 4749.5);
-assert.equal(powers.getPowerRemainingMs('rapid'), 8749.5);
-assert.equal(powers.getPowerRemainingMs('power'), 13749.5);
+assert.equal(powers.getPowerRemainingMs('rapid'), 1749.5);
 powers.collectFixPower('standard');
 assert.equal(powers.getPowerRemainingMs('standard'), 6000);
-assert.equal(powers.getPowerRemainingMs('rapid'), 8749.5);
+assert.equal(powers.getPowerRemainingMs('rapid'), 1749.5);
 setGameFocused(false); advance(60000);
 assert.equal(powers.getPowerRemainingMs('standard'), 6000);
-assert.equal(powers.getPowerRemainingMs('power'), 13749.5);
+assert.equal(powers.getPowerRemainingMs('rapid'), 1749.5);
 setGameFocused(true); advance(6000);
-assert.equal(powers.getActivePowerMask(), 6);
-assert.equal(powers.handlePowerShortcut('KeyG'), false);
-advance(7749.5);
+assert.equal(powers.getActivePowerMask(), 0);
+advance(1749.5);
 assert.equal(powers.getActivePowerMask(), 0);
 powers.resetTemporaryPowers();
 console.log('Concurrent power timers passed: immediate activation, independent refill/expiry, pause and reset.');

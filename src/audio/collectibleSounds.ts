@@ -1,11 +1,12 @@
 import type { GameAudioState } from "../player/footsteps";
-import { getActiveGameAudioState } from "../player/footsteps";
-import { isGameAudioEnabled } from "./gameAudio";
-import { playGameMedia, registerGameMedia, stopGameMedia } from "./gameMedia";
+import { getActiveGameAudioState, trackGameOscillator } from "../player/footsteps";
+import { isGameAudioEnabled, isGameAudioLocked } from "./gameAudio";
+import { playGameMedia, registerGameMedia, stopGameMedia, stopAllGameMedia } from "./gameMedia";
+import { stopAllGameWebAudio } from "../player/footsteps";
 
 const powerPickupAudio = typeof Audio === "undefined" ? null : new Audio("/audio/power.mp3");
 const playerDeathAudio = typeof Audio === "undefined" ? null : new Audio("/audio/die.mp3");
-const sectionFixedAudio = typeof Audio === "undefined" ? null : new Audio("/audio/fixed.mp3");
+const playerFixedAudio = typeof Audio === "undefined" ? null : new Audio("/audio/player-fixed.mp3");
 if (powerPickupAudio) {
   powerPickupAudio.preload = "auto";
   powerPickupAudio.volume = 0.72;
@@ -20,28 +21,31 @@ if (playerDeathAudio) {
   playerDeathAudio.load();
   registerGameMedia(playerDeathAudio);
 }
-if (sectionFixedAudio) {
-  sectionFixedAudio.preload = "auto";
-  sectionFixedAudio.volume = 0.72;
-  sectionFixedAudio.muted = !isGameAudioEnabled();
-  sectionFixedAudio.load();
-  registerGameMedia(sectionFixedAudio);
+if (playerFixedAudio) {
+  playerFixedAudio.preload = "auto";
+  playerFixedAudio.volume = 0.72;
+  playerFixedAudio.muted = !isGameAudioEnabled();
+  playerFixedAudio.load();
+  registerGameMedia(playerFixedAudio);
 }
 
 export function playSectionFixedSound() {
-  if (!sectionFixedAudio) return;
-  stopGameMedia(sectionFixedAudio);
-  sectionFixedAudio.currentTime = 0;
-  sectionFixedAudio.muted = !isGameAudioEnabled();
-  void playGameMedia(sectionFixedAudio);
+  if (!playerFixedAudio || isGameAudioLocked()) return;
+  stopGameMedia(playerFixedAudio);
+  playerFixedAudio.currentTime = 0;
+  playerFixedAudio.muted = !isGameAudioEnabled();
+  void playGameMedia(playerFixedAudio);
 }
 
 export function playPlayerDeathSound() {
   if (!playerDeathAudio) return;
+  stopAllGameMedia();
+  stopAllGameWebAudio();
   stopGameMedia(playerDeathAudio);
   playerDeathAudio.currentTime = 0;
   playerDeathAudio.muted = !isGameAudioEnabled();
-  void playGameMedia(playerDeathAudio);
+  // The death sound is the only media explicitly allowed through the lock.
+  playerDeathAudio.play().catch(() => undefined);
 }
 
 export type CollectibleSound = "power" | "coin" | "penalty" | "contact" | "health" | "damage" | "splat";
@@ -70,11 +74,13 @@ function playTone({ context, masterGain }: GameAudioState, options: ToneOptions)
 
   oscillator.connect(gain);
   gain.connect(masterGain);
+  trackGameOscillator(oscillator);
   oscillator.start(start);
   oscillator.stop(end + 0.01);
 }
 
 export function playCollectibleSound(sound: CollectibleSound) {
+  if (isGameAudioLocked()) return;
   const state = getActiveGameAudioState();
   if (!state) return;
 

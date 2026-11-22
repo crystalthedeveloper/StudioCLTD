@@ -93,7 +93,7 @@ function configureFloorTexture(texture: Texture, repeat: number) {
 }
 
 function createRoadRibbonGeometry(lateralOffset: number, width: number, yOffset = 0) {
-  const sampleCount = 169;
+  const sampleCount = 99;
   const vertices = new Float32Array(sampleCount * 2 * 3);
   const uvs = new Float32Array(sampleCount * 2 * 2);
   const indices = new Uint32Array((sampleCount - 1) * 6);
@@ -364,6 +364,7 @@ export function ModularTerrain({ material }: { material: MeshStandardMaterial })
       <group name="SharedCurvedRoad">
         <RoadCollision />
         <mesh ref={roadMeshRef} name="ContinuousCurvedRoadVisual" geometry={roadGeometry} material={roadMaterial} receiveShadow />
+        <RoadZoneTints />
         <RoadBloodDecals textures={bloodTextures} roadMeshRef={roadMeshRef} />
         <RoadReflectors />
         <mesh name="DoubleYellowLineLeft" geometry={yellowLineLeftGeometry} material={centerLineMaterial} renderOrder={3} />
@@ -371,6 +372,46 @@ export function ModularTerrain({ material }: { material: MeshStandardMaterial })
       </group>
     </group>
   );
+}
+
+const roadZones = [
+  { name: "Error Zone", start: 28, end: -152, color: "#2b3a47", opacity: .11 },
+  { name: "Corruption Zone", start: -132, end: -312, color: "#1f2a34", opacity: .15 },
+  { name: "System Failure Zone", start: -292, end: -460, color: "#29272b", opacity: .19 },
+] as const;
+
+function createZoneGeometry(start: number, end: number) {
+  const samples = 18;
+  const geometry = new BufferGeometry();
+  const vertices = new Float32Array(samples * 2 * 3);
+  const indices = new Uint32Array((samples - 1) * 6);
+  for (let index = 0; index < samples; index += 1) {
+    const z = start + (end - start) * (index / (samples - 1));
+    const left = roadPoint(-roadHalfWidth, z, .045);
+    const right = roadPoint(roadHalfWidth, z, .045);
+    vertices.set(left, index * 6);
+    vertices.set(right, index * 6 + 3);
+    if (index === samples - 1) continue;
+    const next = index * 2;
+    const nextRow = (index + 1) * 2;
+    const triangle = index * 6;
+    indices.set([next, nextRow, nextRow + 1, next, nextRow + 1, next + 1], triangle);
+  }
+  geometry.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(Array.from(indices));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function RoadZoneTints() {
+  const resources = useMemo(() => roadZones.map((zone) => ({
+    geometry: createZoneGeometry(zone.start, zone.end),
+    material: new MeshBasicMaterial({ color: zone.color, transparent: true, opacity: zone.opacity, depthWrite: false, toneMapped: false, side: DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
+  })), []);
+  useEffect(() => () => resources.forEach(({ geometry, material }) => { geometry.dispose(); material.dispose(); }), [resources]);
+  return <group name="RoadZoneTints">
+    {resources.map((resource, index) => <mesh key={roadZones[index].name} geometry={resource.geometry} material={resource.material} renderOrder={1} />)}
+  </group>;
 }
 
 function RoadBloodDecals({ textures, roadMeshRef }: { textures: Texture[]; roadMeshRef: React.RefObject<Mesh> }) {
@@ -458,7 +499,7 @@ function RoadReflectors() {
 
 function RoadCollision() {
   const args = useMemo(() => {
-    const sampleCount = 169;
+    const sampleCount = 99;
     const colliderHalfWidth = roadHalfWidth + 0.8;
     const vertices = new Float32Array(sampleCount * 2 * 3);
     const indices = new Uint32Array((sampleCount - 1) * 6);

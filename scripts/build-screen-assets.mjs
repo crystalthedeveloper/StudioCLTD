@@ -15,7 +15,10 @@ async function writeChanged(path, contents) {
 export async function buildScreenAssets(root = projectRoot) {
   const config = await readFile(resolve(root, 'src/world/systems/HubSections.tsx'), 'utf8');
   const sources = [...new Set(config.match(/\/images\/optimized\/[\w/.-]+\.(?:webp|jpg|png)/g))].sort();
-  if (!sources.length) throw new Error('No screen image sources found');
+  if (!sources.length) {
+    await writeChanged(resolve(root, 'src/world/screen-assets.json'), '{}\n');
+    return {};
+  }
   const directory = resolve(root, 'public/images/screens');
   await mkdir(directory, { recursive: true });
   const manifest = {};

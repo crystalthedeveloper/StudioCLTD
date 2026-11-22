@@ -1,4 +1,3 @@
-import { LocalLightSpill } from "./LocalLightSpill";
 import { createSquarePadGeometry } from "../squarePadGeometry";
 import { gameNow } from "../../player/gameFocus";
 import { CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload, RigidBody } from "@react-three/rapier";
@@ -25,7 +24,8 @@ const transportSectionIds = [
   "urgent-fix",
   "showcase",
 ] as const;
-const homeBaseRoadPoint = roadPoint(0, -800, 0.035);
+// Keep the completed-route HOME BASE trigger at the shortened road endpoint.
+const homeBaseRoadPoint = roadPoint(0, -415, 0.035);
 export const roadHomeBaseTransportPadPosition: readonly [number, number, number] = homeBaseRoadPoint;
 
 export type TransportDestination = {
@@ -172,7 +172,6 @@ function TransportPad({
         onIntersectionEnter={handleEnter}
         onIntersectionExit={handleExit}
       />
-      <LocalLightSpill color={glowColor ?? padVisualStyle.color} intensity={glowColor ? 2.2 : 0.6} distance={4} />
       <mesh geometry={geometry} material={material} rotation-x={-Math.PI / 2} />
 
       {!playerInside && <BillboardLabel

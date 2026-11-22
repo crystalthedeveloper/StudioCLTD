@@ -1,4 +1,5 @@
 import { isGameFocused, subscribeGameFocus } from "../player/gameFocus";
+import { isGameAudioLocked } from "./gameAudio";
 
 const media = new Set<HTMLMediaElement>();
 const resumeOnPlay = new Set<HTMLMediaElement>();
@@ -15,6 +16,10 @@ export function registerGameMedia(element: HTMLMediaElement) {
 }
 
 export function playGameMedia(element: HTMLMediaElement): Promise<boolean> {
+  if (isGameAudioLocked()) {
+    stopGameMedia(element);
+    return Promise.resolve(false);
+  }
   resumeOnPlay.add(element);
   if (!isGameFocused()) return Promise.resolve(true);
   return element.play().then(() => {
@@ -26,10 +31,20 @@ export function playGameMedia(element: HTMLMediaElement): Promise<boolean> {
 export function stopGameMedia(element: HTMLMediaElement) {
   resumeOnPlay.delete(element);
   element.pause();
+  try { element.currentTime = 0; } catch { /* media may not be seekable yet */ }
+}
+
+export function stopAllGameMedia() {
+  resumeOnPlay.clear();
+  media.forEach((element) => {
+    element.pause();
+    try { element.currentTime = 0; } catch { /* media may not be seekable yet */ }
+  });
 }
 
 subscribeGameFocus((running) => {
   if (running) {
+    if (isGameAudioLocked()) return;
     resumeOnPlay.forEach((element) => { void playGameMedia(element); });
   } else {
     media.forEach((element) => {

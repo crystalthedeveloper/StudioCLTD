@@ -79,7 +79,7 @@ export function GameGuide({ onClose }: { onClose: () => void }) {
               </>}
               {index === 3 && <ul className="game-guide__icon-grid">
                 <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.rapid.color }} aria-hidden="true" />}><strong>Gold coin</strong>Cash</Item>
-                <Item image={icon("/images/pickups/heart.svg")}><strong>Red heart</strong>Health</Item>
+                <Item image={icon("/images/pickups/heart.svg")}><strong>Gold heart</strong>Health</Item>
                 <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.rapid.color }} aria-hidden="true" />}><strong>Gold smoke</strong>Shock Power + faster movement</Item>
                 <Item image={logo("#991b1b")}><strong>Red symbol</strong>Penalty</Item>
                 <Item image={logo("#a855f7")}><strong>Purple symbol</strong>Share</Item>

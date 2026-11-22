@@ -4,8 +4,6 @@ import { AmbientLight, DirectionalLight, Object3D } from "three";
 import { useGameFrame } from "../../player/useGameFrame";
 import { playerWorldState } from "../playerWorldState";
 import { sunlightOffset } from "../visualQuality";
-import { LocalLightPool } from "./LocalLightSpill";
-import { roadPoint } from "../roadSurface";
 
 const playerLightingLayer = 2;
 const villainLightingLayer = 1;
@@ -83,7 +81,6 @@ export function WorldLights() {
         intensity={0.5}
         position={[-10, 8, -12]}
       />
-      <LocalLightPool />
       <primitive object={sunTarget} />
       <directionalLight
         ref={sunRef}
@@ -105,12 +102,6 @@ export function WorldLights() {
       />
       <directionalLight color="#9fb9d4" intensity={0.52} position={[20, 28, -16]} />
       <directionalLight ref={lightningRef} color="#dbe8ff" intensity={0} position={[-24, 36, -80]} />
-      <group name="WebsiteFixRedZoneLighting">
-        {[-380, -480, -580, -680].map((z) => {
-          const [x, y, roadZ] = roadPoint(0, z, 4.2);
-          return <pointLight key={`fix-zone-red:${roadZ}`} position={[x, y, roadZ]} color="#ff2638" intensity={7} distance={28} decay={1.8} />;
-        })}
-      </group>
     </>
   );
 }

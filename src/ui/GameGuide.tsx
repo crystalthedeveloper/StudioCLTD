@@ -55,21 +55,21 @@ export function GameGuide({ onClose }: { onClose: () => void }) {
             </button></h3>
             <div id={`guide-section-${index}`} role="region" aria-labelledby={`guide-toggle-${index}`} hidden={open !== section} className="game-guide__body">
               {index === 0 && <ul className="game-guide__steps">
-                <li>Explore the world and collect yellow Shock smoke.</li>
-                <li>Each Power activates immediately, makes you move faster, and lets you defeat villains on contact.</li>
-                <li>Defeat all 8 villains to complete the game.</li>
-                <li>Collect $ symbols to increase your cash.</li>
-                <li>Collect hearts to restore health.</li>
+                <li>Drive the black luxury car through the elevated horror track.</li>
+                <li>Collect gold Shock smoke to move faster and defeat villains on contact.</li>
+                <li>Complete each level’s villain requirement to survive the round.</li>
+                <li>Collect gold pickups to increase your cash and gold hearts to restore health.</li>
+                <li>Reach section triggers to resolve website problems and unlock the fixed screen.</li>
               </ul>}
               {index === 1 && <dl className="game-guide__controls">
-                <div><dt>WASD / Arrow Keys</dt><dd>Move; any active Power automatically makes you faster</dd></div>
-                <div><dt>On-screen arrows</dt><dd>Use the same movement controls on touch screens</dd></div>
+                <div><dt>WASD / Arrow Keys</dt><dd>Steer, accelerate, and reverse the car</dd></div>
+                <div><dt>Virtual joystick</dt><dd>Drag up to accelerate, down to reverse, and left or right to steer; diagonals work too</dd></div>
                 <div><dt>Spacebar / Cruise</dt><dd>Toggle continuous acceleration on or off</dd></div>
                 <div><dt>ESC</dt><dd>Pause</dd></div>
               </dl>}
               {index === 2 && <>
                 <ul className="game-guide__icon-grid">
-                  <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.rapid.color }} aria-hidden="true" />}><strong>Shock</strong>Gold smoke — 10 seconds of Power and faster movement</Item>
+                  <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.rapid.color }} aria-hidden="true" />}><strong>Shock</strong>Gold smoke — 3 seconds of Power and faster movement</Item>
                 </ul>
                 <ul className="game-guide__notes">
                   <li>Shock activates immediately and its timer appears at the top right.</li>

@@ -24,7 +24,6 @@ const dependencies = {
   'react-dom': { createPortal: tree => tree },
   'react/jsx-runtime': runtime,
   '../player/temporaryPowers': { powerModes: { standard: {color:'#009B3A'}, rapid: {color:'#FED100'}, power: {color:'#CE1126'} } },
-  '../player/powerIcons': { powerIcons: { standard: { worldSrc: 'wind.svg' }, rapid: { worldSrc: 'lightning.svg' }, power: { worldSrc: 'fire.svg' } } },
 };
 const exports = {};
 vm.runInNewContext(ts.transpileModule(readFileSync('src/ui/GameGuide.tsx', 'utf8'), {

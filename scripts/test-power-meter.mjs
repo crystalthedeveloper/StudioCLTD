@@ -37,7 +37,6 @@ const { PowerMeter: render } = load('src/ui/PowerMeter.tsx', {
     useEffect: effect => { if (!mounted.has(rendering)) { mounted.add(rendering); effects.push(effect); } },
   },
   'react/jsx-runtime': runtime,
-  '../player/powerIcons': load('src/player/powerIcons.ts', {}),
   '../player/gameFocus': focus,
   '../player/temporaryPowers': powers,
 });

@@ -19,10 +19,8 @@ const assets = load('src/world/mobileAssets.ts', {
 });
 for (const viewport of [390, 430, 768, 844]) {
   width = viewport;
-  assert.equal(assets.assetForDevice('/characters/char-optimized.glb'), '/characters/char-mobile.glb');
+  assert.equal(assets.assetForDevice('/logo/logo-optimized.glb'), '/logo/logo-mobile.glb');
 }
-width = 1440; coarse = false;
-assert.equal(assets.assetForDevice('/characters/char-optimized.glb'), '/characters/char-optimized.glb');
 width = 390;
 assert.equal(quality.isCompactVisualBudget(), true, 'narrow screens with a mouse use mobile budget');
 let slots = [], cursor = 0, frame;

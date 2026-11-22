@@ -5,14 +5,14 @@ StudioCLTD is a lightweight third-person React Three Fiber game world for explor
 ## Highlights
 
 - Eight interactive sections tracked independently from `0/8`: Tips, Offers, Value, Quick Fix, Urgent Fix, Performance, Site Improvement, and Showcase.
-- Third-person movement with WASD, keyboard arrows, and multi-touch on-screen arrows.
-- Collectible contact powers: green Wind for 6 seconds, gold Shock for 10 seconds, and red Fire for 15 seconds. Every active Power includes faster movement.
-- Collect smoke to activate a Power immediately; use Space or Jump for a powered jump. Active powers defeat villains on contact and prevent villain contact damage.
-- Main villains advance section Progress through the existing Fix logic.
-- Two roaming bonus villains award `+$3` Cash and respawn after 8–10 seconds without affecting Progress.
-- Green Coin, red Penalty, blue Contact, purple Share, and decorative black/white logos.
+- Car driving with WASD, keyboard arrows, cruise control, and a mobile virtual joystick.
+- Gold Shock smoke activates a 3-second Power, increases movement speed, and lets the car defeat villains on contact.
+- Villains use the current pooled `villain.glb` model with idle, run, hit, and die clips.
+- Round-based levels escalate villain requirements, speed, spawn timing, and tougher encounters.
+- Gold pickups add cash, gold hearts restore health, and completed service sections show `fixed.webp` with `player-fixed.mp3`.
+- Red penalty, Contact, Share, and decorative logos remain separate from gameplay pickups.
 - Responsive Showcase and Home Base website-video screens.
-- Compact responsive HUD with Health, Progress, Cash, three Power timers, D-pad, Jump, sound, guide, restart, and website controls.
+- Compact responsive HUD with Health, Level, Progress, Cash, Power timer, virtual joystick, sound, guide, restart, and website controls.
 - Full-page restart for a completely fresh game state.
 
 ## World Layout
@@ -35,11 +35,11 @@ Home Base contains Contact and Share, a responsive `crystalthedeveloper.ca` vide
 
 | Action | Controls |
 | --- | --- |
-| Move forward/backward | `W` / `S`, ↑ / ↓, or on-screen arrows |
-| Turn left/right | `A` / `D`, ← / →, or on-screen arrows |
-| Combined movement | Hold forward/backward with left/right |
+| Drive forward/backward | `W` / `S`, ↑ / ↓, or drag the joystick up/down |
+| Steer left/right | `A` / `D`, ← / →, or drag the joystick left/right |
+| Combined movement | Hold diagonal joystick directions or keyboard controls together |
 | Activate a Power | Collect its smoke pickup |
-| Jump while any Power is active | `Space` or **Jump** |
+| Cruise | `Space` or the Cruise control |
 | Game Guide | `1` or Info |
 | Toggle sound | `2` or Sound |
 | Full restart | `3` or Restart |
@@ -47,7 +47,7 @@ Home Base contains Contact and Share, a responsive `crystalthedeveloper.ca` vide
 | Enter game focus | Click/tap **Play** |
 | Release pointer lock | `Esc` |
 
-Wind, Shock, and Fire activate on pickup and have independent timers stacked at the top right. Multiple Powers retain their own abilities and smoke colours. Every Power grants the same movement boost; multiple Powers do not multiply it. Normal movement returns only after all active Powers expire. Collecting a Power again refills only its own timer. Global pause freezes all timers.
+Shock activates on pickup for 3 seconds and appears at the top right. Global pause freezes the timer. There is no jump input; the car remains grounded by the existing road and physics handling.
 
 ## Logo Guide
 
@@ -73,7 +73,7 @@ src/
 ├── audio/          Shared game, collectible, and villain audio
 ├── characters/     Shared character material configuration
 ├── player/         Movement, camera, animation, footsteps, and boosts
-├── ui/             HUD, D-pad, guide, overlays, and labels
+├── ui/             HUD, virtual joystick, guide, overlays, and labels
 └── world/          Terrain, sections, combat, transport, and Home Base
 
 public/
@@ -85,10 +85,9 @@ public/
 
 ## Character Asset and Animations
 
-The player and villains share `public/characters/char-optimized.glb`, losslessly optimized to approximately 11.0 MB with Meshopt and embedded WebP textures.
+The player uses `public/characters/sports-car.glb`; villains use `public/characters/villain.glb`.
 
-- Player: `idleH`, `runH`
-- Villain: `idleV`, `runV`, `dieV`, `fixedH`
+- Villain source clips are matched case-insensitively: `idle`, `run`, `hit`, and `die`.
 
 ## Development
 

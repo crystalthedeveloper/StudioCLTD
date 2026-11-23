@@ -6,6 +6,7 @@ export const powerModes = {
   power: { label: "03", name: "Fire", pickupSize: 0.5, color: effectColors.fire, impactDuration: 0.34, impactSize: 1.5 },
 } as const;
 export type PowerMode = keyof typeof powerModes;
+export type DefeatEffect = "blood" | "shock" | "fire";
 
 export const powerDurations = { standard: 6000, rapid: 3000, power: 15000 } as const;
 export const fixPowerRespawnMs = 20000;

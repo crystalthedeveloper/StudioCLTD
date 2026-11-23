@@ -3,7 +3,7 @@ import { bonusRouteSpots } from "../worldLayout";
 import { isCompactVisualBudget } from "../visualQuality";
 import { NearbyAsset } from "../NearbyAsset";
 import { assetForDevice } from "../mobileAssets";
-import { powerModes, type PowerMode, getActivePowers, isPowerActive, resolvePowerContact, resetPowerContact } from "../../player/temporaryPowers";
+import { powerModes, type PowerMode, type DefeatEffect, getActivePowers, isPowerActive, resolvePowerContact, resetPowerContact } from "../../player/temporaryPowers";
 import { createVillainCombat, villainClips } from "../../villain/villainCombat";
 import { useVillainNavigation } from "../../villain/useVillainNavigation";
 import { useVillainHitReaction } from "../../villain/useVillainHitReaction";
@@ -12,9 +12,10 @@ import { useGameAnimations } from "../../player/useGameFrame";
 import { gameNow } from "../../player/gameFocus";
 import { gameTimers } from "../../player/gameFocus";
 import { useGLTF } from "@react-three/drei";
+import { useLoader } from "@react-three/fiber";
 import { CylinderCollider, IntersectionEnterPayload, IntersectionExitPayload } from "@react-three/rapier";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Box3, Group, Mesh, MeshBasicMaterial, Vector3 } from "three";
+import { AdditiveBlending, Box3, CanvasTexture, Group, Mesh, MeshBasicMaterial, Sprite, SpriteMaterial, TextureLoader, Vector3 } from "three";
 import { SkeletonUtils } from "three-stdlib";
 import { applyCharacterMaterials, villainMaterialProfile } from "../../characters/characterMaterials";
 import { applyNaturalMaterials } from "../../characters/naturalMaterials";
@@ -160,8 +161,39 @@ function canBonusVillainMove(fromX: number, fromZ: number, toX: number, toZ: num
   return nextClearance > getBonusRoamingClearance(fromX, fromZ) + 0.0001;
 }
 const powerDefeatHandlers = new Map<string, (reward: number) => void>();
-const powerImpactListeners = new Set<(position: Vector3, mode: PowerMode) => void>();
-function poweredContact(id: string, basePosition: Vector3) {
+const powerImpactListeners = new Set<(position: Vector3, effect: DefeatEffect) => void>();
+let impactParticleTexture: CanvasTexture | null = null;
+function getImpactParticleTexture() {
+  if (impactParticleTexture || typeof document === "undefined") return impactParticleTexture;
+  const canvas = document.createElement("canvas");
+  canvas.width = 32; canvas.height = 32;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  const gradient = context.createRadialGradient(16, 16, 1, 16, 16, 16);
+  gradient.addColorStop(0, "rgba(255,255,255,1)");
+  gradient.addColorStop(0.35, "rgba(255,255,255,.9)");
+  gradient.addColorStop(1, "rgba(255,255,255,0)");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 32, 32);
+  impactParticleTexture = new CanvasTexture(canvas);
+  impactParticleTexture.needsUpdate = true;
+  return impactParticleTexture;
+}
+let bloodSplatterTexture: CanvasTexture | null = null;
+function getBloodSplatterTexture() {
+  if (bloodSplatterTexture || typeof document === "undefined") return bloodSplatterTexture;
+  const canvas = document.createElement("canvas");
+  canvas.width = 96; canvas.height = 64;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  context.fillStyle = "#8f1724";
+  const drops = [[48, 32, 27, 13], [18, 25, 9, 5], [76, 21, 8, 4], [27, 48, 6, 3], [70, 47, 5, 3], [55, 13, 4, 3]];
+  drops.forEach(([x, y, rx, ry]) => { context.beginPath(); context.ellipse(x, y, rx, ry, (x - 48) * 0.02, 0, Math.PI * 2); context.fill(); });
+  bloodSplatterTexture = new CanvasTexture(canvas);
+  bloodSplatterTexture.needsUpdate = true;
+  return bloodSplatterTexture;
+}
+function poweredContact(id: string, basePosition: Vector3, defeatEffect: DefeatEffect) {
   const defeat = powerDefeatHandlers.get(id);
   if (!defeat) return false;
   return resolvePowerContact(true, id, (mode, reward) => {
@@ -170,7 +202,7 @@ function poweredContact(id: string, basePosition: Vector3) {
     defeat(reward);
     playVillainDefeatSound();
     // Emit one visual wisp per active power; gameplay still resolves exactly once.
-    getActivePowers().forEach(activeMode => powerImpactListeners.forEach(listener => listener(point, activeMode)));
+    powerImpactListeners.forEach(listener => listener(point, defeatEffect));
   });
 }
 type CombatPrototypeProps = {
@@ -183,6 +215,7 @@ type CombatPrototypeProps = {
   level: number;
   roundActive: boolean;
   onVillainDefeated: () => void;
+  defeatEffect: DefeatEffect;
 };
 
 export function CombatPrototype({
@@ -195,6 +228,7 @@ export function CombatPrototype({
   level,
   roundActive,
   onVillainDefeated,
+  defeatEffect,
 }: CombatPrototypeProps) {
   const contactDamage = () => { if (!isPowerActive()) onPlayerDamage(); };
   const [visibleEncounterCount, setVisibleEncounterCount] = useState(1);
@@ -226,6 +260,7 @@ export function CombatPrototype({
       <BonusVillainSystem
         key={`bonus-villains:${restartKey}`}
         onDefeat={(amount) => { onVillainReward(amount); onVillainDefeated(); }}
+        defeatEffect={defeatEffect}
         onPlayerDamage={contactDamage}
         roundActive={roundActive}
         level={level}
@@ -251,16 +286,18 @@ function BonusVillainSystem({
   onPlayerDamage,
   roundActive,
   level,
+  defeatEffect,
 }: {
   onDefeat: (amount: number) => void;
   onPlayerDamage: () => void;
   roundActive: boolean;
   level: number;
+  defeatEffect: DefeatEffect;
 }) {
   return (
     <group name="BonusVillains">
       {Array.from({ length: villainPoolSize }, (_, index) => (
-        <BonusVillain key={`bonus-pool:${index + 1}`} id={`bonus:${index + 1}`} initialSpot={index % bonusSpawnSpots.length} initiallyActive={index < activeVillainPoolSize()} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} roundActive={roundActive} level={level} />
+        <BonusVillain key={`bonus-pool:${index + 1}`} id={`bonus:${index + 1}`} initialSpot={index % bonusSpawnSpots.length} initiallyActive={index < activeVillainPoolSize()} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} roundActive={roundActive} level={level} defeatEffect={defeatEffect} />
       ))}
     </group>
   );
@@ -274,6 +311,7 @@ function BonusVillain({
   onPlayerDamage,
   roundActive,
   level,
+  defeatEffect,
 }: {
   id: string;
   initialSpot: number;
@@ -282,6 +320,7 @@ function BonusVillain({
   onPlayerDamage: () => void;
   roundActive: boolean;
   level: number;
+  defeatEffect: DefeatEffect;
 }) {
   const model = useGLTF(assetForDevice("/characters/villain.glb"), false, true);
   const scene = useMemo(() => {
@@ -408,7 +447,7 @@ function BonusVillain({
       playerWorldState.position.y - (positionRef.current.y + 1.2), 0);
     const touchingBody = bodyDx * bodyDx + bodyDy * bodyDy + bodyDz * bodyDz <= playerSphereRadius ** 2;
     if (touchingBody
-      && poweredContact(id, positionRef.current)) return;
+      && poweredContact(id, positionRef.current, defeatEffect)) return;
     if (inRange) onPlayerDamage();
     if (reaction.active()) { combat.setMotion("idle"); return; }
     const detected = sameLevel && playerDistanceSq <= bonusVillainDetectionRadiusSq;
@@ -487,61 +526,118 @@ function BonusVillain({
   );
 }
 
-type VillainBloodBurst = { id: number; position: Vector3 };
+type VillainImpact = { id: number; position: Vector3; effect: DefeatEffect };
 
 function PowerContactEffects() {
-  const [bloodBursts, setBloodBursts] = useState<VillainBloodBurst[]>([]);
+  const [impacts, setImpacts] = useState<VillainImpact[]>([]);
   const nextId = useRef(0);
   useEffect(() => {
-    const blood = (position: Vector3, _mode: PowerMode) => {
+    const impact = (position: Vector3, effect: DefeatEffect) => {
       const id = nextId.current++;
-      setBloodBursts(current => [...current.slice(-7), { id, position }]);
+      setImpacts(current => [...current.slice(-7), { id, position, effect }]);
     };
-    powerImpactListeners.add(blood);
-    return () => { powerImpactListeners.delete(blood); };
+    powerImpactListeners.add(impact);
+    return () => { powerImpactListeners.delete(impact); };
   }, []);
   return <group name="PowerContactEffects">
-    {bloodBursts.map(burst => <VillainBloodBurst key={burst.id} burst={burst}
-      onComplete={() => setBloodBursts(current => current.filter(({ id }) => id !== burst.id))} />)}
+    {impacts.map(impact => <VillainImpactEffect key={impact.id} impact={impact}
+      onComplete={() => setImpacts(current => current.filter(({ id }) => id !== impact.id))} />)}
   </group>;
 }
 
-function VillainBloodBurst({ onComplete, burst }: { onComplete: () => void; burst: VillainBloodBurst }) {
-  const { position } = burst;
+function VillainImpactEffect({ onComplete, impact }: { onComplete: () => void; impact: VillainImpact }) {
+  const { position, effect } = impact;
   const elapsedRef = useRef(0);
+  const groupRef = useRef<Group>(null);
+  const fireSheet = useLoader(TextureLoader, "/vfx/cluster-bomb/sprite-sheet.png");
+  const bloodSheet = useLoader(TextureLoader, "/vfx/blood-splat/sprite-sheet.png");
+  const stormSheet = useLoader(TextureLoader, "/vfx/lightning-strike/sprite-sheet.png");
+  const fireMap = useMemo(() => {
+    const map = fireSheet.clone();
+    map.needsUpdate = true;
+    map.repeat.set(1 / 8, 1 / 4);
+    map.magFilter = 1003;
+    map.minFilter = 1003;
+    return map;
+  }, [fireSheet]);
+  const bloodMap = useMemo(() => {
+    const map = bloodSheet.clone();
+    map.needsUpdate = true;
+    map.repeat.set(1 / 8, 1 / 2);
+    map.magFilter = 1003;
+    map.minFilter = 1003;
+    return map;
+  }, [bloodSheet]);
+  const stormMap = useMemo(() => {
+    const map = stormSheet.clone();
+    map.needsUpdate = true;
+    map.repeat.set(1 / 8, 1 / 3);
+    map.magFilter = 1003;
+    map.minFilter = 1003;
+    return map;
+  }, [stormSheet]);
 
   useGameFrame((_, delta) => {
     elapsedRef.current += delta;
-    const progress = Math.min(elapsedRef.current / 1.5, 1);
+    const progress = Math.min(elapsedRef.current / 1.15, 1);
+    if (groupRef.current) {
+      groupRef.current.scale.setScalar(0.92 + progress * 0.08);
+      groupRef.current.traverse((object) => {
+        const material = (object as Sprite | Mesh).material;
+        if (!material) return;
+        const materials = Array.isArray(material) ? material : [material];
+        materials.forEach((item) => { if ("opacity" in item) item.opacity = Math.max(0, 0.9 * (1 - progress)); });
+      });
+    }
+    if (effect === "fire") {
+      const frame = Math.min(30, Math.floor(elapsedRef.current / 0.07));
+      fireMap.offset.x = (frame % 8) / 8;
+      fireMap.offset.y = 1 - (Math.floor(frame / 8) + 1) / 4;
+      fireMap.needsUpdate = true;
+    }
+    if (effect === "blood") {
+      const frame = Math.min(15, Math.floor(elapsedRef.current / 0.07));
+      bloodMap.offset.x = (frame % 8) / 8;
+      bloodMap.offset.y = 1 - (Math.floor(frame / 8) + 1) / 2;
+      bloodMap.needsUpdate = true;
+    }
+    if (effect === "shock") {
+      const frame = Math.min(17, Math.floor(elapsedRef.current / 0.08));
+      stormMap.offset.x = (frame % 8) / 8;
+      stormMap.offset.y = 1 - (Math.floor(frame / 8) + 1) / 3;
+      stormMap.needsUpdate = true;
+    }
     if (progress >= 1) onComplete();
   });
 
+  const texture = getImpactParticleTexture();
+  const splatter = getBloodSplatterTexture();
+  if (effect === "shock") return <group ref={groupRef} position={position}>
+    <sprite position={[0, -0.82, 0]} scale={1.45}><spriteMaterial map={splatter} color="#8f1724" transparent opacity={0.75} depthWrite={false} /></sprite>
+    <sprite position={[0, 0.38, 0]} scale={[1.55, 1.65, 1]}><spriteMaterial map={stormMap} color="#d1a914" transparent opacity={0.9} depthWrite={false} blending={AdditiveBlending} /></sprite>
+    {[
+      [-0.42, 0.55, 0, 0.28], [0.35, 0.72, 0.12, 0.22], [0.02, 1.12, -0.18, 0.18],
+      [-0.62, 0.18, 0.08, 0.13], [0.58, 0.3, -0.12, 0.12],
+    ].map(([x, y, z, size], index) => <sprite key={index} position={[x, y, z]} scale={size}>
+      <spriteMaterial map={texture} color="#d1a914" transparent opacity={0.86} depthWrite={false} blending={AdditiveBlending} />
+    </sprite>)}
+  </group>;
+  if (effect === "fire") return <group ref={groupRef} position={position}>
+    <sprite position={[0, -0.82, 0]} scale={1.45}><spriteMaterial map={splatter} color="#8f1724" transparent opacity={0.75} depthWrite={false} /></sprite>
+    <sprite position={[0, 0.36, 0]} scale={[1.45, 1.8, 1]}>
+      <spriteMaterial map={fireMap} color="#d34a28" transparent opacity={0.88} depthWrite={false} blending={AdditiveBlending} />
+    </sprite>
+    {[[-0.45, 0.82, 0.08, 0.1], [0.38, 0.95, -0.1, 0.08], [0.12, 1.15, 0.04, 0.06]].map(([x, y, z, size], index) => <sprite key={index} position={[x, y, z]} scale={size}>
+      <spriteMaterial map={texture} color="#d34a28" transparent opacity={0.82} depthWrite={false} blending={AdditiveBlending} />
+    </sprite>)}
+  </group>;
   return (
-    <group position={position}>
-      <mesh position={[0, -0.8, 0]} scale={[1.55, 0.12, 1.25]}>
-        <sphereGeometry args={[0.42, 12, 6]} />
-        <meshBasicMaterial color="#5b101b" transparent opacity={0.82} depthWrite={false} />
-      </mesh>
+    <group ref={groupRef} position={position}>
+      <sprite position={[0, -0.72, 0]} scale={[1.3, 1.15, 1]}><spriteMaterial map={bloodMap} color="#7b1323" transparent opacity={0.88} depthWrite={false} /></sprite>
       {[
-        [-0.18, -0.82, 0.08, 0.42, 0.06, 0.18, "#7b1323"],
-        [0.28, -0.81, -0.12, 0.3, 0.05, 0.12, "#951b2b"],
-        [-0.5, -0.8, -0.18, 0.2, 0.035, 0.08, "#6d101d"],
-      ].map(([x, y, z, sx, sy, sz, color], index) => (
-        <mesh key={`pool-${index}`} position={[x as number, y as number, z as number]} scale={[sx as number, sy as number, sz as number]}>
-          <sphereGeometry args={[1, 10, 5]} />
-          <meshBasicMaterial color={color as string} transparent opacity={0.72} depthWrite={false} />
-        </mesh>
-      ))}
-      {[ 
-        [-0.42, -0.48, 0.06, 0.12], [0.38, -0.56, -0.1, 0.1], [-0.18, -0.42, 0.32, 0.08],
-        [0.2, -0.34, -0.34, 0.07], [-0.58, -0.3, -0.2, 0.055], [0.55, -0.25, 0.2, 0.05],
-        [0.06, -0.18, 0.42, 0.042], [-0.3, -0.12, -0.42, 0.035],
-      ].map(([x, y, z, size], index) => (
-        <mesh key={index} position={[x, y, z]} scale={size}>
-          <sphereGeometry args={[1, 8, 6]} />
-          <meshBasicMaterial color="#c32638" transparent opacity={0.78} depthWrite={false} />
-        </mesh>
-      ))}
+        [-0.48, 0.15, 0.04, 0.13], [-0.32, 0.42, 0.1, 0.09], [-0.12, 0.7, -0.04, 0.075],
+        [0.18, 0.52, 0.14, 0.08], [0.42, 0.26, -0.08, 0.065], [0.58, 0.68, 0.04, 0.05],
+      ].map(([x, y, z, size], index) => <sprite key={index} position={[x, y, z]} scale={size}><spriteMaterial map={texture} color={index % 2 ? "#a51e2d" : "#6d101d"} transparent opacity={0.8} depthWrite={false} /></sprite>)}
     </group>
   );
 }

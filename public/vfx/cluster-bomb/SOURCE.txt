@@ -1,0 +1,10 @@
+Asset: PVFX Foundry — cluster-bomb sprite sheet (lit/grid)
+Author: nerijs / Pixel VFX Studio
+Source: https://nerijs.itch.io/pvfx-foundry
+License: CC0 1.0
+License details: https://creativecommons.org/publicdomain/zero/1.0/
+
+The PVFX Foundry page states that its sprite sheets and metadata may be used,
+modified, and redistributed in commercial and non-commercial games with no
+attribution required. This project uses the cluster-bomb sheet as the
+temporary Fire defeat burst.

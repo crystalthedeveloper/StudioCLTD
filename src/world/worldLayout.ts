@@ -57,8 +57,13 @@ export const routePickupPositions: Record<string, GroundPoint> = {
   'light-4': [12, 16], 'light-5': [-15, -8],
 };
 export const bonusRouteSpots: GroundPoint[] = [
-  [-3.2, -38], [3.2, -62], [-2.8, -88], [2.8, -114],
-  [-3.2, -140], [3.2, -166], [-2.8, -192], [2.8, -218],
-  [-3.2, -244], [3.2, -270], [-2.8, -296], [2.8, -322],
-  [-3.2, -348], [2.8, -374], [-3.2, -400], [2.8, -414],
+  // One unique starting location per active pooled villain. Alternating
+  // lanes keeps the road readable while distributing encounters from the
+  // opening stretch through the final section.
+  [-3.2, -32], [3.2, -48], [-2.8, -64], [2.8, -80],
+  [-3.2, -96], [3.2, -112], [-2.8, -128], [2.8, -144],
+  [-3.2, -160], [3.2, -176], [-2.8, -192], [2.8, -208],
+  [-3.2, -224], [3.2, -240], [-2.8, -256], [2.8, -272],
+  [-3.2, -288], [3.2, -304], [-2.8, -320], [2.8, -336],
+  [-3.2, -352], [3.2, -368], [-2.8, -384], [2.8, -400],
 ];

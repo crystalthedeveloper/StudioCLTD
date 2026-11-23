@@ -35,6 +35,8 @@ const initialControls: MovementControls = {
 
 const keyboardControls = { ...initialControls };
 const touchControls = { ...initialControls };
+let touchSteering = 0;
+let touchThrottle = 0;
 const subscribers = new Set<(controls: MovementControls) => void>();
 
 function mergeControls(): MovementControls {
@@ -56,8 +58,15 @@ function resetControls() {
     keyboardControls[key] = false;
     touchControls[key] = false;
   });
+  touchSteering = 0;
+  touchThrottle = 0;
   emitControls();
 }
+
+export function setTouchSteering(value: number) { touchSteering = Math.max(-1, Math.min(1, value)); }
+export function getTouchSteering() { return touchSteering; }
+export function setTouchThrottle(value: number) { touchThrottle = Math.max(-1, Math.min(1, value)); }
+export function getTouchThrottle() { return touchThrottle; }
 
 function emitControls() {
   const controls = mergeControls();

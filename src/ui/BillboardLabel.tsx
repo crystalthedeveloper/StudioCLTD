@@ -19,6 +19,7 @@ type BillboardLabelProps = {
   position?: [number, number, number];
   outlineColor?: string;
   outlineWidth?: number;
+  extruded?: boolean;
 };
 
 export function BillboardLabel({
@@ -30,6 +31,7 @@ export function BillboardLabel({
   position = [0, 1.05, 0],
   outlineColor = "#05070b",
   outlineWidth = 0.012,
+  extruded = false,
 }: BillboardLabelProps) {
   const groupRef = useRef<Group>(null);
 
@@ -54,6 +56,20 @@ export function BillboardLabel({
 
   return (
     <group ref={groupRef} position={position}>
+      {extruded && <Text
+        position={[0, 0, -0.028]}
+        material-depthTest={true}
+        material-depthWrite={true}
+        anchorX="center"
+        anchorY="middle"
+        color="#070a10"
+        font={gameTextFont}
+        fontSize={fontSize}
+        lineHeight={lineHeight}
+        maxWidth={maxWidth}
+      >
+        {children}
+      </Text>}
       <Text
         material-depthTest={true}
         material-depthWrite={true}

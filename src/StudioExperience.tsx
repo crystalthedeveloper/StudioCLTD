@@ -1,6 +1,6 @@
 import { createContactDamageGate } from "./player/contactDamage";
 import { createGuidePauseSession } from "./player/guidePauseSession";
-import { resetTemporaryPowers } from "./player/temporaryPowers";
+import { resetTemporaryPowers, type DefeatEffect } from "./player/temporaryPowers";
 import { cancelCruise, toggleCruise } from "./player/useKeyboardControls";
 import { gameNow } from "./player/gameFocus";
 import { Canvas, useFrame } from "@react-three/fiber";
@@ -73,6 +73,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
   const [runVillains, setRunVillains] = useState(0);
   const [runStartedAt] = useState(() => Date.now());
   const [personalBest, setPersonalBest] = useState<RunScore | null>(() => readPersonalBest());
+  const defeatEffect: DefeatEffect = (["blood", "shock", "fire"] as const)[Math.floor(((level - 1) % 9) / 3)];
   const levelTimerRef = useRef<number | null>(null);
   const returnTimerRef = useRef<number | null>(null);
 
@@ -216,9 +217,9 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
     resetTemporaryPowers();
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || event.altKey || event.ctrlKey || event.metaKey || !isGameFocused()) return;
-      if (event.code !== "Space") return;
       const target = event.target;
       if (target instanceof HTMLElement && target.closest("input, textarea, [contenteditable=true]")) return;
+      if (event.code !== "Space") return;
       if (event.code === "Space" && target instanceof HTMLElement && target.closest("button:not(.game-hud__fix):not(.game-hud__power-bar)")) return;
       event.preventDefault();
       if (event.code === "Space") toggleCruise();
@@ -523,6 +524,7 @@ export function StudioExperience({ onLoadProgress, onOpenWebsite, onReady, onRes
                 level={level}
                 roundActive={roundActive}
                 onVillainDefeated={handleVillainDefeated}
+                defeatEffect={defeatEffect}
                 onOpenShare={() => {
                   document.exitPointerLock?.();
                   setGameFocused(false);

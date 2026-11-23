@@ -19,6 +19,7 @@ import type { TransportDestination } from "./systems/TransportPads";
 import { roadPoint } from "./roadSurface";
 import { playGeneralFixedSound, playSectionFixedSound } from "../audio/collectibleSounds";
 import { homeBaseCenter } from "./systems/HomeBase";
+import type { DefeatEffect } from "../player/temporaryPowers";
 
 type StudioWorldProps = {
   damageFlashUntil: number;
@@ -37,6 +38,7 @@ type StudioWorldProps = {
   level: number;
   roundActive: boolean;
   onVillainDefeated: () => void;
+  defeatEffect: DefeatEffect;
 };
 
 const requiredSectionTriggers: Record<string, number> = {
@@ -50,7 +52,7 @@ const requiredSectionTriggers: Record<string, number> = {
   showcase: 1,
 };
 
-export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, onHealthCollect, onOpenShare, onPlayerDamage, onReset, onSectionComplete, restartKey, returning, respawnCameraSnap, carHidden, startCamera, level, roundActive, onVillainDefeated }: StudioWorldProps) {
+export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, onHealthCollect, onOpenShare, onPlayerDamage, onReset, onSectionComplete, restartKey, returning, respawnCameraSnap, carHidden, startCamera, level, roundActive, onVillainDefeated, defeatEffect }: StudioWorldProps) {
   const groundMaterial = useSharedGroundMaterial();
   const dialogueIdRef = useRef(0);
   const activatedSectionTriggersRef = useRef<Record<string, Set<string>>>({});
@@ -139,6 +141,7 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
         level={level}
         roundActive={roundActive}
         onVillainDefeated={onVillainDefeated}
+        defeatEffect={defeatEffect}
         onSectionTrigger={recordSectionTrigger}
         onPlayerDialogue={(text) => setPlayerDialogue(createDialogue(text))}
         onSectionResolved={(sectionId) => {

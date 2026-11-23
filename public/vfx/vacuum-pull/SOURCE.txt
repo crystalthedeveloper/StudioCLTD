@@ -1,0 +1,9 @@
+Asset: PVFX Foundry — vacuum-pull sprite sheet (lit/grid)
+Author: nerijs / Pixel VFX Studio
+Source: https://nerijs.itch.io/pvfx-foundry
+License: CC0 1.0
+License details: https://creativecommons.org/publicdomain/zero/1.0/
+
+Used for the temporary Shock defeat effect. The source pack states that its
+sprite sheets and metadata may be used, modified, and redistributed in
+commercial and non-commercial games with no attribution required.

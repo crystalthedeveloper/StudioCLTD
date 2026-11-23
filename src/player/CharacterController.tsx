@@ -6,7 +6,7 @@ import { MathUtils, Vector3 } from "three";
 import { playerCenterHeightReduction } from "./playerDimensions";
 import { PlayerCharacter } from "./PlayerCharacter";
 import { ThirdPersonCamera } from "./ThirdPersonCamera";
-import { useKeyboardControls, cancelCruise } from "./useKeyboardControls";
+import { getTouchSteering, getTouchThrottle, useKeyboardControls, cancelCruise } from "./useKeyboardControls";
 import { DialogueMessage } from "../ui/DialogueBubble";
 import { playerWorldState } from "../world/playerWorldState";
 import type { TransportDestination } from "../world/systems/TransportPads";
@@ -24,6 +24,7 @@ const mobileRunSpeed = 18;
 const mobileBoostedRunSpeed = 30;
 const mobileReverseSpeed = 15;
 const turnSpeed = 2.2;
+const mobileTurnSpeed = 1.35;
 const acceleration = 9;
 const braking = 15;
 const maxFrameDelta = 1 / 30;
@@ -62,6 +63,7 @@ export function CharacterController({
   const controlsRef = useRef(controls);
   const movementDirectionRef = useRef(new Vector3());
   const forwardBackSpeedRef = useRef(0);
+  const mobileSteeringRef = useRef(0);
   const spawn = useMemo<[number, number, number]>(() => [0, 1.34, 18], []);
   const checkpointRef = useRef<[number, number, number]>(spawn);
   const teleportTimerRef = useRef<number | null>(null);
@@ -143,8 +145,18 @@ export function CharacterController({
     const translation = body.translation();
     playerWorldState.position.set(translation.x, translation.y, translation.z);
     if (controls.backward) cancelCruise();
-    const throttle = Number(controls.forward || (controls as typeof controls & { cruise?: boolean }).cruise) - Number(controls.backward);
-    const turnInput = Number(controls.left) - Number(controls.right);
+    const touchThrottle = getTouchThrottle();
+    const throttle = Math.abs(touchThrottle) > 0.001
+      ? touchThrottle
+      : Number(controls.forward || (controls as typeof controls & { cruise?: boolean }).cruise) - Number(controls.backward);
+    const touchSteering = getTouchSteering();
+    const steeringTarget = compactControls && Math.abs(touchSteering) > 0.001
+      ? touchSteering
+      : Number(controls.left) - Number(controls.right);
+    mobileSteeringRef.current = compactControls
+      ? MathUtils.damp(mobileSteeringRef.current, steeringTarget, 10, frameDelta)
+      : steeringTarget;
+    const turnInput = mobileSteeringRef.current;
     const forwardBackSpeed = hasPowerSpeedBoost()
       ? (compactControls ? mobileBoostedRunSpeed : boostedRunSpeed)
       : (compactControls ? mobileRunSpeed : baseRunSpeed);
@@ -152,7 +164,7 @@ export function CharacterController({
     const steeringGrip = Math.min(1, Math.abs(speed) / 3.2);
     const highSpeedStability = 1 - 0.28 * Math.min(1, Math.abs(speed) / forwardBackSpeed);
     if (turnInput !== 0 && steeringGrip > 0.02) {
-      yawRef.current += turnInput * turnSpeed * steeringGrip * highSpeedStability * (speed < 0 ? -1 : 1) * frameDelta;
+      yawRef.current += turnInput * (compactControls ? mobileTurnSpeed : turnSpeed) * steeringGrip * highSpeedStability * (speed < 0 ? -1 : 1) * frameDelta;
     }
 
     playerForward.set(-Math.sin(yawRef.current), 0, -Math.cos(yawRef.current));

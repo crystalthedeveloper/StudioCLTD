@@ -780,8 +780,8 @@ canvas {
 }
 .direction-controls--arrows { display: grid !important; grid-template-columns: repeat(3, clamp(52px, 15vw, 68px)) !important; grid-template-rows: repeat(2, clamp(52px, 15vw, 68px)) !important; gap: 7px !important; width: max-content; height: max-content; }
 .direction-controls--arrows .direction-controls__button { min-width: 52px; min-height: 52px; border: 1px solid rgba(242, 201, 76, .48); border-radius: 12px; background: rgba(9, 14, 23, .9); color: #f2c94c; font-size: clamp(24px, 7vw, 34px); }
-.direction-controls--mobile { display: flex !important; align-items: center; justify-content: center !important; width: max-content !important; gap: 12px; pointer-events: none; }
-.direction-controls--mobile .direction-controls__joystick { flex: 0 0 auto; }
+.direction-controls--mobile { position: fixed !important; left: max(12px, env(safe-area-inset-left)) !important; right: max(12px, env(safe-area-inset-right)) !important; bottom: max(12px, env(safe-area-inset-bottom)) !important; display: flex !important; align-items: center; justify-content: space-between !important; width: auto !important; margin: 0 !important; gap: 12px; pointer-events: none; }
+.direction-controls--mobile .direction-controls__joystick { width: clamp(90px, 22.4vw, 118px); height: clamp(90px, 22.4vw, 118px); flex: 0 0 clamp(90px, 22.4vw, 118px); }
 .direction-controls__gas { width: clamp(90px, 22.4vw, 118px) !important; height: clamp(90px, 22.4vw, 118px) !important; min-width: 0 !important; min-height: 0 !important; aspect-ratio: 1 / 1; flex: 0 0 clamp(90px, 22.4vw, 118px); border: 2px solid rgba(242, 201, 76, .42); border-radius: 50%; background: radial-gradient(circle, rgba(30, 37, 50, .76), rgba(6, 8, 14, .88) 68%); box-shadow: inset 0 0 0 10px rgba(0, 0, 0, .18), 0 12px 32px rgba(0, 0, 0, .45); pointer-events: auto; touch-action: none; }
 .direction-controls__gas:active { border-color: rgba(242, 201, 76, .8); box-shadow: inset 0 0 0 10px rgba(0, 0, 0, .22), 0 0 18px rgba(242, 201, 76, .2); }
 

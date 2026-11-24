@@ -7,12 +7,12 @@ type RoadDecal = { text: string; z: number; lateral: number; color: string; widt
 const decals: RoadDecal[] = [
   { text: "ACCESS DENIED", z: -42, lateral: -4.5, color: "#7f1d2b", width: 3.8, height: .64, angle: -.03 },
   { text: "FATAL ERROR", z: -78, lateral: 4.6, color: "#7f1d2b", width: 3.2, height: .62, angle: .02 },
-  { text: "404 — PAGE NOT FOUND", z: -112, lateral: -4.3, color: "#c6c0ad", width: 5.4, height: .64, angle: .025 },
-  { text: "SCRIPT FAILED", z: -142, lateral: 4.6, color: "#c6c0ad", width: 3.7, height: .56, angle: -.025 },
+  { text: "404 — PAGE NOT FOUND", z: -112, lateral: -4.3, color: "#7f1d2b", width: 5.4, height: .64, angle: .025 },
+  { text: "SCRIPT FAILED", z: -142, lateral: 4.6, color: "#7f1d2b", width: 3.7, height: .56, angle: -.025 },
   { text: "503 — SERVICE UNAVAILABLE", z: -180, lateral: -4.2, color: "#7f1d2b", width: 5.2, height: .58, angle: .025 },
-  { text: "RETRY", z: -212, lateral: 4.7, color: "#c6c0ad", width: 1.9, height: .52, angle: -.02 },
-  { text: "CONNECTION LOST", z: -260, lateral: -4.5, color: "#c6c0ad", width: 4.2, height: .6, angle: -.02 },
-  { text: "connection = null;", z: -294, lateral: 4.4, color: "#c6c0ad", width: 3.8, height: .42, angle: .02 },
+  { text: "RETRY", z: -212, lateral: 4.7, color: "#7f1d2b", width: 1.9, height: .52, angle: -.02 },
+  { text: "CONNECTION LOST", z: -260, lateral: -4.5, color: "#7f1d2b", width: 4.2, height: .6, angle: -.02 },
+  { text: "connection = null;", z: -294, lateral: 4.4, color: "#7f1d2b", width: 3.8, height: .42, angle: .02 },
   { text: "SYSTEM FAILURE", z: -360, lateral: -4.4, color: "#7f1d2b", width: 4.2, height: .62, angle: .025 },
 ];
 

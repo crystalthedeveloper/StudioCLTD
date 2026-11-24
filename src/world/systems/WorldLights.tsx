@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { AmbientLight, DirectionalLight, Object3D } from "three";
 import { useGameFrame } from "../../player/useGameFrame";
 import { playerWorldState } from "../playerWorldState";
-import { sunlightOffset } from "../visualQuality";
+import { isCompactVisualBudget, sunlightOffset } from "../visualQuality";
+import { Sparkles } from "@react-three/drei";
+import { hubSections } from "../hubSections";
 
 const playerLightingLayer = 2;
 const villainLightingLayer = 1;
@@ -53,8 +55,8 @@ export function WorldLights() {
 
   return (
     <>
-      <ambientLight intensity={0.62} color={WINTER_THEME_ENABLED ? "#bacddd" : "#fffdf8"} />
-      <hemisphereLight intensity={0.9} color={WINTER_THEME_ENABLED ? "#c2d6eb" : "#eef7fc"} groundColor={WINTER_THEME_ENABLED ? "#6d7c8d" : "#85877f"} />
+      <ambientLight intensity={0.72} color={WINTER_THEME_ENABLED ? "#bacddd" : "#fffdf8"} />
+      <hemisphereLight intensity={0.98} color={WINTER_THEME_ENABLED ? "#c2d6eb" : "#eef7fc"} groundColor={WINTER_THEME_ENABLED ? "#6d7c8d" : "#85877f"} />
       <ambientLight ref={playerFillRef} intensity={0.56} color="#fffdf8" />
       <directionalLight
         ref={playerKeyRef}
@@ -100,8 +102,27 @@ export function WorldLights() {
         shadow-mapSize-height={shadowSize}
         shadow-mapSize-width={shadowSize}
       />
-      <directionalLight color="#9fb9d4" intensity={0.52} position={[20, 28, -16]} />
+      <directionalLight color="#9fb9d4" intensity={0.64} position={[20, 28, -16]} />
       <directionalLight ref={lightningRef} color="#dbe8ff" intensity={0} position={[-24, 36, -80]} />
+      <Sparkles
+        count={isCompactVisualBudget() ? 12 : 28}
+        scale={[42, 16, 520]}
+        position={[0, 7, -215]}
+        size={0.7}
+        speed={0.12}
+        opacity={0.28}
+        color="#c8d9df"
+      />
+      {hubSections.slice(0, 4).map((section) => (
+        <pointLight
+          key={`screen-light-${section.id}`}
+          position={[section.position[0], section.position[1] + 3.2, section.position[2] - 1.8]}
+          color="#aebfd0"
+          intensity={0.16}
+          distance={9}
+          decay={2}
+        />
+      ))}
     </>
   );
 }

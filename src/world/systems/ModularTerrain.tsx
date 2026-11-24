@@ -28,7 +28,6 @@ import {
 import { destinationPlatformRadius, hubSections, sectionRampApproachLength, sectionRampWidth } from "../hubSections";
 import { roadCenterX, roadHalfWidth, roadHeight, roadPoint, roadTangent } from "../roadSurface";
 import { isInsideTriggerExclusion } from "../worldLayout";
-import { brandYellow } from "../../player/effectColors";
 
 
 export const concreteTexturePaths: string[] = [
@@ -337,27 +336,12 @@ export function ModularTerrain({ material }: { material: MeshStandardMaterial })
   const roadMaterial = useMemo(() => createRoadMaterial(asphaltSource, normalSource, roughnessSource), [asphaltSource, normalSource, roughnessSource]);
   const roadMeshRef = useRef<Mesh>(null);
   const roadGeometry = useMemo(() => createRoadRibbonGeometry(0, roadHalfWidth * 2), []);
-  const yellowLineLeftGeometry = useMemo(() => createRoadRibbonGeometry(0.15, 0.08, 0.035), []);
-  const yellowLineRightGeometry = useMemo(() => createRoadRibbonGeometry(-0.15, 0.08, 0.035), []);
-  const centerLineMaterial = useMemo(() => new MeshBasicMaterial({
-    color: brandYellow,
-    transparent: true,
-    opacity: 0.74,
-    depthWrite: false,
-    toneMapped: true,
-    polygonOffset: true,
-    polygonOffsetFactor: -1,
-    polygonOffsetUnits: -1,
-  }), []);
   useEffect(() => () => {
     if (typeof roadMaterial.dispose === "function") roadMaterial.dispose();
   }, [roadMaterial]);
   useEffect(() => () => {
     roadGeometry.dispose();
-    yellowLineLeftGeometry.dispose();
-    yellowLineRightGeometry.dispose();
-  }, [roadGeometry, yellowLineLeftGeometry, yellowLineRightGeometry]);
-  useEffect(() => () => centerLineMaterial.dispose(), [centerLineMaterial]);
+  }, [roadGeometry]);
 
   return (
     <group name="WeatheredConcreteTerrain">
@@ -366,9 +350,6 @@ export function ModularTerrain({ material }: { material: MeshStandardMaterial })
         <mesh ref={roadMeshRef} name="ContinuousCurvedRoadVisual" geometry={roadGeometry} material={roadMaterial} receiveShadow />
         <RoadZoneTints />
         <RoadBloodDecals textures={bloodTextures} roadMeshRef={roadMeshRef} />
-        <RoadReflectors />
-        <mesh name="DoubleYellowLineLeft" geometry={yellowLineLeftGeometry} material={centerLineMaterial} renderOrder={3} />
-        <mesh name="DoubleYellowLineRight" geometry={yellowLineRightGeometry} material={centerLineMaterial} renderOrder={3} />
       </group>
     </group>
   );
@@ -483,18 +464,6 @@ function RoadBloodDecals({ textures, roadMeshRef }: { textures: Texture[]; roadM
       })}
     </group>
   );
-}
-
-function RoadReflectors() {
-  const positions = useMemo(() => [-72, -172, -272, -372, -472, -572, -672, -772].map((z) => roadPoint(0, z, 0.055)), []);
-  return <group name="FaintYellowRoadReflectors">
-    {positions.map((position, index) => (
-      <mesh key={`road-reflector:${index}`} position={position} renderOrder={4}>
-        <sphereGeometry args={[0.055, 6, 4]} />
-        <meshBasicMaterial color="#b89d18" toneMapped opacity={0.62} transparent depthWrite={false} />
-      </mesh>
-    ))}
-  </group>;
 }
 
 function RoadCollision() {

@@ -83,7 +83,7 @@ export function GameGuide({ onClose }: { onClose: () => void }) {
                 <Item image={<span className="game-guide__power-dot" style={{ backgroundColor: powerModes.rapid.color }} aria-hidden="true" />}><strong>Gold smoke</strong>Shock Power + faster movement</Item>
                 <Item image={logo("#991b1b")}><strong>Red symbol</strong>Penalty</Item>
                 <Item image={logo("#a855f7")}><strong>Purple symbol</strong>Share</Item>
-                <Item image={logo("#dedede")}><strong>White logo</strong>Decorative</Item>
+                <Item image={logo("#2583e8")}><strong>Blue symbol</strong>Contact</Item>
               </ul>}
             </div>
           </section>)}

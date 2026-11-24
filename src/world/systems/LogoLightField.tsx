@@ -10,7 +10,6 @@ import { useGLTF, useTexture } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
 import {
   BallCollider,
-  CuboidCollider,
   IntersectionEnterPayload,
   IntersectionExitPayload,
   RapierCollider,
@@ -35,7 +34,6 @@ const worldLogoRotation = -0.35;
 const decorativeLogoScale = 0.72;
 // Keep decorative logos outside the driving line and alternate sides with
 // enough longitudinal separation to read as painted road marks, not a cluster.
-const decorativeLogoOffsets = [-6.2, 6.1, -5.5, 5.8, -6.5, 6.3, -5.8, 6.0] as const;
 const pickupColliderRadius = 1.55;
 const collectibleRespawnMs = 28000;
 const healthGroupRespawnMs = 36000;
@@ -49,7 +47,7 @@ const collectibleSpacing = 5;
 const placementSearchStep = 1.25;
 const placementSearchDirections = 32;
 
-type LogoKind = "coin" | "penalty" | "contact" | "share" | "light" | "dark";
+type LogoKind = "coin" | "penalty" | "contact" | "share" | "dark";
 
 type PlazaLogo = {
   height?: number;
@@ -80,11 +78,6 @@ const plazaLogos: PlazaLogo[] = [
   { id: "penalty-1", kind: "penalty", position: [42, -15] },
   { id: "penalty-2", kind: "penalty", position: [-39, -20] },
   { id: "penalty-3", kind: "penalty", position: [48, 4] },
-  { id: "light-1", kind: "light", position: [16, -23] },
-  { id: "light-2", kind: "light", position: [34, 12] },
-  { id: "light-3", kind: "light", position: [-42, -32] },
-  { id: "light-4", kind: "light", position: [-8, 48] },
-  { id: "light-5", kind: "light", position: [-58, 6] },
   { id: "dark-1", kind: "dark", position: [-34, 30], rotationOffset: -0.1 },
   { id: "dark-2", kind: "dark", position: [36, -28], rotationOffset: 0.12 },
   { id: "dark-3", kind: "dark", position: [10, 52], rotationOffset: -0.05 },
@@ -182,7 +175,6 @@ const logoColors: Record<LogoKind, string> = {
   penalty: "#991b1b",
   contact: "#2583e8",
   share: "#a855f7",
-  light: "#ffffff",
   dark: "#000",
 };
 
@@ -191,7 +183,7 @@ function createSharedMaterial(kind: LogoKind) {
   return new MeshStandardMaterial({
     color,
     emissive: color,
-    emissiveIntensity: kind === "light" ? 0.12 : kind === "coin" ? 0.55 : kind === "contact" || kind === "share" ? 0.65 : kind === "dark" ? 0.08 : 0.55,
+    emissiveIntensity: kind === "coin" ? 0.55 : kind === "contact" || kind === "share" ? 0.65 : kind === "dark" ? 0.08 : 0.55,
     metalness: 0.04,
     roughness: 0.72,
     toneMapped: false,
@@ -248,7 +240,6 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
       penalty: createSharedMaterial("penalty"),
       contact: createSharedMaterial("contact"),
       share: createSharedMaterial("share"),
-      light: createSharedMaterial("light"),
     }),
     [],
   );
@@ -258,7 +249,6 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
       penalty: createLogoTemplate(scene, materials.penalty),
       contact: createLogoTemplate(scene, materials.contact),
       share: createLogoTemplate(scene, materials.share),
-      light: createLogoTemplate(scene, materials.light),
       dark: pickupVisuals[1].template,
     }),
     [materials, scene, pickupVisuals],
@@ -289,8 +279,8 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
       });
       let decorativeIndex = 0;
       const restartRelocated = [...roadMoney, ...homeBaseLogos].map((logo, index) => {
-        if (logo.kind !== "penalty" && logo.kind !== "light") return logo;
-        // Keep red and white road logos in the safe road zone, but give them a
+        if (logo.kind !== "penalty") return logo;
+        // Keep red road logos in the safe road zone, but give them a
         // fresh deterministic spot each full restart instead of reusing the
         // same old-world coordinates.
         let seed = (restartKey + 1) * 1103515245 + (index + 17) * 12345;
@@ -298,9 +288,7 @@ export function LogoLightField({ onCoinCollect, onHealthCollect, onOpenShare, on
           seed = (seed * 1664525 + 1013904223) >>> 0;
           return seed / 4294967296;
         };
-        const lateral = logo.kind === "penalty"
-          ? (decorativeIndex % 2 === 0 ? -5.5 : 5.5)
-          : decorativeLogoOffsets[decorativeIndex % decorativeLogoOffsets.length];
+        const lateral = decorativeIndex % 2 === 0 ? -5.5 : 5.5;
         // Give red penalty logos a small forward nudge so they do not sit
         // directly in the previous road mark's visual band.
         const forwardOffset = logo.kind === "penalty" ? -12 : (next() - 0.5) * 4;
@@ -566,7 +554,7 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, goldScene, surface, 
     [cancelContactCountdown, logo.kind],
   );
 
-  if (!available && logo.kind !== "light") return null;
+  if (!available) return null;
 
   const position: [number, number, number] = [logo.position[0], surface.y, logo.position[1]];
   const standardVisual = (
@@ -600,16 +588,6 @@ function PlazaLogoInstance({ healthRespawnGeneration, logo, goldScene, surface, 
       ) : standardVisual}
     </>
   );
-
-  if (logo.kind === "light") {
-    return (
-      <RigidBody type="fixed" colliders={false} position={[logo.position[0], logo.height ?? floorLogoY, logo.position[1]]} name={`WhiteLogoObstacle:${logo.id}`}>
-        {/* Keep the visible logo solid, but keep its collision footprint tight to the art. */}
-        <CuboidCollider args={[0.72, 0.34, 0.18]} position={[0, 0.34, 0]} />
-        {visual}
-      </RigidBody>
-    );
-  }
 
   return (
     <RigidBody type="fixed" colliders={false} position={position} name={`PlazaLogo:${logo.id}`}>

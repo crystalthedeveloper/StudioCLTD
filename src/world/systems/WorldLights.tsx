@@ -1,6 +1,6 @@
 import { WINTER_THEME_ENABLED } from "../winterTheme";
 import { useEffect, useRef, useState } from "react";
-import { AmbientLight, DirectionalLight, Object3D } from "three";
+import { AdditiveBlending, AmbientLight, CanvasTexture, DirectionalLight, Group, Object3D, Sprite, SpriteMaterial } from "three";
 import { useGameFrame } from "../../player/useGameFrame";
 import { playerWorldState } from "../playerWorldState";
 import { isCompactVisualBudget, sunlightOffset } from "../visualQuality";
@@ -123,6 +123,64 @@ export function WorldLights() {
           decay={2}
         />
       ))}
+      <FloatingRedEmbers />
     </>
   );
+}
+
+const emberPositions = [
+  [-8, 3.2, -38], [7, 5.6, -76], [-10, 2.6, -118], [9, 4.4, -156],
+  [-7, 6.1, -198], [8, 3.4, -238], [-11, 4.8, -282], [10, 6.4, -326],
+  [-6, 3.1, -372], [6, 5.2, -418], [16, 4.5, -92], [-17, 3.8, -252],
+] as const;
+
+function createEmberTexture() {
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  const glow = context.createRadialGradient(32, 32, 2, 32, 32, 32);
+  glow.addColorStop(0, "rgba(255, 100, 72, 1)");
+  glow.addColorStop(0.2, "rgba(210, 35, 35, .9)");
+  glow.addColorStop(0.58, "rgba(125, 12, 25, .28)");
+  glow.addColorStop(1, "rgba(70, 0, 10, 0)");
+  context.fillStyle = glow;
+  context.fillRect(0, 0, 64, 64);
+  const texture = new CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function FloatingRedEmbers() {
+  const groupRef = useRef<Group>(null);
+  const timeRef = useRef(0);
+  const texture = useState(createEmberTexture)[0];
+  const compact = isCompactVisualBudget();
+  const visiblePositions = compact ? emberPositions.filter((_, index) => index % 2 === 0) : emberPositions;
+
+  useEffect(() => () => texture?.dispose(), [texture]);
+  useGameFrame((_, delta) => {
+    timeRef.current += Math.min(delta, 1 / 30);
+    groupRef.current?.children.forEach((child, index) => {
+      const sprite = child as Sprite;
+      const phase = index * 0.83;
+      sprite.position.x = visiblePositions[index][0] + Math.sin(timeRef.current * 0.18 + phase) * 0.12;
+      sprite.position.y = visiblePositions[index][1] + Math.sin(timeRef.current * 0.32 + phase) * 0.18;
+      sprite.position.z = visiblePositions[index][2] + Math.cos(timeRef.current * 0.16 + phase) * 0.08;
+      const pulse = 0.82 + Math.sin(timeRef.current * 1.1 + phase) * 0.12;
+      (sprite.material as SpriteMaterial).opacity = pulse;
+      sprite.scale.setScalar((compact ? 1.05 : 1.25) * (0.94 + Math.sin(timeRef.current * 0.8 + phase) * 0.05));
+    });
+  });
+
+  if (!texture) return null;
+  return <group ref={groupRef} name="FloatingRedEmbers">
+    {visiblePositions.map(([x, y, z], index) => (
+      <sprite key={`red-ember-${index}`} position={[x, y, z]} scale={compact ? 1.05 : 1.25}>
+        <spriteMaterial map={texture} color="#b51f2d" transparent depthWrite={false} blending={AdditiveBlending} opacity={0.82} />
+      </sprite>
+    ))}
+  </group>;
 }

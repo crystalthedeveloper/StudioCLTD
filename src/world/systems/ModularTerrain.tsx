@@ -456,7 +456,7 @@ function RoadBloodDecals({ textures, roadMeshRef }: { textures: Texture[]; roadM
       {decals.map(({ point, normal, rotation, scale, textureIndex, color }, index) => {
         const orientation = new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), normal);
         return (
-          <mesh key={`blood-decal:${index}`} frustumCulled={false} position={point} quaternion={orientation} scale={[scale * (index % 3 === 2 ? 7.5 : 5.6), scale * 2.2, 1]} rotation-z={rotation}>
+          <mesh key={`blood-decal:${index}`} frustumCulled={false} position={point} quaternion={orientation} scale={[scale * (index % 3 === 2 ? 11.25 : 8.4), scale * 3.3, 1]} rotation-z={rotation}>
             <planeGeometry args={[1, 1]} />
             <meshBasicMaterial map={textures[textureIndex % textures.length]} color={color} transparent opacity={0.96} alphaTest={0.01} side={DoubleSide} depthWrite={false} polygonOffset polygonOffsetFactor={-8} polygonOffsetUnits={-8} toneMapped={false} />
           </mesh>

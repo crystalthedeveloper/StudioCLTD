@@ -20,7 +20,8 @@ export function DirectionControls() {
   const pointerIdRef = useRef<number | null>(null);
   const [knob, setKnob] = useState({ x: 0, y: 0 });
   const [mobile, setMobile] = useState(false);
-  const arrowPressedRef = useRef(new Set<keyof MovementControls>());
+  const gasPressedRef = useRef(false);
+  const mobileStickRef = useRef<MovementControls>({ ...releasedControls });
   const pressed = useKeyboardControls();
 
   useEffect(() => {
@@ -31,30 +32,28 @@ export function DirectionControls() {
     return () => query.removeEventListener("change", update);
   }, []);
 
-  const updateArrowControls = () => {
-    const next = { ...releasedControls };
-    arrowPressedRef.current.forEach((key) => { next[key] = true; });
+  const syncMobileControls = () => {
+    const next = { ...mobileStickRef.current, forward: gasPressedRef.current };
     setTouchControls(next);
-    setTouchSteering(0);
-    setTouchThrottle(0);
   };
 
-  const pressArrow = (key: keyof MovementControls, event: PointerEvent<HTMLButtonElement>) => {
+  const pressGas = (event: PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    arrowPressedRef.current.add(key);
-    updateArrowControls();
+    gasPressedRef.current = true;
+    syncMobileControls();
   };
 
-  const releaseArrow = (key: keyof MovementControls, event: PointerEvent<HTMLButtonElement>) => {
+  const releaseGas = (event: PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
-    arrowPressedRef.current.delete(key);
-    updateArrowControls();
+    gasPressedRef.current = false;
+    syncMobileControls();
   };
 
   const releaseJoystick = () => {
     pointerIdRef.current = null;
-    arrowPressedRef.current.clear();
+    gasPressedRef.current = false;
+    mobileStickRef.current = { ...releasedControls };
     setKnob({ x: 0, y: 0 });
     setTouchControls(releasedControls);
     setTouchSteering(0);
@@ -87,9 +86,11 @@ export function DirectionControls() {
     const normalizedX = x / radius;
     const normalizedY = y / radius;
     setKnob({ x: normalizedX * 50, y: normalizedY * 50 });
-    setTouchControls(controlsFromStick(normalizedX, normalizedY));
+    mobileStickRef.current = controlsFromStick(normalizedX, normalizedY);
+    mobileStickRef.current.forward = false;
+    syncMobileControls();
     setTouchSteering(steeringFromStick(normalizedX));
-    setTouchThrottle(normalizedY < -deadZone ? -normalizedY : normalizedY > deadZone ? -normalizedY : 0);
+    setTouchThrottle(normalizedY > deadZone ? -normalizedY : 0);
   };
 
   const blockPointer = (event: PointerEvent<HTMLDivElement>) => {
@@ -121,11 +122,12 @@ export function DirectionControls() {
 
   const active = pressed.forward || pressed.backward || pressed.left || pressed.right;
   if (mobile) return (
-    <div className="direction-controls direction-controls--arrows" aria-label="Mobile driving controls">
-      <button className="direction-controls__button direction-controls__button--forward" aria-label="Accelerate" onPointerDown={(event) => pressArrow("forward", event)} onPointerUp={(event) => releaseArrow("forward", event)} onPointerCancel={(event) => releaseArrow("forward", event)} onPointerLeave={(event) => releaseArrow("forward", event)}>▲</button>
-      <button className="direction-controls__button direction-controls__button--left" aria-label="Steer left" onPointerDown={(event) => pressArrow("left", event)} onPointerUp={(event) => releaseArrow("left", event)} onPointerCancel={(event) => releaseArrow("left", event)} onPointerLeave={(event) => releaseArrow("left", event)}>◀</button>
-      <button className="direction-controls__button direction-controls__button--right" aria-label="Steer right" onPointerDown={(event) => pressArrow("right", event)} onPointerUp={(event) => releaseArrow("right", event)} onPointerCancel={(event) => releaseArrow("right", event)} onPointerLeave={(event) => releaseArrow("right", event)}>▶</button>
-      <button className="direction-controls__button direction-controls__button--backward" aria-label="Reverse" onPointerDown={(event) => pressArrow("backward", event)} onPointerUp={(event) => releaseArrow("backward", event)} onPointerCancel={(event) => releaseArrow("backward", event)} onPointerLeave={(event) => releaseArrow("backward", event)}>▼</button>
+    <div className="direction-controls direction-controls--mobile" aria-label="Mobile driving controls">
+      <button className="direction-controls__gas" aria-label="Hold to accelerate" onPointerDown={pressGas} onPointerUp={releaseGas} onPointerCancel={releaseGas} onPointerLeave={releaseGas} />
+      <div ref={baseRef} className={`direction-controls__joystick${active ? " direction-controls__joystick--active" : ""}`} role="application" aria-label="Drag left or right to steer, pull down to reverse" onContextMenu={(event) => event.preventDefault()} onPointerDown={startJoystick} onPointerMove={moveJoystick} onPointerUp={endJoystick} onPointerCancel={endJoystick} onLostPointerCapture={endJoystick}>
+        <span className="direction-controls__joystick-mark direction-controls__joystick-mark--down">▼</span>
+        <span className="direction-controls__joystick-knob" style={{ transform: `translate(calc(-50% + ${knob.x}%), calc(-50% + ${knob.y}%))` }} />
+      </div>
     </div>
   );
   return (

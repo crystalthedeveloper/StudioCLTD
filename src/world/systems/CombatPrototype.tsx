@@ -294,10 +294,23 @@ function BonusVillainSystem({
   level: number;
   defeatEffect: DefeatEffect;
 }) {
+  const activeLimit = activeVillainPoolSize();
   return (
     <group name="BonusVillains">
       {Array.from({ length: villainPoolSize }, (_, index) => (
-        <BonusVillain key={`bonus-pool:${index + 1}`} id={`bonus:${index + 1}`} initialSpot={index % bonusSpawnSpots.length} initiallyActive={index < activeVillainPoolSize()} onDefeat={onDefeat} onPlayerDamage={onPlayerDamage} roundActive={roundActive} level={level} defeatEffect={defeatEffect} />
+        <BonusVillain
+          key={`bonus-pool:${index + 1}`}
+          id={`bonus:${index + 1}`}
+          initialSpot={index < activeLimit
+            ? Math.round(index * (bonusSpawnSpots.length - 1) / Math.max(1, activeLimit - 1))
+            : index % bonusSpawnSpots.length}
+          initiallyActive={index < activeLimit}
+          onDefeat={onDefeat}
+          onPlayerDamage={onPlayerDamage}
+          roundActive={roundActive}
+          level={level}
+          defeatEffect={defeatEffect}
+        />
       ))}
     </group>
   );

@@ -2,7 +2,6 @@ import { WINTER_THEME_ENABLED } from "./winterTheme";
 import { WinterSnow } from "./systems/WinterSnow";
 import { RoadErrorDecals } from "./systems/RoadErrorDecals";
 import { FixPowerPickups } from "./systems/FixPowerPickups";
-import { Environment } from "@react-three/drei";
 import { useEffect, useRef, useState } from "react";
 import { hubSections } from "./hubSections";
 import { CharacterController } from "../player/CharacterController";
@@ -109,7 +108,6 @@ export function StudioWorld({ damageFlashUntil, onVillainReward, onCoinCollect, 
       <RoadErrorDecals />
       <FixPowerPickups key={`powers:${restartKey}`} />
       <SpaceSky />
-      <Environment preset="warehouse" background={false} environmentIntensity={0.16} />
       <ModularTerrain material={groundMaterial} />
       <HomeBase material={groundMaterial} />
       <TransportPads
